@@ -6,64 +6,81 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; // <--- UPDATE THIS
+const MONGO_URI = "PASTE_YOUR_MONGODB_LINK_HERE"; // <--- UPDATE THIS
 
 mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected"));
 
 // --- SCHEMAS ---
 
-// 1. Builder Collection (Updated with Email and Address)
 const builderSchema = new mongoose.Schema({
-  companyName: { type: String, required: true },
-  mobile: String,
-  email: String,   // Re-added
-  gstNumber: String,
-  address: String  // Re-added
+  companyName: String, mobile: String, email: String, gstNumber: String, address: String
 });
 const Builder = mongoose.model('Builder', builderSchema);
 
-// 2. Site Collection (Linked to Builder)
 const siteSchema = new mongoose.Schema({
   builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' },
-  siteName: String,
-  siteAddress: String
+  siteName: String, siteAddress: String
 });
 const Site = mongoose.model('Site', siteSchema);
 
-// 3. Inventory Collection
 const inventorySchema = new mongoose.Schema({
-  itemName: String,
-  category: String,
-  totalStock: Number
+  itemName: String, category: String, totalStock: Number, availableStock: Number
 });
 const Inventory = mongoose.model('Inventory', inventorySchema);
 
+// NEW: Transaction Schema for Dispatch/Return
+const transactionSchema = new mongoose.Schema({
+  type: String, // 'DC' for Dispatch, 'RC' for Return
+  challanNo: String,
+  builderId: mongoose.Schema.Types.ObjectId,
+  siteId: mongoose.Schema.Types.ObjectId,
+  itemId: mongoose.Schema.Types.ObjectId,
+  quantity: Number,
+  rate: Number,
+  date: { type: Date, default: Date.now }
+});
+const Transaction = mongoose.model('Transaction', transactionSchema);
+
 // --- ROUTES ---
 
-// Get all Builders (to fill the dropdown)
-app.get('/builders', async (req, res) => {
-  const builders = await Builder.find();
-  res.json(builders);
-});
+app.get('/builders', async (req, res) => res.json(await Builder.find()));
+app.get('/sites/:builderId', async (req, res) => res.json(await Site.find({builderId: req.params.builderId})));
+app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 
-// Add Builder
-app.post('/add-builder', async (req, res) => {
-  const newBuilder = new Builder(req.body);
-  await newBuilder.save();
-  res.send("Builder Saved");
-});
+app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
+app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
 
-// Add Site
-app.post('/add-site', async (req, res) => {
-  const newSite = new Site(req.body);
-  await newSite.save();
-  res.send("Site Saved");
-});
-
+// Updated Inventory: Initialize availableStock when adding new item
 app.post('/add-item', async (req, res) => {
-  const item = new Inventory(req.body);
-  await item.save();
-  res.send("Item Saved");
+    const data = req.body;
+    data.availableStock = data.totalStock; 
+    await new Inventory(data).save();
+    res.send("Item Saved");
+});
+
+// NEW: Dispatch Route with Stock Validation
+app.post('/dispatch', async (req, res) => {
+    try {
+        const { itemId, quantity } = req.body;
+        const item = await Inventory.findById(itemId);
+        
+        if (item.availableStock < quantity) {
+            return res.status(400).send(`Insufficient Stock! Available: ${item.availableStock}`);
+        }
+
+        // Subtract from Inventory
+        item.availableStock -= quantity;
+        await item.save();
+
+        // Generate DC Number (Simple timestamp version for trial)
+        const count = await Transaction.countDocuments({type: 'DC'});
+        const challanNo = `DC-${1001 + count}`;
+        
+        const txn = new Transaction({...req.body, type: 'DC', challanNo});
+        await txn.save();
+        
+        res.status(200).json({message: "Dispatched successfully", challanNo});
+    } catch (err) { res.status(500).send(err.message); }
 });
 
 app.listen(5000);
