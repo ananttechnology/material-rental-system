@@ -105,5 +105,35 @@ app.post('/return', async (req, res) => {
         res.status(200).json({message: "Success", challanNo});
     } catch (err) { res.status(500).json({message: err.message}); }
 });
+// NEW: Get current balance of items at a specific site
+app.get('/site-balance/:siteId', async (req, res) => {
+    try {
+        const txns = await Transaction.find({ siteId: req.params.siteId });
+        let balance = {};
 
+        txns.forEach(t => {
+            const key = t.itemId.toString();
+            if (!balance[key]) balance[key] = 0;
+            if (t.type === 'DC') balance[key] += t.quantity;
+            if (t.type === 'RC') balance[key] -= t.quantity;
+        });
+
+        // Convert the balance object into a list of items with names
+        let result = [];
+        for (let itemId in balance) {
+            if (balance[itemId] > 0) {
+                const item = await Inventory.findById(itemId);
+                result.push({
+                    itemId: itemId,
+                    itemName: item.itemName,
+                    category: item.category,
+                    currentBalance: balance[itemId]
+                });
+            }
+        }
+        res.json(result);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
 app.listen(5000);
