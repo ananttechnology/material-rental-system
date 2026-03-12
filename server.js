@@ -12,12 +12,13 @@ mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected"));
 
 // --- SCHEMAS ---
 
-// 1. Builder Collection
+// 1. Builder Collection (Updated with Email and Address)
 const builderSchema = new mongoose.Schema({
   companyName: { type: String, required: true },
   mobile: String,
+  email: String,   // Re-added
   gstNumber: String,
-  address: String
+  address: String  // Re-added
 });
 const Builder = mongoose.model('Builder', builderSchema);
 
