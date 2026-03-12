@@ -6,80 +6,82 @@
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
         .section { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h2 { border-bottom: 2px solid #28a745; padding-bottom: 5px; }
-        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-        button { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        h2 { border-bottom: 2px solid #28a745; padding-bottom: 5px; color: #333; }
+        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; }
+        .refresh-btn { background: #007bff; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div class="section">
-    <h2>1. Add Builder & Site</h2>
-    <input type="text" id="bName" placeholder="Builder / Company Name">
-    <input type="text" id="mobile" placeholder="Mobile Number">
-    <input type="text" id="gst" placeholder="GST Number (Optional)">
-    <input type="text" id="sName" placeholder="Site Name (e.g. Dahej Jolva)">
-    <textarea id="sAddr" placeholder="Site Address" style="width:100%; height:60px;"></textarea>
-    <button onclick="saveSite()">Save Builder & Site</button>
+    <h2>1. Create New Builder (Company)</h2>
+    <input type="text" id="compName" placeholder="Company Name">
+    <input type="text" id="bMobile" placeholder="Mobile Number">
+    <input type="text" id="bGst" placeholder="GST Number">
+    <button onclick="saveBuilder()">Save Builder Profile</button>
 </div>
 
 <div class="section">
-    <h2>2. Inventory Entry</h2>
-    <select id="itemName" onchange="updateCategories()">
-        <option value="">--Select Item--</option>
-        <option value="MS Plate">MS Plate</option>
-        <option value="Cuplock Vertical">Cuplock Vertical</option>
-        <option value="Joint Pin">Joint Pin</option>
+    <h2>2. Add Site to Builder</h2>
+    <button class="refresh-btn" onclick="loadBuilders()">Click to Refresh Builder List</button>
+    <select id="builderSelect">
+        <option value="">-- Select Builder First --</option>
     </select>
-    <select id="category"><option value="N/A">N/A</option></select>
-    <input type="number" id="qty" placeholder="Quantity">
-    <button onclick="saveItem()">Add Stock</button>
+    <input type="text" id="sName" placeholder="Site Name (e.g. Dahej Jolva)">
+    <input type="text" id="sAddr" placeholder="Site Address">
+    <button onclick="saveSite()">Link Site to Builder</button>
 </div>
 
 <script>
-    function updateCategories() {
-        const item = document.getElementById('itemName').value;
-        const cat = document.getElementById('category');
-        cat.innerHTML = '';
-        const data = {
-            'MS Plate': ['3 x 24', '3 x 21', '3 x 18'],
-            'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr'],
-            'Joint Pin': ['N/A']
+    const API_URL = 'https://material-backend-trial.onrender.com';
+
+    async function saveBuilder() {
+        const body = {
+            companyName: document.getElementById('compName').value,
+            mobile: document.getElementById('bMobile').value,
+            gstNumber: document.getElementById('bGst').value
         };
-        (data[item] || ['N/A']).forEach(s => {
-            let o = document.createElement('option'); o.value = s; o.innerText = s; cat.appendChild(o);
+        const res = await fetch(`${API_URL}/add-builder`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if(res.ok) { alert("Builder Profile Created!"); loadBuilders(); }
+    }
+
+    async function loadBuilders() {
+        const res = await fetch(`${API_URL}/builders`);
+        const builders = await res.json();
+        const select = document.getElementById('builderSelect');
+        select.innerHTML = '<option value="">-- Select Builder First --</option>';
+        builders.forEach(b => {
+            let o = document.createElement('option');
+            o.value = b._id;
+            o.innerText = b.companyName;
+            select.appendChild(o);
         });
     }
 
     async function saveSite() {
+        const builderId = document.getElementById('builderSelect').value;
+        if(!builderId) return alert("Please select a builder first!");
+        
         const body = {
-            builderName: document.getElementById('bName').value,
-            mobile: document.getElementById('mobile').value,
-            gstNumber: document.getElementById('gst').value,
+            builderId: builderId,
             siteName: document.getElementById('sName').value,
             siteAddress: document.getElementById('sAddr').value
         };
-        const res = await fetch('https://material-backend-trial.onrender.com/add-site', {
+        const res = await fetch(`${API_URL}/add-site`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
         });
-        if(res.ok) alert("Builder & Site Saved!");
+        if(res.ok) alert("Site successfully linked to Builder!");
     }
 
-    async function saveItem() {
-        const body = {
-            itemName: document.getElementById('itemName').value,
-            category: document.getElementById('category').value,
-            totalStock: document.getElementById('qty').value
-        };
-        const res = await fetch('https://material-backend-trial.onrender.com/add-item', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-        });
-        if(res.ok) alert("Item Added!");
-    }
+    // Load builders automatically when page opens
+    window.onload = loadBuilders;
 </script>
 </body>
 </html>
