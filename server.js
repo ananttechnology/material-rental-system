@@ -42,11 +42,34 @@ app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 
 app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
 app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
+// SMART INVENTORY: Adds to existing stock if item exists
 app.post('/add-item', async (req, res) => {
-    const data = req.body;
-    data.availableStock = data.totalStock; 
-    await new Inventory(data).save();
-    res.send("Item Saved");
+    try {
+        const { itemName, category, totalStock } = req.body;
+        
+        // 1. Check if this exact item/size already exists
+        let existingItem = await Inventory.findOne({ itemName, category });
+
+        if (existingItem) {
+            // 2. If it exists, add to the numbers
+            existingItem.totalStock += Number(totalStock);
+            existingItem.availableStock += Number(totalStock);
+            await existingItem.save();
+            res.send("Stock Updated (Added to existing)");
+        } else {
+            // 3. If it's new, create it
+            const newItem = new Inventory({
+                itemName,
+                category,
+                totalStock: Number(totalStock),
+                availableStock: Number(totalStock)
+            });
+            await newItem.save();
+            res.send("New Item Created");
+        }
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
 // DISPATCH LOGIC (DC)
