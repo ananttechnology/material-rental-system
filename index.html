@@ -22,12 +22,7 @@
 
 <div class="section">
     <h2>1. Create Builder Profile</h2>
-    <div class="grid">
-        <input type="text" id="compName" placeholder="Company Name *">
-        <input type="text" id="bMobile" placeholder="Mobile Number">
-        <input type="email" id="bEmail" placeholder="Email">
-        <input type="text" id="bGst" placeholder="GST Number">
-    </div>
+    <div class="grid"><input type="text" id="compName" placeholder="Company Name *"><input type="text" id="bMobile" placeholder="Mobile Number"><input type="email" id="bEmail" placeholder="Email"><input type="text" id="bGst" placeholder="GST Number"></div>
     <textarea id="bAddr" placeholder="Office Address"></textarea>
     <button onclick="saveBuilder()">Save Builder</button>
 </div>
@@ -36,10 +31,7 @@
     <h2>2. Add Site to Builder</h2>
     <button class="refresh-btn" onclick="loadBuilders()">🔄 Sync Builders</button>
     <select id="builderSelect"><option value="">-- Select Builder --</option></select>
-    <div class="grid">
-        <input type="text" id="sName" placeholder="Site Name *">
-        <input type="text" id="sAddr" placeholder="Site Location">
-    </div>
+    <div class="grid"><input type="text" id="sName" placeholder="Site Name *"><input type="text" id="sAddr" placeholder="Site Location"></div>
     <button onclick="saveSite()">Link Site</button>
 </div>
 
@@ -79,8 +71,9 @@
 
 <div class="section return-sec">
     <h2>5. Material Return (RC)</h2>
-    <div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"><option value="">-- Select Builder --</option></select><select id="rSite"><option value="">-- Select Site --</option></select></div>
-    <div class="grid"><select id="rItem"><option value="">-- Select Item --</option></select></div>
+    <div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"><option value="">-- Select Builder --</option></select>
+    <select id="rSite" onchange="loadReturnItems()"><option value="">-- Select Site --</option></select></div>
+    <div class="grid"><select id="rItem"><option value="">-- Select Item (Only shows items on site) --</option></select></div>
     <div class="grid"><input type="number" id="rQty" placeholder="Quantity Returned"></div>
     <input type="date" id="rDate"><button class="return-btn" onclick="processTxn('return')">Confirm Return (RC)</button>
 </div>
@@ -105,13 +98,31 @@
         data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
     }
 
+    // NEW FUNCTION: Only loads items that have a balance at the selected site
+    async function loadReturnItems() {
+        const siteId = document.getElementById('rSite').value;
+        const itemSel = document.getElementById('rItem');
+        if(!siteId) return;
+        
+        itemSel.innerHTML = '<option value="">-- Loading Site Balance... --</option>';
+        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+        const itemsOnSite = await res.json();
+        
+        itemSel.innerHTML = '<option value="">-- Select Item to Return --</option>';
+        if(itemsOnSite.length === 0) {
+            itemSel.innerHTML = '<option value="">No items currently at this site</option>';
+        }
+        itemsOnSite.forEach(i => {
+            itemSel.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) [Site Balance: ${i.currentBalance}]</option>`;
+        });
+    }
+
     async function initInventory() {
         const res = await fetch(`${API_URL}/inventory`);
         fullInventory = await res.json();
-        ['dItem', 'rItem'].forEach(id => {
-            const s = document.getElementById(id); s.innerHTML = '<option value="">-- Select Item --</option>';
-            fullInventory.forEach(i => s.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
-        });
+        const iSel = document.getElementById('dItem');
+        iSel.innerHTML = '<option value="">-- Select Item --</option>';
+        fullInventory.forEach(i => iSel.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
     }
 
     async function processTxn(type) {
@@ -129,7 +140,7 @@
         });
         const result = await res.json();
         if(res.ok) { alert(`SUCCESS! Challan: ${result.challanNo}`); location.reload(); }
-        else alert(result.message);
+        else alert(result.message || "Transaction Failed");
     }
 
     async function saveBuilder() {
