@@ -20,11 +20,54 @@
 </head>
 <body>
 
-<div class="section"><h2>1. Create Builder Profile</h2><div class="grid"><input type="text" id="compName" placeholder="Company Name *"><input type="text" id="bMobile" placeholder="Mobile Number"><input type="email" id="bEmail" placeholder="Email"><input type="text" id="bGst" placeholder="GST Number"></div><textarea id="bAddr" placeholder="Office Address"></textarea><button onclick="saveBuilder()">Save Builder</button></div>
+<div class="section">
+    <h2>1. Create Builder Profile</h2>
+    <div class="grid">
+        <input type="text" id="compName" placeholder="Company Name *">
+        <input type="text" id="bMobile" placeholder="Mobile Number">
+        <input type="email" id="bEmail" placeholder="Email">
+        <input type="text" id="bGst" placeholder="GST Number">
+    </div>
+    <textarea id="bAddr" placeholder="Office Address"></textarea>
+    <button onclick="saveBuilder()">Save Builder</button>
+</div>
 
-<div class="section"><h2>2. Add Site to Builder</h2><button class="refresh-btn" onclick="loadBuilders()">🔄 Sync Builders</button><select id="builderSelect"><option value="">-- Select Builder --</option></select><div class="grid"><input type="text" id="sName" placeholder="Site Name *"><input type="text" id="sAddr" placeholder="Site Location"></div><button onclick="saveSite()">Link Site</button></div>
+<div class="section">
+    <h2>2. Add Site to Builder</h2>
+    <button class="refresh-btn" onclick="loadBuilders()">🔄 Sync Builders</button>
+    <select id="builderSelect"><option value="">-- Select Builder --</option></select>
+    <div class="grid">
+        <input type="text" id="sName" placeholder="Site Name *">
+        <input type="text" id="sAddr" placeholder="Site Location">
+    </div>
+    <button onclick="saveSite()">Link Site</button>
+</div>
 
-<div class="section"><h2>3. Master Inventory Entry</h2><div class="grid"><select id="itemName" onchange="updateCategories()"><option value="">--Select Item--</option><option value="MS Plate">MS Plate</option><option value="MS Props Jack">MS Props Jack</option><option value="Cuplock Vertical">Cuplock Vertical</option><option value="MS Ledger">MS Ledger</option><option value="Ms Pipe">Ms Pipe</option><option value="Channel">Channel</option><option value="Ms Clamp">Ms Clamp</option><option value="Joint Pin">Joint Pin</option></select><select id="category"><option value="N/A">N/A</option></select></div><input type="number" id="qty" placeholder="Quantity in Yard"><button onclick="saveItem()" style="background: #17a2b8;">Add Stock</button></div>
+<div class="section">
+    <h2>3. Master Inventory Entry</h2>
+    <div class="grid">
+        <select id="itemName" onchange="updateCategories()">
+            <option value="">--Select Item--</option>
+            <option value="MS Plate">MS Plate</option>
+            <option value="MS Props Jack">MS Props Jack</option>
+            <option value="Cuplock Vertical">Cuplock Vertical</option>
+            <option value="MS Ledger">MS Ledger</option>
+            <option value="Ms Pipe">Ms Pipe</option>
+            <option value="Channel">Channel</option>
+            <option value="Ms Clamp">Ms Clamp</option>
+            <option value="Acrow Span">Acrow Span</option>
+            <option value="Base Jack">Base Jack</option>
+            <option value="U Jack">U Jack</option>
+            <option value="Joint Pin">Joint Pin</option>
+            <option value="Ms Khapeda">Ms Khapeda</option>
+            <option value="Wood Chavi">Wood Chavi</option>
+            <option value="Sikanja">Sikanja</option>
+        </select>
+        <select id="category"><option value="N/A">N/A</option></select>
+    </div>
+    <input type="number" id="qty" placeholder="Quantity in Yard">
+    <button onclick="saveItem()" style="background: #17a2b8;">Add Stock</button>
+</div>
 
 <div class="section dispatch-sec">
     <h2>4. Material Dispatch (DC)</h2>
@@ -50,8 +93,7 @@
         const res = await fetch(`${API_URL}/builders`);
         const data = await res.json();
         ['builderSelect', 'dBuilder', 'rBuilder'].forEach(id => {
-            const s = document.getElementById(id); s.innerHTML = '<option value="">-- Select Builder --</option>';
-            data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+            const s = document.getElementById(id); if(s) { s.innerHTML = '<option value="">-- Select Builder --</option>'; data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`); }
         });
     }
 
@@ -90,7 +132,6 @@
         else alert(result.message);
     }
 
-    // Previous helper functions (Save Builder, Site, Item, Category Update)
     async function saveBuilder() {
         const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
         await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
@@ -106,34 +147,24 @@
         await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         alert("Inventory Updated!"); initInventory();
     }
-    function updateCategories() {
-    const item = document.getElementById('itemName').value;
-    const cat = document.getElementById('category');
-    cat.innerHTML = '';
     
-    // Complete Master List from your original photo
-    const data = { 
-        'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 
-        'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 
-        'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 
-        'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 
-        'Ms Pipe': ['6 mtr', '3 mtr'], 
-        'Channel': ['6 mtr', '3 mtr'], 
-        'Ms Clamp': ['Fix', 'Round (360°)'],
-        'Acrow Span': ['N/A'],
-        'Base Jack': ['N/A'],
-        'U Jack': ['N/A'],
-        'Joint Pin': ['N/A'],
-        'Ms Khapeda': ['N/A'],
-        'Wood Chavi': ['N/A'],
-        'Sikanja': ['N/A']
-    };
-
-    const sizes = data[item] || ['N/A'];
-    sizes.forEach(s => {
-        cat.innerHTML += `<option value="${s}">${s}</option>`;
-    });
+    function updateCategories() {
+        const item = document.getElementById('itemName').value;
+        const cat = document.getElementById('category');
+        cat.innerHTML = '';
+        const data = { 
+            'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 
+            'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 
+            'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 
+            'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 
+            'Ms Pipe': ['6 mtr', '3 mtr'], 
+            'Channel': ['6 mtr', '3 mtr'], 
+            'Ms Clamp': ['Fix', 'Round (360°)'],
+            'Acrow Span': ['N/A'], 'Base Jack': ['N/A'], 'U Jack': ['N/A'], 'Joint Pin': ['N/A'], 'Ms Khapeda': ['N/A'], 'Wood Chavi': ['N/A'], 'Sikanja': ['N/A']
+        };
+        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
     }
+    
     function showStock(id, label) {
         const item = fullInventory.find(i => i._id === document.getElementById(id).value);
         document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
