@@ -7,151 +7,114 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .section { background: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #28a745; }
         .dispatch-sec { border-top: 5px solid #dc3545; }
+        .return-sec { border-top: 5px solid #007bff; }
         h2 { color: #2c3e50; margin-top: 0; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
         button { background: #28a745; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
         .dispatch-btn { background: #dc3545; }
-        .refresh-btn { background: #007bff; margin-bottom: 15px; width: auto; padding: 8px 15px; }
-        .stock-label { color: #dc3545; font-weight: bold; }
+        .return-btn { background: #007bff; }
+        .refresh-btn { background: #6c757d; margin-bottom: 15px; width: auto; padding: 8px 15px; }
+        .stock-label { color: #d9534f; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="section">
-    <h2>1. Create New Builder (Company Profile)</h2>
-    <div class="grid">
-        <input type="text" id="compName" placeholder="Company Name *">
-        <input type="text" id="bMobile" placeholder="Mobile Number">
-        <input type="email" id="bEmail" placeholder="Email Address">
-        <input type="text" id="bGst" placeholder="GST Number">
-    </div>
-    <textarea id="bAddr" placeholder="Office Address"></textarea>
-    <button onclick="saveBuilder()">Save Builder Profile</button>
-</div>
+<div class="section"><h2>1. Create Builder Profile</h2><div class="grid"><input type="text" id="compName" placeholder="Company Name *"><input type="text" id="bMobile" placeholder="Mobile Number"><input type="email" id="bEmail" placeholder="Email"><input type="text" id="bGst" placeholder="GST Number"></div><textarea id="bAddr" placeholder="Office Address"></textarea><button onclick="saveBuilder()">Save Builder</button></div>
 
-<div class="section">
-    <h2>2. Add New Site to Builder</h2>
-    <button class="refresh-btn" onclick="loadBuilders()">🔄 Sync Builder List</button>
-    <select id="builderSelect"><option value="">-- Select Builder --</option></select>
-    <div class="grid">
-        <input type="text" id="sName" placeholder="Site Name *">
-        <input type="text" id="sAddr" placeholder="Site Location">
-    </div>
-    <button onclick="saveSite()">Link Site to Builder</button>
-</div>
+<div class="section"><h2>2. Add Site to Builder</h2><button class="refresh-btn" onclick="loadBuilders()">🔄 Sync Builders</button><select id="builderSelect"><option value="">-- Select Builder --</option></select><div class="grid"><input type="text" id="sName" placeholder="Site Name *"><input type="text" id="sAddr" placeholder="Site Location"></div><button onclick="saveSite()">Link Site</button></div>
 
-<div class="section">
-    <h2>3. Master Inventory Entry</h2>
-    <div class="grid">
-        <select id="itemName" onchange="updateCategories()">
-            <option value="">--Select Item--</option>
-            <option value="MS Plate">MS Plate</option>
-            <option value="MS Props Jack">MS Props Jack</option>
-            <option value="Cuplock Vertical">Cuplock Vertical</option>
-            <option value="MS Ledger">MS Ledger</option>
-            <option value="Ms Pipe">Ms Pipe</option>
-            <option value="Channel">Channel</option>
-            <option value="Ms Clamp">Ms Clamp</option>
-            <option value="Joint Pin">Joint Pin</option>
-            <option value="Acrow Span">Acrow Span</option>
-            <option value="Base Jack">Base Jack</option>
-            <option value="U Jack">U Jack</option>
-            <option value="Sikanja">Sikanja</option>
-        </select>
-        <select id="category"><option value="N/A">N/A</option></select>
-    </div>
-    <input type="number" id="qty" placeholder="Quantity in Yard">
-    <button onclick="saveItem()" style="background: #17a2b8;">Add Stock</button>
-</div>
+<div class="section"><h2>3. Master Inventory Entry</h2><div class="grid"><select id="itemName" onchange="updateCategories()"><option value="">--Select Item--</option><option value="MS Plate">MS Plate</option><option value="MS Props Jack">MS Props Jack</option><option value="Cuplock Vertical">Cuplock Vertical</option><option value="MS Ledger">MS Ledger</option><option value="Ms Pipe">Ms Pipe</option><option value="Channel">Channel</option><option value="Ms Clamp">Ms Clamp</option><option value="Joint Pin">Joint Pin</option></select><select id="category"><option value="N/A">N/A</option></select></div><input type="number" id="qty" placeholder="Quantity in Yard"><button onclick="saveItem()" style="background: #17a2b8;">Add Stock</button></div>
 
 <div class="section dispatch-sec">
-    <h2>4. Material Dispatch (Generate DC)</h2>
-    <div class="grid">
-        <select id="dBuilder" onchange="loadDispatchSites()"><option value="">-- Select Builder --</option></select>
-        <select id="dSite"><option value="">-- Select Site --</option></select>
-    </div>
-    <div class="grid">
-        <select id="dItem" onchange="showAvailableStock()"><option value="">-- Select Item --</option></select>
-        <div style="padding-top:15px;"><span class="stock-label" id="stockStatus">Available: 0</span></div>
-    </div>
-    <div class="grid">
-        <input type="number" id="dQty" placeholder="Quantity to Dispatch">
-        <input type="number" id="dRate" placeholder="Rate per Day">
-    </div>
-    <input type="date" id="dDate">
-    <button class="dispatch-btn" onclick="processDispatch()">Confirm Dispatch (Generate DC)</button>
+    <h2>4. Material Dispatch (DC)</h2>
+    <div class="grid"><select id="dBuilder" onchange="loadSites('dBuilder','dSite')"><option value="">-- Select Builder --</option></select><select id="dSite"><option value="">-- Select Site --</option></select></div>
+    <div class="grid"><select id="dItem" onchange="showStock('dItem','stockStatus')"><option value="">-- Select Item --</option></select><div style="padding-top:15px;"><span class="stock-label" id="stockStatus">Available: 0</span></div></div>
+    <div class="grid"><input type="number" id="dQty" placeholder="Quantity"><input type="number" id="dRate" placeholder="Rate"></div>
+    <input type="date" id="dDate"><button class="dispatch-btn" onclick="processTxn('dispatch')">Confirm Dispatch (DC)</button>
+</div>
+
+<div class="section return-sec">
+    <h2>5. Material Return (RC)</h2>
+    <div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"><option value="">-- Select Builder --</option></select><select id="rSite"><option value="">-- Select Site --</option></select></div>
+    <div class="grid"><select id="rItem"><option value="">-- Select Item --</option></select></div>
+    <div class="grid"><input type="number" id="rQty" placeholder="Quantity Returned"></div>
+    <input type="date" id="rDate"><button class="return-btn" onclick="processTxn('return')">Confirm Return (RC)</button>
 </div>
 
 <script>
     const API_URL = 'https://material-backend-trial.onrender.com';
     let fullInventory = [];
 
-    async function saveBuilder() {
-        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
-        const res = await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) { alert("Builder Saved!"); loadBuilders(); }
-    }
-
     async function loadBuilders() {
         const res = await fetch(`${API_URL}/builders`);
-        const builders = await res.json();
-        const bSelects = [document.getElementById('builderSelect'), document.getElementById('dBuilder')];
-        bSelects.forEach(s => {
-            s.innerHTML = '<option value="">-- Select Builder --</option>';
-            builders.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+        const data = await res.json();
+        ['builderSelect', 'dBuilder', 'rBuilder'].forEach(id => {
+            const s = document.getElementById(id); s.innerHTML = '<option value="">-- Select Builder --</option>';
+            data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
         });
     }
 
-    async function loadDispatchSites() {
-        const bId = document.getElementById('dBuilder').value;
-        const res = await fetch(`${API_URL}/sites/${bId}`);
-        const sites = await res.json();
-        const sSel = document.getElementById('dSite');
-        sSel.innerHTML = '<option value="">-- Select Site --</option>';
-        sites.forEach(s => sSel.innerHTML += `<option value="${s._id}">${s.siteName}</option>`);
-    }
-
-    async function saveSite() {
-        const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value };
-        const res = await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) alert("Site Linked!");
-    }
-
-    function updateCategories() {
-        const item = document.getElementById('itemName').value;
-        const cat = document.getElementById('category');
-        cat.innerHTML = '';
-        const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
-        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
-    }
-
-    async function saveItem() {
-        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) };
-        const res = await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) { alert("Inventory Updated!"); initInventory(); }
+    async function loadSites(bId, sId) {
+        const val = document.getElementById(bId).value;
+        const res = await fetch(`${API_URL}/sites/${val}`);
+        const data = await res.json();
+        const s = document.getElementById(sId); s.innerHTML = '<option value="">-- Select Site --</option>';
+        data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
     }
 
     async function initInventory() {
         const res = await fetch(`${API_URL}/inventory`);
         fullInventory = await res.json();
-        const iSel = document.getElementById('dItem');
-        iSel.innerHTML = '<option value="">-- Select Item --</option>';
-        fullInventory.forEach(item => iSel.innerHTML += `<option value="${item._id}">${item.itemName} (${item.category})</option>`);
+        ['dItem', 'rItem'].forEach(id => {
+            const s = document.getElementById(id); s.innerHTML = '<option value="">-- Select Item --</option>';
+            fullInventory.forEach(i => s.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
+        });
     }
 
-    function showAvailableStock() {
-        const itemId = document.getElementById('dItem').value;
-        const item = fullInventory.find(i => i._id === itemId);
-        document.getElementById('stockStatus').innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
-    }
-
-    async function processDispatch() {
-        const body = { builderId: document.getElementById('dBuilder').value, siteId: document.getElementById('dSite').value, itemId: document.getElementById('dItem').value, quantity: Number(document.getElementById('dQty').value), rate: Number(document.getElementById('dRate').value), date: document.getElementById('dDate').value };
-        const res = await fetch(`${API_URL}/dispatch`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+    async function processTxn(type) {
+        const prefix = type === 'dispatch' ? 'd' : 'r';
+        const body = {
+            builderId: document.getElementById(`${prefix}Builder`).value,
+            siteId: document.getElementById(`${prefix}Site`).value,
+            itemId: document.getElementById(`${prefix}Item`).value,
+            quantity: Number(document.getElementById(`${prefix}Qty`).value),
+            rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0,
+            date: document.getElementById(`${prefix}Date`).value
+        };
+        const res = await fetch(`${API_URL}/${type}`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        });
         const result = await res.json();
         if(res.ok) { alert(`SUCCESS! Challan: ${result.challanNo}`); location.reload(); }
-        else { alert(result.message); }
+        else alert(result.message);
+    }
+
+    // Previous helper functions (Save Builder, Site, Item, Category Update)
+    async function saveBuilder() {
+        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
+        await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        alert("Builder Saved!"); loadBuilders();
+    }
+    async function saveSite() {
+        const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value };
+        await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        alert("Site Linked!");
+    }
+    async function saveItem() {
+        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) };
+        await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        alert("Inventory Updated!"); initInventory();
+    }
+    function updateCategories() {
+        const item = document.getElementById('itemName').value;
+        const cat = document.getElementById('category'); cat.innerHTML = '';
+        const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
+        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
+    }
+    function showStock(id, label) {
+        const item = fullInventory.find(i => i._id === document.getElementById(id).value);
+        document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
     }
 
     window.onload = () => { loadBuilders(); initInventory(); };
