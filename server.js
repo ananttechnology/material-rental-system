@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+
 // --- 1. CONNECT TO YOUR DATABASE ---
 // Make sure to replace <password> with your actual database password!
 const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting";
