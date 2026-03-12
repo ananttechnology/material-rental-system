@@ -107,10 +107,32 @@
         alert("Inventory Updated!"); initInventory();
     }
     function updateCategories() {
-        const item = document.getElementById('itemName').value;
-        const cat = document.getElementById('category'); cat.innerHTML = '';
-        const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
-        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
+    const item = document.getElementById('itemName').value;
+    const cat = document.getElementById('category');
+    cat.innerHTML = '';
+    
+    // Complete Master List from your original photo
+    const data = { 
+        'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 
+        'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 
+        'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 
+        'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 
+        'Ms Pipe': ['6 mtr', '3 mtr'], 
+        'Channel': ['6 mtr', '3 mtr'], 
+        'Ms Clamp': ['Fix', 'Round (360°)'],
+        'Acrow Span': ['N/A'],
+        'Base Jack': ['N/A'],
+        'U Jack': ['N/A'],
+        'Joint Pin': ['N/A'],
+        'Ms Khapeda': ['N/A'],
+        'Wood Chavi': ['N/A'],
+        'Sikanja': ['N/A']
+    };
+
+    const sizes = data[item] || ['N/A'];
+    sizes.forEach(s => {
+        cat.innerHTML += `<option value="${s}">${s}</option>`;
+    });
     }
     function showStock(id, label) {
         const item = fullInventory.find(i => i._id === document.getElementById(id).value);
