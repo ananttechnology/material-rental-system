@@ -6,62 +6,63 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// --- 1. CONNECT TO YOUR DATABASE ---
-const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; // <--- UPDATE THIS!
+const MONGO_URI = "PASTE_YOUR_MONGODB_LINK_HERE"; // <--- UPDATE THIS
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected!"))
-  .catch(err => console.log("❌ Connection Error: ", err));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected"));
 
-// --- 2. DATABASE SCHEMAS ---
+// --- SCHEMAS ---
 
-// Builder & Site Schema
-const siteSchema = new mongoose.Schema({
-  builderName: { type: String, required: true },
+// 1. Builder Collection
+const builderSchema = new mongoose.Schema({
+  companyName: { type: String, required: true },
   mobile: String,
-  email: String,
-  address: String,
-  gstNumber: String, // Can be empty if not applicable
-  siteName: { type: String, required: true },
-  siteAddress: String,
-  useGST: { type: Boolean, default: false } // The GST Toggle
+  gstNumber: String,
+  address: String
 });
+const Builder = mongoose.model('Builder', builderSchema);
 
+// 2. Site Collection (Linked to Builder)
+const siteSchema = new mongoose.Schema({
+  builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' },
+  siteName: String,
+  siteAddress: String
+});
+const Site = mongoose.model('Site', siteSchema);
+
+// 3. Inventory Collection
 const inventorySchema = new mongoose.Schema({
   itemName: String,
   category: String,
-  totalStock: Number,
-  availableStock: Number
+  totalStock: Number
 });
-
-const Site = mongoose.model('Site', siteSchema);
 const Inventory = mongoose.model('Inventory', inventorySchema);
 
-// --- 3. ROUTES ---
+// --- ROUTES ---
 
-app.get('/', (req, res) => res.send("Rental System API is Running..."));
+// Get all Builders (to fill the dropdown)
+app.get('/builders', async (req, res) => {
+  const builders = await Builder.find();
+  res.json(builders);
+});
 
-// Add New Site & Builder
+// Add Builder
+app.post('/add-builder', async (req, res) => {
+  const newBuilder = new Builder(req.body);
+  await newBuilder.save();
+  res.send("Builder Saved");
+});
+
+// Add Site
 app.post('/add-site', async (req, res) => {
-  try {
-    const newSite = new Site(req.body);
-    await newSite.save();
-    res.status(200).send("Builder & Site added successfully!");
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+  const newSite = new Site(req.body);
+  await newSite.save();
+  res.send("Site Saved");
 });
 
-// Add Inventory Item
 app.post('/add-item', async (req, res) => {
-  try {
-    const newItem = new Inventory(req.body);
-    await newItem.save();
-    res.status(200).send("Item added!");
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+  const item = new Inventory(req.body);
+  await item.save();
+  res.send("Item Saved");
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(5000);
