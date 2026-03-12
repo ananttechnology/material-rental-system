@@ -88,22 +88,39 @@ app.post('/dispatch', async (req, res) => {
     } catch (err) { res.status(500).json({message: err.message}); }
 });
 
-// RETURN LOGIC (RC) - NEW
+// SAFE RETURN LOGIC: Checks site balance before adding back to yard
 app.post('/return', async (req, res) => {
     try {
-        const { itemId, quantity } = req.body;
-        const item = await Inventory.findById(itemId);
+        const { itemId, siteId, quantity } = req.body;
         
-        // Add back to Yard
+        // 1. Calculate current balance at site
+        const txns = await Transaction.find({ siteId, itemId });
+        let siteBalance = 0;
+        txns.forEach(t => {
+            if (t.type === 'DC') siteBalance += t.quantity;
+            if (t.type === 'RC') siteBalance -= t.quantity;
+        });
+
+        // 2. Stop if return quantity is more than what is at site
+        if (Number(quantity) > siteBalance) {
+            return res.status(400).json({ message: `Error: Only ${siteBalance} items are currently at this site!` });
+        }
+
+        // 3. Update Inventory (Yard Stock)
+        const item = await Inventory.findById(itemId);
         item.availableStock += Number(quantity);
         await item.save();
 
-        const count = await Transaction.countDocuments({type: 'RC'});
+        // 4. Save Return Transaction
+        const count = await Transaction.countDocuments({ type: 'RC' });
         const challanNo = `RC-${1001 + count}`;
-        const txn = new Transaction({...req.body, type: 'RC', challanNo});
+        const txn = new Transaction({ ...req.body, type: 'RC', challanNo });
         await txn.save();
-        res.status(200).json({message: "Success", challanNo});
-    } catch (err) { res.status(500).json({message: err.message}); }
+        
+        res.status(200).json({ message: "Success", challanNo });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 });
 // NEW: Get current balance of items at a specific site
 app.get('/site-balance/:siteId', async (req, res) => {
