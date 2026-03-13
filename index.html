@@ -14,7 +14,6 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
         button { background: #28a745; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.3s; margin-top: 10px;}
-        button:hover { opacity: 0.8; }
         .print-btn { background: #343a40; display: none; } 
         .sync-btn { background: #6c757d; font-size: 0.75rem; padding: 5px 10px; width: auto; position: absolute; top: 20px; right: 25px; margin: 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
@@ -88,7 +87,10 @@
         <input type="number" id="dQty" placeholder="Quantity">
         <input type="number" id="dRate" placeholder="Rate per Day">
     </div>
-    <input type="date" id="dDate">
+    <div class="grid">
+        <input type="number" id="dLoading" placeholder="Loading Charges (₹)">
+        <input type="date" id="dDate">
+    </div>
     <button style="background:#dc3545" onclick="processTxn('dispatch')">Confirm Dispatch</button>
     <button id="btnPrintDC" class="print-btn" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
 </div>
@@ -100,7 +102,10 @@
         <select id="rSite" onchange="loadReturnItems()"><option value="">-- Select Site --</option></select>
     </div>
     <select id="rItem"><option value="">-- Select Item --</option></select>
-    <input type="number" id="rQty" placeholder="Qty Returned">
+    <div class="grid">
+        <input type="number" id="rQty" placeholder="Qty Returned">
+        <input type="number" id="rUnloading" placeholder="Unloading Charges (₹)">
+    </div>
     <input type="date" id="rDate">
     <button style="background:#007bff" onclick="processTxn('return')">Confirm Return</button>
     <button id="btnPrintRC" class="print-btn" onclick="printChallan('RC')">🖨️ Print Return Challan</button>
@@ -132,10 +137,10 @@
     const API_URL = 'https://material-backend-trial.onrender.com';
     let fullInventory = [];
     let currentBillData = [];
+    let currentServiceTotal = 0;
     let lastTxn = null;
 
     async function masterSync() {
-        console.log("Master Sync Started...");
         await loadBuilders();
         await initInventory();
     }
@@ -152,7 +157,7 @@
                     data.forEach(b => el.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
                 }
             });
-        } catch(e) { console.error("Builder Load Error", e); }
+        } catch(e) { console.error(e); }
     }
 
     async function initInventory() {
@@ -164,37 +169,17 @@
                 dItem.innerHTML = '<option value="">-- Select Item --</option>';
                 fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
             }
-        } catch(e) { console.error("Inventory Load Error", e); }
+        } catch(e) { console.error(e); }
     }
 
     async function loadSites(bId, sId) {
         const val = document.getElementById(bId).value;
         const s = document.getElementById(sId);
         if(!val) { s.innerHTML = '<option value="">-- Select Site --</option>'; return; }
-        try {
-            const res = await fetch(`${API_URL}/sites/${val}`);
-            const data = await res.json();
-            s.innerHTML = '<option value="">-- Select Site --</option>';
-            data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
-        } catch(e) { console.error("Site Load Error", e); }
-    }
-
-    async function saveBuilder() {
-        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
-        await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        alert("Builder Saved!"); masterSync();
-    }
-
-    async function saveSite() {
-        const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value };
-        await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        alert("Site Linked!");
-    }
-
-    async function saveItem() {
-        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) };
-        await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        alert("Stock Updated!"); masterSync();
+        const res = await fetch(`${API_URL}/sites/${val}`);
+        const data = await res.json();
+        s.innerHTML = '<option value="">-- Select Site --</option>';
+        data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
     }
 
     function updateCategories() {
@@ -216,6 +201,24 @@
         document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
     }
 
+    async function saveBuilder() {
+        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
+        await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        alert("Builder Saved!"); masterSync();
+    }
+
+    async function saveSite() {
+        const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value };
+        await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        alert("Site Linked!");
+    }
+
+    async function saveItem() {
+        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) };
+        await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        alert("Stock Updated!"); masterSync();
+    }
+
     async function processTxn(type) {
         const prefix = type === 'dispatch' ? 'd' : 'r';
         const body = {
@@ -224,6 +227,8 @@
             itemId: document.getElementById(`${prefix}Item`).value,
             quantity: Number(document.getElementById(`${prefix}Qty`).value),
             rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0,
+            loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0,
+            unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0,
             date: document.getElementById(`${prefix}Date`).value
         };
 
@@ -253,7 +258,6 @@
 
     async function getSiteReport() {
         const siteId = document.getElementById('repSite').value;
-        if(!siteId) return alert("Select site");
         const res = await fetch(`${API_URL}/site-balance/${siteId}`);
         const data = await res.json();
         let h = '<table><tr><th>Item</th><th>Qty on Site</th></tr>';
@@ -263,34 +267,47 @@
 
     async function generateBill() {
         const siteId = document.getElementById('billSite').value;
-        if(!siteId) return alert("Select site");
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
-        currentBillData = await res.json();
+        const data = await res.json();
+        currentBillData = data.billDetails;
+        currentServiceTotal = data.serviceCharges;
         updateBillDisplay();
     }
 
     function updateBillDisplay() {
         let h = '<table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Amt</th></tr>';
-        let sub = 0;
+        let subRent = 0;
         currentBillData.forEach(i => {
             h += `<tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.amount}</td></tr>`;
-            sub += i.amount;
+            subRent += i.amount;
         });
-        const gst = document.getElementById('gstToggle').checked ? sub * 0.18 : 0;
-        document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box"><p>Subtotal: ₹${sub}</p><p>GST (18%): ₹${gst}</p><h3>Grand Total: ₹${sub + (gst || 0)}</h3></div>`;
+        
+        let subtotal = subRent + currentServiceTotal;
+        const gst = document.getElementById('gstToggle').checked ? subtotal * 0.18 : 0;
+        
+        document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box">
+            <p>Total Rent: ₹${subRent}</p>
+            <p>Loading/Unloading: ₹${currentServiceTotal}</p>
+            ${document.getElementById('gstToggle').checked ? `<p>GST (18%): ₹${gst.toFixed(2)}</p>` : ''}
+            <h3>Grand Total: ₹${(subtotal + gst).toFixed(2)}</h3>
+        </div>`;
     }
 
     function printChallan(type) {
         if(!lastTxn) return;
         const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN";
-        const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>' + title + '</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>');
-        printWindow.document.write('<div class="header"><h1>C.J. CONSTRUCTION</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>');
-        printWindow.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>');
-        printWindow.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>');
-        printWindow.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>');
-        printWindow.document.close();
-        printWindow.print();
+        const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges";
+        const chargeAmt = type === 'DC' ? lastTxn.loadingCharges : lastTxn.unloadingCharges;
+
+        const win = window.open('', '', 'height=600,width=800');
+        win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>');
+        win.document.write('<div class="header"><h1>C.J. CONSTRUCTION</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>');
+        win.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>');
+        win.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>');
+        win.document.write('<p style="margin-top:20px;"><b>'+chargeLabel+':</b> ₹'+chargeAmt+'</p>');
+        win.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>');
+        win.document.close();
+        win.print();
     }
 
     function printDoc(el, title) {
