@@ -3,13 +3,20 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
+// --- ROBUST CORS CONFIGURATION ---
+app.use(cors({
+    origin: "*", // This allows all websites (including your GitHub) to access the data
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
-app.use(cors());
 
 // --- UPDATE YOUR LINK HERE ---
 const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; 
 
-mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected"));
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("✅ DB Connected Successfully"))
+  .catch((err) => console.error("❌ DB Connection Error:", err));
 
 // --- SCHEMAS ---
 const builderSchema = new mongoose.Schema({
