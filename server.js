@@ -36,10 +36,18 @@ const inventorySchema = new mongoose.Schema({
 });
 const Inventory = mongoose.model('Inventory', inventorySchema);
 
+// 1. Updated Transaction Schema
 const transactionSchema = new mongoose.Schema({
-  type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId,
-  siteId: mongoose.Schema.Types.ObjectId, itemId: mongoose.Schema.Types.ObjectId,
-  quantity: Number, rate: Number, date: { type: Date, default: Date.now }
+  type: String, 
+  challanNo: String, 
+  builderId: mongoose.Schema.Types.ObjectId,
+  siteId: mongoose.Schema.Types.ObjectId, 
+  itemId: mongoose.Schema.Types.ObjectId,
+  quantity: Number, 
+  rate: Number, 
+  loadingCharges: { type: Number, default: 0 },   // Added
+  unloadingCharges: { type: Number, default: 0 }, // Added
+  date: { type: Date, default: Date.now }
 });
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
@@ -112,7 +120,11 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
     const txns = await Transaction.find({ siteId: req.params.siteId }).sort({ date: 1 });
     const inventory = await Inventory.find();
     let itemBatches = {};
+    let totalServiceCharges = 0;
     txns.forEach(t => {
+        // Accumulate all loading and unloading charges for the site
+        totalServiceCharges += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+
         if (!itemBatches[t.itemId]) itemBatches[t.itemId] = [];
         itemBatches[t.itemId].push({...t._doc}); 
     });
@@ -139,7 +151,13 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
             }
         });
     }
-    res.json(bill);
+    // At the end of the matching loop, we add a special object for charges:
+    
+    // Example of sending the data back:
+    res.json({
+        billDetails: bill, // Your existing FIFO rows
+        serviceCharges: totalServiceCharges
+    });
 });
 
 app.listen(5000);
