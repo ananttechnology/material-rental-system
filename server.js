@@ -153,4 +153,74 @@ app.get('/site-balance/:siteId', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+app.get('/calculate-bill/:siteId', async (req, res) => {
+    try {
+        const txns = await Transaction.find({ siteId: req.params.siteId }).sort({ date: 1 });
+        const inventory = await Inventory.find();
+        
+        let itemBatches = {};
+        txns.forEach(t => {
+            if (!itemBatches[t.itemId]) itemBatches[t.itemId] = [];
+            itemBatches[t.itemId].push({...t._doc}); 
+        });
+
+        let billDetails = [];
+
+        for (let itemId in itemBatches) {
+            let dispatches = itemBatches[itemId].filter(t => t.type === 'DC');
+            let returns = itemBatches[itemId].filter(t => t.type === 'RC');
+            const itemInfo = inventory.find(i => i._id.toString() === itemId);
+
+            // Match Returns to Dispatches
+            returns.forEach(ret => {
+                let qtyToMatch = ret.quantity;
+                for (let disp of dispatches) {
+                    if (disp.quantity > 0 && qtyToMatch > 0) {
+                        let billedQty = Math.min(disp.quantity, qtyToMatch);
+                        const d1 = new Date(disp.date);
+                        const d2 = new Date(ret.date);
+                        let days = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+
+                        billDetails.push({
+                            itemName: itemInfo.itemName,
+                            category: itemInfo.category,
+                            qty: billedQty,
+                            dispatchDate: d1.toLocaleDateString(),
+                            returnDate: d2.toLocaleDateString(),
+                            days: days,
+                            rate: disp.rate,
+                            amount: billedQty * disp.rate * days
+                        });
+
+                        disp.quantity -= billedQty;
+                        qtyToMatch -= billedQty;
+                    }
+                }
+            });
+            
+            // Items still at site (Unreturned)
+            dispatches.forEach(disp => {
+                if (disp.quantity > 0) {
+                    const d1 = new Date(disp.date);
+                    const d2 = new Date(); 
+                    let days = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+                    
+                    billDetails.push({
+                        itemName: itemInfo.itemName,
+                        category: itemInfo.category,
+                        qty: disp.quantity,
+                        dispatchDate: d1.toLocaleDateString(),
+                        returnDate: "On Site",
+                        days: days,
+                        rate: disp.rate,
+                        amount: disp.quantity * disp.rate * days
+                    });
+                }
+            });
+        }
+        res.json(billDetails);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
 app.listen(5000);
