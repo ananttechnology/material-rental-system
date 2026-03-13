@@ -31,7 +31,7 @@
 
 <div class="section">
     <h2>1. Create Builder Profile</h2>
-    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <div class="grid">
         <input type="text" id="compName" placeholder="Company Name *">
         <input type="text" id="bMobile" placeholder="Mobile Number">
@@ -44,7 +44,7 @@
 
 <div class="section">
     <h2>2. Add Site to Builder</h2>
-    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <select id="builderSelect"><option value="">-- Select Builder --</option></select>
     <div class="grid">
         <input type="text" id="sName" placeholder="Site Name *">
@@ -55,7 +55,7 @@
 
 <div class="section">
     <h2>3. Inventory Entry</h2>
-    <button class="sync-btn" onclick="initInventory()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <div class="grid">
         <select id="itemName" onchange="updateCategories()">
             <option value="">--Select Item--</option>
@@ -82,7 +82,7 @@
 
 <div class="section dispatch-sec">
     <h2>4. Dispatch (DC)</h2>
-    <button class="sync-btn" onclick="syncDispatch()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <div class="grid">
         <select id="dBuilder" onchange="loadSites('dBuilder','dSite')"><option value="">-- Builder --</option></select>
         <select id="dSite"><option value="">-- Site --</option></select>
@@ -101,7 +101,7 @@
 
 <div class="section return-sec">
     <h2>5. Return (RC)</h2>
-    <button class="sync-btn" onclick="syncReturn()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <div class="grid">
         <select id="rBuilder" onchange="loadSites('rBuilder','rSite')"><option value="">-- Builder --</option></select>
         <select id="rSite" onchange="loadReturnItems()"><option value="">-- Site --</option></select>
@@ -114,7 +114,7 @@
 
 <div class="section report-sec">
     <h2>6. Site Stock Report</h2>
-    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <div class="grid">
         <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"><option value="">-- Builder --</option></select>
         <select id="repSite"><option value="">-- Site --</option></select>
@@ -125,7 +125,7 @@
 
 <div class="section bill-sec">
     <h2>7. Billing Engine</h2>
-    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
+    <button class="sync-btn" onclick="masterSync()">🔄 Sync All</button>
     <div class="grid">
         <select id="billBuilder" onchange="loadSites('billBuilder','billSite')"><option value="">-- Builder --</option></select>
         <select id="billSite"><option value="">-- Site --</option></select>
@@ -140,38 +140,57 @@
     let fullInventory = [];
     let currentBillData = [];
 
-    // COMPACT SYNC HELPERS
-    function syncDispatch() { loadBuilders(); initInventory(); }
-    function syncReturn() { loadBuilders(); }
+    // Master Sync that triggers everything
+    async function masterSync() {
+        console.log("Syncing with server...");
+        await loadBuilders();
+        await initInventory();
+    }
 
     async function loadBuilders() {
-        const res = await fetch(`${API_URL}/builders`);
-        const data = await res.json();
-        ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder'].forEach(id => {
-            const s = document.getElementById(id);
-            if(s) {
-                s.innerHTML = '<option value="">-- Select Builder --</option>';
-                data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
-            }
-        });
+        try {
+            const res = await fetch(`${API_URL}/builders`);
+            const data = await res.json();
+            const ids = ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder'];
+            ids.forEach(id => {
+                const s = document.getElementById(id);
+                if(s) {
+                    const currentVal = s.value;
+                    s.innerHTML = '<option value="">-- Select Builder --</option>';
+                    data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+                    s.value = currentVal; 
+                }
+            });
+        } catch (e) { console.error("Builder Load Fail", e); }
     }
 
     async function loadSites(bId, sId) {
         const val = document.getElementById(bId).value;
-        if(!val) return;
-        const res = await fetch(`${API_URL}/sites/${val}`);
-        const data = await res.json();
         const s = document.getElementById(sId);
-        s.innerHTML = '<option value="">-- Select Site --</option>';
-        data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
+        if(!val) {
+            s.innerHTML = '<option value="">-- Select Site --</option>';
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/sites/${val}`);
+            const data = await res.json();
+            s.innerHTML = '<option value="">-- Select Site --</option>';
+            data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
+        } catch (e) { console.error("Site Load Fail", e); }
     }
 
     async function initInventory() {
-        const res = await fetch(`${API_URL}/inventory`);
-        fullInventory = await res.json();
-        const dItem = document.getElementById('dItem');
-        dItem.innerHTML = '<option value="">-- Select Item --</option>';
-        fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
+        try {
+            const res = await fetch(`${API_URL}/inventory`);
+            fullInventory = await res.json();
+            const dItem = document.getElementById('dItem');
+            if(dItem) {
+                const currentVal = dItem.value;
+                dItem.innerHTML = '<option value="">-- Select Item --</option>';
+                fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
+                dItem.value = currentVal;
+            }
+        } catch (e) { console.error("Inventory Load Fail", e); }
     }
 
     function updateCategories() {
@@ -196,7 +215,7 @@
     async function saveBuilder() {
         const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
         await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        alert("Builder Profile Saved!"); loadBuilders();
+        alert("Saved!"); masterSync();
     }
 
     async function saveSite() {
@@ -208,7 +227,7 @@
     async function saveItem() {
         const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) };
         await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        alert("Inventory Updated!"); initInventory();
+        alert("Inventory Updated!"); masterSync();
     }
 
     async function processTxn(type) {
@@ -216,7 +235,7 @@
         const body = { builderId: document.getElementById(`${prefix}Builder`).value, siteId: document.getElementById(`${prefix}Site`).value, itemId: document.getElementById(`${prefix}Item`).value, quantity: Number(document.getElementById(`${prefix}Qty`).value), rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, date: document.getElementById(`${prefix}Date`).value };
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
-        if(res.ok) { alert(`Success! Challan: ${result.challanNo}`); location.reload(); } else alert(result.message);
+        if(res.ok) { alert(`Success! Challan: ${result.challanNo}`); masterSync(); } else alert(result.message);
     }
 
     async function loadReturnItems() {
@@ -255,7 +274,8 @@
         document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box"><p>Subtotal: ₹${sub}</p><p>GST: ₹${gst}</p><h3>Total: ₹${sub + gst}</h3></div>`;
     }
 
-    window.onload = () => { loadBuilders(); initInventory(); };
+    // Auto-sync on page load
+    window.onload = masterSync;
 </script>
 </body>
 </html>
