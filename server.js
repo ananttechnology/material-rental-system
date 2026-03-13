@@ -7,7 +7,7 @@ app.use(express.json());
 app.use(cors());
 
 // --- UPDATE YOUR LINK HERE ---
-const MONGO_URI = "PASTE_YOUR_MONGODB_LINK_HERE"; 
+const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; 
 
 mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected"));
 
