@@ -5,7 +5,7 @@
     <title>C.J. Construction Management</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .section { background: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #28a745; }
+        .section { background: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #28a745; position: relative; }
         .dispatch-sec { border-top-color: #dc3545; }
         .return-sec { border-top-color: #007bff; }
         .report-sec { border-top-color: #ffc107; }
@@ -19,7 +19,7 @@
         .return-btn { background: #007bff; }
         .report-btn { background: #ffc107; color: black; }
         .bill-btn { background: #6f42c1; }
-        .refresh-btn { background: #6c757d; margin-bottom: 15px; width: auto; padding: 8px 15px; font-size: 0.8rem; }
+        .sync-btn { background: #6c757d; font-size: 0.75rem; padding: 5px 10px; width: auto; position: absolute; top: 20px; right: 25px; }
         .stock-label { color: #dc3545; font-weight: bold; font-size: 0.9rem; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
@@ -31,6 +31,7 @@
 
 <div class="section">
     <h2>1. Create Builder Profile</h2>
+    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
     <div class="grid">
         <input type="text" id="compName" placeholder="Company Name *">
         <input type="text" id="bMobile" placeholder="Mobile Number">
@@ -43,7 +44,7 @@
 
 <div class="section">
     <h2>2. Add Site to Builder</h2>
-    <button class="refresh-btn" onclick="loadBuilders()">🔄 Sync Builders</button>
+    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
     <select id="builderSelect"><option value="">-- Select Builder --</option></select>
     <div class="grid">
         <input type="text" id="sName" placeholder="Site Name *">
@@ -54,6 +55,7 @@
 
 <div class="section">
     <h2>3. Inventory Entry</h2>
+    <button class="sync-btn" onclick="initInventory()">🔄 Sync</button>
     <div class="grid">
         <select id="itemName" onchange="updateCategories()">
             <option value="">--Select Item--</option>
@@ -80,6 +82,7 @@
 
 <div class="section dispatch-sec">
     <h2>4. Dispatch (DC)</h2>
+    <button class="sync-btn" onclick="syncDispatch()">🔄 Sync</button>
     <div class="grid">
         <select id="dBuilder" onchange="loadSites('dBuilder','dSite')"><option value="">-- Builder --</option></select>
         <select id="dSite"><option value="">-- Site --</option></select>
@@ -98,6 +101,7 @@
 
 <div class="section return-sec">
     <h2>5. Return (RC)</h2>
+    <button class="sync-btn" onclick="syncReturn()">🔄 Sync</button>
     <div class="grid">
         <select id="rBuilder" onchange="loadSites('rBuilder','rSite')"><option value="">-- Builder --</option></select>
         <select id="rSite" onchange="loadReturnItems()"><option value="">-- Site --</option></select>
@@ -110,6 +114,7 @@
 
 <div class="section report-sec">
     <h2>6. Site Stock Report</h2>
+    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
     <div class="grid">
         <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"><option value="">-- Builder --</option></select>
         <select id="repSite"><option value="">-- Site --</option></select>
@@ -120,6 +125,7 @@
 
 <div class="section bill-sec">
     <h2>7. Billing Engine</h2>
+    <button class="sync-btn" onclick="loadBuilders()">🔄 Sync</button>
     <div class="grid">
         <select id="billBuilder" onchange="loadSites('billBuilder','billSite')"><option value="">-- Builder --</option></select>
         <select id="billSite"><option value="">-- Site --</option></select>
@@ -134,18 +140,25 @@
     let fullInventory = [];
     let currentBillData = [];
 
+    // COMPACT SYNC HELPERS
+    function syncDispatch() { loadBuilders(); initInventory(); }
+    function syncReturn() { loadBuilders(); }
+
     async function loadBuilders() {
         const res = await fetch(`${API_URL}/builders`);
         const data = await res.json();
         ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder'].forEach(id => {
             const s = document.getElementById(id);
-            s.innerHTML = '<option value="">-- Select Builder --</option>';
-            data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+            if(s) {
+                s.innerHTML = '<option value="">-- Select Builder --</option>';
+                data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+            }
         });
     }
 
     async function loadSites(bId, sId) {
         const val = document.getElementById(bId).value;
+        if(!val) return;
         const res = await fetch(`${API_URL}/sites/${val}`);
         const data = await res.json();
         const s = document.getElementById(sId);
