@@ -64,38 +64,6 @@
         const data = await res.json();
         document.getElementById(sId).innerHTML = '<option value="">-- Site --</option>' + data.map(site => `<option value="${site._id}">${site.siteName}</option>`).join('');
     }
-
-    async function generateBill() {
-        const siteId = document.getElementById('billSite').value;
-        if(!siteId) return alert("Select site");
-        const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
-        currentBillData = await res.json();
-        calculateFinalTotal();
-    }
-
-    function calculateFinalTotal() {
-        let html = `<table><tr><th>Item</th><th>Qty</th><th>Dispatch</th><th>Return</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
-        let subtotal = 0;
-
-        currentBillData.forEach(item => {
-            html += `<tr><td>${item.itemName} (${item.category})</td><td>${item.qty}</td><td>${item.dispatchDate}</td><td>${item.returnDate}</td><td>${item.days}</td><td>${item.rate}</td><td>₹${item.amount}</td></tr>`;
-            subtotal += item.amount;
-        });
-        html += `</table>`;
-
-        const useGst = document.getElementById('gstToggle').checked;
-        const gstAmount = useGst ? subtotal * 0.18 : 0;
-        const finalTotal = subtotal + gstAmount;
-
-        html += `<div class="total-box">
-            <p>Subtotal: ₹${subtotal.toFixed(2)}</p>
-            ${useGst ? `<p>GST (18%): ₹${gstAmount.toFixed(2)}</p>` : ''}
-            <h3>Grand Total: ₹${finalTotal.toFixed(2)}</h3>
-        </div>`;
-        
-        document.getElementById('billDisplay').innerHTML = html;
-    }
-
     // ALL OTHER FUNCTIONS (saveBuilder, saveSite, saveItem, updateCategories, initInventory, loadReturnItems, processTxn, getSiteReport, showStock) MUST BE KEPT HERE
     // Copy them from your previous code to ensure the buttons keep working!
     // I am omitting the full text of those helpers to keep this clean, but make sure they are in your script tag.
@@ -181,6 +149,39 @@
         document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
     }
 
+
+    async function generateBill() {
+        const siteId = document.getElementById('billSite').value;
+        if(!siteId) return alert("Select site");
+        const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
+        currentBillData = await res.json();
+        calculateFinalTotal();
+    }
+
+    function calculateFinalTotal() {
+        let html = `<table><tr><th>Item</th><th>Qty</th><th>Dispatch</th><th>Return</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
+        let subtotal = 0;
+
+        currentBillData.forEach(item => {
+            html += `<tr><td>${item.itemName} (${item.category})</td><td>${item.qty}</td><td>${item.dispatchDate}</td><td>${item.returnDate}</td><td>${item.days}</td><td>${item.rate}</td><td>₹${item.amount}</td></tr>`;
+            subtotal += item.amount;
+        });
+        html += `</table>`;
+
+        const useGst = document.getElementById('gstToggle').checked;
+        const gstAmount = useGst ? subtotal * 0.18 : 0;
+        const finalTotal = subtotal + gstAmount;
+
+        html += `<div class="total-box">
+            <p>Subtotal: ₹${subtotal.toFixed(2)}</p>
+            ${useGst ? `<p>GST (18%): ₹${gstAmount.toFixed(2)}</p>` : ''}
+            <h3>Grand Total: ₹${finalTotal.toFixed(2)}</h3>
+        </div>`;
+        
+        document.getElementById('billDisplay').innerHTML = html;
+    }
+
+    
 
     window.onload = () => { loadBuilders(); initInventory(); };
 </script>
