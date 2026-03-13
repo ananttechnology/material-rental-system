@@ -159,5 +159,34 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
         serviceCharges: totalServiceCharges
     });
 });
+// 1. Payment Schema
+const paymentSchema = new mongoose.Schema({
+  builderId: mongoose.Schema.Types.ObjectId,
+  amountPaid: Number,
+  paymentMode: String, // e.g., Cash, Cheque, Online
+  referenceNo: String, // e.g., Cheque number or UTR
+  date: { type: Date, default: Date.now }
+});
+const Payment = mongoose.model('Payment', paymentSchema);
+
+// 2. Add Payment Route
+app.post('/add-payment', async (req, res) => {
+    try {
+        await new Payment(req.body).save();
+        res.send("Payment Recorded");
+    } catch (e) { res.status(500).send(e.message); }
+});
+
+// 3. Get Payment History & Statement
+app.get('/statement/:builderId', async (req, res) => {
+    try {
+        const payments = await Payment.find({ builderId: req.params.builderId }).sort({ date: 1 });
+        const sites = await Site.find({ builderId: req.params.builderId });
+        
+        // This is a simplified summary. In a full system, 
+        // we'd aggregate all bills from all sites here.
+        res.json({ payments });
+    } catch (e) { res.status(500).send(e.message); }
+});
 
 app.listen(5000);
