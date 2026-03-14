@@ -87,26 +87,58 @@
     <div class="content-area">
         <div id="dashboard" class="page active">
             <div class="dash-grid">
-                <div class="card" style="border-color: var(--success);"><h3>Ankleshwar Stock</h3><div id="stat-ank" class="value">0</div></div>
-                <div class="card" style="border-color: var(--accent);"><h3>Dahej Stock</h3><div id="stat-dah" class="value">0</div></div>
-                <div class="card" style="border-color: var(--warning);"><h3>Total Billed</h3><div id="stat-billed" class="value">₹0</div></div>
-                <div class="card" style="border-color: var(--danger);"><h3>Outstanding</h3><div id="stat-out" class="value">₹0</div></div>
-            </div>
-            
-            <div class="grid">
-                <div class="section">
-                    <h3>Site Holding Report</h3>
-                    <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select>
-                    <select id="repSite" onchange="getSiteReport()"></select>
-                    <div id="reportContainer"></div>
-                </div>
-                <div class="section">
-                    <h3>Billing Quick View</h3>
-                    <select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select>
-                    <select id="billSite" onchange="generateBill()"></select>
-                    <div id="billDisplay"></div>
-                </div>
-            </div>
+    <div class="card" onclick="openStockModal('Ankleshwar')">
+        <h3>Ankleshwar Stock</h3>
+        <div class="value"><i class="fas fa-warehouse"></i> View List</div>
+    </div>
+    <div class="card" onclick="openStockModal('Dahej')">
+        <h3>Dahej Stock</h3>
+        <div class="value"><i class="fas fa-warehouse"></i> View List</div>
+    </div>
+    <div class="card" onclick="openMonthlyModal('billed')">
+        <h3>Current Month Billed</h3>
+        <div id="dash-billed" class="value">₹0</div>
+    </div>
+    <div class="card" onclick="openMonthlyModal('out')">
+        <h3>Total Outstanding</h3>
+        <div id="dash-out" class="value">₹0</div>
+    </div>
+</div>
+
+<div class="section dispatch-sec">
+    <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
+    ...
+    <div id="msg4" class="msg-area"></div>
+</div>
+
+<div class="section return-sec">
+    <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
+    ...
+    <div id="msg5" class="msg-area"></div>
+</div>
+
+<div class="section report-sec">
+    <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
+    <div class="grid">
+        <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select>
+        <select id="repSite"></select>
+    </div>
+    <button onclick="openSiteReportModal()">Generate Holding List</button>
+</div>
+
+<div class="section pay-sec">
+    <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
+    ...
+    <div id="msg8" class="msg-area"></div>
+</div>
+
+<div id="dataModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h2 id="modalTitle">Report</h2>
+        <div id="modalBody"></div>
+    </div>
+</div>
         </div>
 
         <div id="builder" class="page">
@@ -470,6 +502,50 @@
     
     // Note: To get Total Billed/Outstanding globally, we would need 
     // a small backend change, but for now, we can update these when a builder is selected.
+}
+    function openStockModal(godownName) {
+    document.getElementById('modalTitle').innerText = godownName + " Godown Stock";
+    let h = `<table><tr><th>Item</th><th>Category</th><th>Available</th></tr>`;
+    fullInventory.filter(i => i.godown === godownName).forEach(item => {
+        h += `<tr><td>${item.itemName}</td><td>${item.category}</td><td>${item.availableStock}</td></tr>`;
+    });
+    document.getElementById('modalBody').innerHTML = h + `</table>`;
+    document.getElementById('dataModal').style.display = 'block';
+}
+
+async function openMonthlyModal(type) {
+    document.getElementById('modalTitle').innerText = type === 'billed' ? "Monthly Billing History" : "Monthly Outstanding History";
+    // Fetch history from /company-stats
+    const res = await fetch(`${API_URL}/company-stats`);
+    const data = await res.json();
+    let h = `<table><tr><th>Month</th><th>Amount</th></tr>`;
+    data.history.forEach(row => {
+        h += `<tr><td>${row.month}</td><td>₹${row.amount}</td></tr>`;
+    });
+    document.getElementById('modalBody').innerHTML = h + `</table>`;
+    document.getElementById('dataModal').style.display = 'block';
+}
+
+async function openSiteReportModal() {
+    const siteId = document.getElementById('repSite').value;
+    if(!siteId) return alert("Select site first");
+    
+    document.getElementById('modalTitle').innerText = "Current Site Holdings";
+    const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+    const data = await res.json();
+    let h = '<table><tr><th>Item</th><th>Qty on Site</th></tr>';
+    data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.currentBalance}</td></tr>`);
+    document.getElementById('modalBody').innerHTML = h + '</table>';
+    document.getElementById('dataModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('dataModal').style.display = 'none';
+}
+
+// Close modal if user clicks outside the box
+window.onclick = function(event) {
+    if (event.target == document.getElementById('dataModal')) closeModal();
 }
 
     window.onload = masterSync;
