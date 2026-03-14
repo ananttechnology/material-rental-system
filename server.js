@@ -23,15 +23,27 @@ const Site = mongoose.model('Site', new mongoose.Schema({
   siteName: String, siteAddress: String
 }));
 
+// --- UPDATED SCHEMAS FOR GODOWN ---
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({
-  itemName: String, category: String, totalStock: Number, availableStock: Number
+  itemName: String, 
+  category: String, 
+  godown: String, // Added: 'Ankleshwar' or 'Dahej'
+  totalStock: Number, 
+  availableStock: Number
 }));
 
 const Transaction = mongoose.model('Transaction', new mongoose.Schema({
-  type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId,
-  siteId: mongoose.Schema.Types.ObjectId, itemId: mongoose.Schema.Types.ObjectId,
-  quantity: Number, rate: Number, loadingCharges: { type: Number, default: 0 },
-  unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now }
+  type: String, 
+  challanNo: String, 
+  builderId: mongoose.Schema.Types.ObjectId,
+  siteId: mongoose.Schema.Types.ObjectId, 
+  itemId: mongoose.Schema.Types.ObjectId,
+  godown: String, // Added to track which godown the material left/entered
+  quantity: Number, 
+  rate: Number, 
+  loadingCharges: { type: Number, default: 0 },
+  unloadingCharges: { type: Number, default: 0 }, 
+  date: { type: Date, default: Date.now }
 }));
 
 const Payment = mongoose.model('Payment', new mongoose.Schema({
@@ -47,15 +59,17 @@ app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
 app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
 
+// --- UPDATED ROUTES FOR GODOWN ---
 app.post('/add-item', async (req, res) => {
-    const { itemName, category, totalStock } = req.body;
-    let item = await Inventory.findOne({ itemName, category });
+    const { itemName, category, totalStock, godown } = req.body;
+    // Look for item matching name, category AND godown
+    let item = await Inventory.findOne({ itemName, category, godown });
     if (item) {
         item.totalStock += Number(totalStock);
         item.availableStock += Number(totalStock);
         await item.save();
     } else {
-        await new Inventory({ itemName, category, totalStock, availableStock: totalStock }).save();
+        await new Inventory({ itemName, category, godown, totalStock, availableStock: totalStock }).save();
     }
     res.send("Success");
 });
@@ -63,12 +77,14 @@ app.post('/add-item', async (req, res) => {
 app.post('/dispatch', async (req, res) => {
     const { itemId, quantity } = req.body;
     const item = await Inventory.findById(itemId);
-    if (item.availableStock < quantity) return res.status(400).json({message: "Insufficient Stock in Yard"});
+    if (!item || item.availableStock < quantity) {
+        return res.status(400).json({message: Insufficient Stock in ${item ? item.godown : 'Godown'}});
+    }
     item.availableStock -= Number(quantity);
     await item.save();
     const count = await Transaction.countDocuments({type: 'DC'});
-    const challanNo = `DC-${1001 + count}`;
-    await new Transaction({...req.body, type: 'DC', challanNo}).save();
+    const challanNo = DC-${1001 + count};
+    await new Transaction({...req.body, type: 'DC', challanNo, godown: item.godown}).save();
     res.json({challanNo});
 });
 
