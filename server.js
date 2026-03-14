@@ -116,48 +116,66 @@ app.post('/return', async (req, res) => {
     res.json({challanNo});
 });
 
-app.get('/calculate-bill/:siteId', async (req, res) => {
-    const txns = await Transaction.find({ siteId: req.params.siteId }).sort({ date: 1 });
-    const inventory = await Inventory.find();
-    let itemBatches = {};
-    let totalServiceCharges = 0;
-    txns.forEach(t => {
-        // Accumulate all loading and unloading charges for the site
-        totalServiceCharges += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+app.get('/statement/:builderId', async (req, res) => {
+    try {
+        // 1. Get all payments
+        const payments = await Payment.find({ builderId: req.params.builderId }).sort({ date: 1 });
+        
+        // 2. Get all sites for this builder
+        const sites = await Site.find({ builderId: req.params.builderId });
+        
+        let totalBilledAcrossAllSites = 0;
 
-        if (!itemBatches[t.itemId]) itemBatches[t.itemId] = [];
-        itemBatches[t.itemId].push({...t._doc}); 
-    });
-    let bill = [];
-    for (let id in itemBatches) {
-        let dcs = itemBatches[id].filter(x => x.type === 'DC');
-        let rcs = itemBatches[id].filter(x => x.type === 'RC');
-        const info = inventory.find(i => i._id.toString() === id);
-        rcs.forEach(r => {
-            let qty = r.quantity;
-            for (let d of dcs) {
-                if (d.quantity > 0 && qty > 0) {
-                    let take = Math.min(d.quantity, qty);
-                    let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
-                    bill.push({ itemName: info.itemName, category: info.category, qty: take, dDate: new Date(d.date).toLocaleDateString(), rDate: new Date(r.date).toLocaleDateString(), days, rate: d.rate, amount: take * d.rate * days });
-                    d.quantity -= take; qty -= take;
-                }
+        // 3. Loop through each site to calculate total accrued rent + charges
+        for (let site of sites) {
+            const txns = await Transaction.find({ siteId: site._id });
+            const inventory = await Inventory.find();
+            
+            // Calculate Service Charges (Loading/Unloading)
+            txns.forEach(t => totalBilledAcrossAllSites += (t.loadingCharges || 0) + (t.unloadingCharges || 0));
+
+            // FIFO logic to find rent for items (Simplified for ledger view)
+            let itemBatches = {};
+            txns.forEach(t => {
+                if (!itemBatches[t.itemId]) itemBatches[t.itemId] = [];
+                itemBatches[t.itemId].push({...t._doc}); 
+            });
+
+            for (let id in itemBatches) {
+                let dcs = itemBatches[id].filter(x => x.type === 'DC');
+                let rcs = itemBatches[id].filter(x => x.type === 'RC');
+                
+                // Match Returns
+                rcs.forEach(r => {
+                    let qty = r.quantity;
+                    for (let d of dcs) {
+                        if (d.quantity > 0 && qty > 0) {
+                            let take = Math.min(d.quantity, qty);
+                            let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
+                            totalBilledAcrossAllSites += (take * d.rate * days);
+                            d.quantity -= take; qty -= take;
+                        }
+                    }
+                });
+                // Calculate rent for items still on site until TODAY
+                dcs.forEach(d => {
+                    if (d.quantity > 0) {
+                        let days = Math.floor((new Date() - new Date(d.date)) / 86400000) + 1;
+                        totalBilledAcrossAllSites += (d.quantity * d.rate * days);
+                    }
+                });
             }
+        }
+
+        const totalPaid = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+
+        res.json({ 
+            payments, 
+            totalBilled: totalBilledAcrossAllSites, 
+            totalPaid: totalPaid,
+            outstanding: totalBilledAcrossAllSites - totalPaid
         });
-        dcs.forEach(d => {
-            if (d.quantity > 0) {
-                let days = Math.floor((new Date() - new Date(d.date)) / 86400000) + 1;
-                bill.push({ itemName: info.itemName, category: info.category, qty: d.quantity, dDate: new Date(d.date).toLocaleDateString(), rDate: "On Site", days, rate: d.rate, amount: d.quantity * d.rate * days });
-            }
-        });
-    }
-    // At the end of the matching loop, we add a special object for charges:
-    
-    // Example of sending the data back:
-    res.json({
-        billDetails: bill, // Your existing FIFO rows
-        serviceCharges: totalServiceCharges
-    });
+    } catch (e) { res.status(500).send(e.message); }
 });
 // 1. Payment Schema
 const paymentSchema = new mongoose.Schema({
