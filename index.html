@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Material Management System</title>
     <style>
-        /* All your existing styles remain */
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .section { background: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #28a745; position: relative; }
         .dispatch-sec { border-top-color: #dc3545; }
@@ -21,109 +20,100 @@
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f8f9fa; }
         .total-box { margin-top: 20px; padding: 15px; background: #f1f3f5; border-radius: 8px; text-align: right; border: 1px solid #dee2e6; }
-        
-        /* Login Overlay Style */
-        #loginOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #f0f2f5; z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
     </style>
 </head>
 <body>
 
-<div id="loginOverlay">
-    <div class="login-card">
-        <h2>Admin Login</h2>
-        <input type="password" id="adminPass" placeholder="Enter Password">
-        <button onclick="checkLogin()">Access System</button>
-    </div>
-</div>
+<div class="section"><h2>1. Create Builder Profile</h2><button class="sync-btn" onclick="masterSync()">🔄 Sync All</button><div class="grid"><input type="text" id="compName" placeholder="Company Name *"><input type="text" id="bMobile" placeholder="Mobile Number"><input type="email" id="bEmail" placeholder="Email"><input type="text" id="bGst" placeholder="GST Number"></div><textarea id="bAddr" placeholder="Office Address"></textarea><button onclick="saveBuilder()">Save Builder</button></div>
+<div class="section"><h2>2. Add Site to Builder</h2><select id="builderSelect"></select><div class="grid"><input type="text" id="sName" placeholder="Site Name *"><input type="text" id="sAddr" placeholder="Location"></div><button onclick="saveSite()">Link Site</button></div>
+<div class="section"><h2>3. Inventory Entry</h2><div class="grid"><select id="itemName" onchange="updateCategories()"><option value="">--Item--</option><option value="MS Plate">MS Plate</option><option value="MS Props Jack">MS Props Jack</option><option value="Cuplock Vertical">Cuplock Vertical</option><option value="MS Ledger">MS Ledger</option><option value="Ms Pipe">Ms Pipe</option><option value="Channel">Channel</option><option value="Ms Clamp">Ms Clamp</option><option value="Acrow Span">Acrow Span</option><option value="Base Jack">Base Jack</option><option value="U Jack">U Jack</option><option value="Joint Pin">Joint Pin</option><option value="Ms Khapeda">Ms Khapeda</option><option value="Wood Chavi">Wood Chavi</option><option value="Sikanja">Sikanja</option></select><select id="category"><option value="N/A">N/A</option></select></div><input type="number" id="qty" placeholder="Quantity to Add"><button onclick="saveItem()" style="background: #17a2b8;">Add Stock</button></div>
+<div class="section dispatch-sec"><h2>4. Dispatch (DC)</h2><div class="grid"><select id="dBuilder" onchange="loadSites('dBuilder','dSite')"></select><select id="dSite"></select></div><div class="grid"><select id="dItem" onchange="showStock('dItem','stockStatus')"></select><span id="stockStatus"></span></div><div class="grid"><input type="number" id="dQty" placeholder="Qty"><input type="number" id="dRate" placeholder="Rate"></div><div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="date" id="dDate"></div><button style="background:#dc3545" onclick="processTxn('dispatch')">Confirm Dispatch</button><button id="btnPrintDC" class="print-btn" style="display:none; background:#343a40; color:white;" onclick="printChallan('DC')">🖨️ Print DC</button></div>
+<div class="section return-sec"><h2>5. Return (RC)</h2><div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"></select><select id="rSite" onchange="loadReturnItems()"></select></div><select id="rItem"></select><div class="grid"><input type="number" id="rQty" placeholder="Qty Returned"><input type="number" id="rUnloading" placeholder="Unloading Charges (₹)"></div><input type="date" id="rDate"><button style="background:#007bff" onclick="processTxn('return')">Confirm Return</button><button id="btnPrintRC" class="print-btn" style="display:none; background:#343a40; color:white;" onclick="printChallan('RC')">🖨️ Print RC</button></div>
+<div class="section report-sec"><h2>6. Site Stock Report</h2><div class="grid"><select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select><select id="repSite"></select></div><button style="background:#ffc107; color:black" onclick="getSiteReport()">Show Report</button><div id="reportContainer"></div></div>
+<div class="section bill-sec"><h2>7. Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><label><input type="checkbox" id="gstToggle" onchange="updateBillDisplay()"> GST 18%</label><button style="background:#6f42c1" onclick="generateBill()">Generate Bill</button><button class="print-btn" style="display:inline-block; background:#343a40; color:white;" onclick="printDoc('billDisplay', 'RENTAL INVOICE')">🖨️ Print Bill</button><div id="billDisplay"></div></div>
 
-<div id="mainContent" style="display:none;">
-    <div class="section"><h2>1. Create Builder Profile</h2><button class="sync-btn" onclick="masterSync()">🔄 Sync All</button><div class="grid"><input type="text" id="compName" placeholder="Company Name *"><input type="text" id="bMobile" placeholder="Mobile Number"><input type="email" id="bEmail" placeholder="Email"><input type="text" id="bGst" placeholder="GST Number"></div><textarea id="bAddr" placeholder="Office Address"></textarea><button onclick="saveBuilder()">Save Builder</button></div>
-    <div class="section"><h2>2. Add Site to Builder</h2><select id="builderSelect"></select><div class="grid"><input type="text" id="sName" placeholder="Site Name *"><input type="text" id="sAddr" placeholder="Location"></div><button onclick="saveSite()">Link Site</button></div>
-    <div class="section"><h2>3. Inventory Entry</h2><div class="grid"><select id="itemName" onchange="updateCategories()"><option value="">--Item--</option><option value="MS Plate">MS Plate</option><option value="MS Props Jack">MS Props Jack</option><option value="Cuplock Vertical">Cuplock Vertical</option><option value="MS Ledger">MS Ledger</option><option value="Ms Pipe">Ms Pipe</option><option value="Channel">Channel</option><option value="Ms Clamp">Ms Clamp</option><option value="Acrow Span">Acrow Span</option><option value="Base Jack">Base Jack</option><option value="U Jack">U Jack</option><option value="Joint Pin">Joint Pin</option><option value="Ms Khapeda">Ms Khapeda</option><option value="Wood Chavi">Wood Chavi</option><option value="Sikanja">Sikanja</option></select><select id="category"><option value="N/A">N/A</option></select></div><input type="number" id="qty" placeholder="Quantity to Add"><button onclick="saveItem()" style="background: #17a2b8;">Add Stock</button></div>
-    <div class="section dispatch-sec"><h2>4. Dispatch (DC)</h2><div class="grid"><select id="dBuilder" onchange="loadSites('dBuilder','dSite')"></select><select id="dSite"></select></div><div class="grid"><select id="dItem" onchange="showStock('dItem','stockStatus')"></select><span id="stockStatus"></span></div><div class="grid"><input type="number" id="dQty" placeholder="Qty"><input type="number" id="dRate" placeholder="Rate"></div><div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="date" id="dDate"></div><button style="background:#dc3545" onclick="processTxn('dispatch')">Confirm Dispatch</button><button id="btnPrintDC" class="print-btn" style="display:none" onclick="printChallan('DC')">🖨️ Print DC</button></div>
-    <div class="section return-sec"><h2>5. Return (RC)</h2><div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"></select><select id="rSite" onchange="loadReturnItems()"></select></div><select id="rItem"></select><div class="grid"><input type="number" id="rQty" placeholder="Qty Returned"><input type="number" id="rUnloading" placeholder="Unloading Charges (₹)"></div><input type="date" id="rDate"><button style="background:#007bff" onclick="processTxn('return')">Confirm Return</button><button id="btnPrintRC" class="print-btn" style="display:none" onclick="printChallan('RC')">🖨️ Print RC</button></div>
-    <div class="section report-sec"><h2>6. Site Stock Report</h2><div class="grid"><select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select><select id="repSite"></select></div><button style="background:#ffc107; color:black" onclick="getSiteReport()">Show Report</button><div id="reportContainer"></div></div>
-    <div class="section bill-sec"><h2>7. Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><label><input type="checkbox" id="gstToggle" onchange="updateBillDisplay()"> GST 18%</label><button style="background:#6f42c1" onclick="generateBill()">Generate Bill</button><button class="print-btn" style="display:inline-block" onclick="printDoc('billDisplay', 'RENTAL INVOICE')">🖨️ Print Bill</button><div id="billDisplay"></div></div>
-
-    <div class="section pay-sec">
-        <h2>8. Payment Tracking & Ledger</h2>
-        <select id="pBuilder" onchange="loadLedger()"><option value="">-- Select Builder --</option></select>
-        <div class="grid">
-            <input type="number" id="pAmount" placeholder="Amount Paid (₹)">
-            <select id="pMode">
-                <option value="Cash">Cash</option>
-                <option value="Online / G-Pay">Online / G-Pay</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-            </select>
-        </div>
-        <div class="grid">
-            <input type="text" id="pRef" placeholder="Reference No. (Cheque / UTR)">
-            <input type="date" id="pDate">
-        </div>
-        <button style="background:#e83e8c" onclick="recordPayment()">Record Payment</button>
-        <div id="ledgerDisplay"></div>
+<div class="section pay-sec">
+    <h2>8. Payment Tracking (Builder Ledger)</h2>
+    <select id="pBuilder" onchange="loadLedger()"><option value="">-- Select Builder --</option></select>
+    <div class="grid">
+        <input type="number" id="pAmount" placeholder="Amount Paid (₹)">
+        <select id="pMode">
+            <option value="Cash">Cash</option>
+            <option value="Online / G-Pay">Online / G-Pay</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+        </select>
     </div>
+    <div class="grid">
+        <input type="text" id="pRef" placeholder="Reference No. (Cheque / UTR)">
+        <input type="date" id="pDate">
+    </div>
+    <button style="background:#e83e8c" onclick="recordPayment()">Record Payment Receipt</button>
+    <div id="ledgerDisplay"></div>
 </div>
 
 <script>
     const API_URL = 'https://material-backend-trial.onrender.com';
     let fullInventory = [];
     let lastTxn = null;
+    let currentBillData = [];
+    let currentServiceTotal = 0;
 
-    // LOGIN CHECK
-    async function checkLogin() {
-        const password = document.getElementById('adminPass').value;
-        const res = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password})
+    async function masterSync() { await loadBuilders(); await initInventory(); }
+
+    async function loadBuilders() {
+        const res = await fetch(`${API_URL}/builders`);
+        const data = await res.json();
+        ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
+            const s = document.getElementById(id);
+            if(s) {
+                s.innerHTML = '<option value="">-- Select Builder --</option>';
+                data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+            }
         });
-        if(res.ok) {
-            document.getElementById('loginOverlay').style.display = 'none';
-            document.getElementById('mainContent').style.display = 'block';
-            masterSync();
-        } else { alert("Incorrect Password"); }
     }
 
-    // UPDATED LEDGER LOGIC
     async function loadLedger() {
         const bId = document.getElementById('pBuilder').value;
         if(!bId) return;
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
-        
-        let h = '<h3>Payment History</h3><table><tr><th>Date</th><th>Mode</th><th>Ref</th><th>Amount</th></tr>';
-        let totalPaid = 0;
+        let h = '<table><tr><th>Date</th><th>Mode</th><th>Ref No.</th><th>Amount Received</th></tr>';
+        let total = 0;
         data.payments.forEach(p => {
             h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>${p.referenceNo}</td><td>₹${p.amountPaid}</td></tr>`;
-            totalPaid += p.amountPaid;
+            total += p.amountPaid;
         });
-        document.getElementById('ledgerDisplay').innerHTML = h + `</table><div class="total-box"><h3>Total Received: ₹${totalPaid}</h3></div>`;
+        document.getElementById('ledgerDisplay').innerHTML = h + `</table><div class="total-box"><h3>Total Received: ₹${total}</h3></div>`;
     }
 
-    // REST OF YOUR FUNCTIONS (masterSync, loadBuilders, loadSites, etc. - keep them as they are)
-    // ... [Paste your existing functions here] ...
-    
-    // Quick copy of your existing logic to ensure it's complete:
-    async function masterSync() { await loadBuilders(); await initInventory(); }
-    async function loadBuilders() { const res = await fetch(`${API_URL}/builders`); const data = await res.json(); ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => { const s = document.getElementById(id); if(s) { s.innerHTML = '<option value="">-- Select Builder --</option>'; data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`); } }); }
+    async function recordPayment() {
+        const body = {
+            builderId: document.getElementById('pBuilder').value,
+            amountPaid: Number(document.getElementById('pAmount').value),
+            paymentMode: document.getElementById('pMode').value,
+            referenceNo: document.getElementById('pRef').value,
+            date: document.getElementById('pDate').value
+        };
+        if(!body.builderId || !body.amountPaid) return alert("Fill mandatory fields");
+        const res = await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        if(res.ok) { alert("Payment Recorded!"); loadLedger(); }
+    }
+
     async function loadSites(bId, sId) { const val = document.getElementById(bId).value; const res = await fetch(`${API_URL}/sites/${val}`); const data = await res.json(); const s = document.getElementById(sId); s.innerHTML = '<option value="">-- Select Site --</option>'; data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`); }
     async function initInventory() { const res = await fetch(`${API_URL}/inventory`); fullInventory = await res.json(); const dItem = document.getElementById('dItem'); if(dItem) { dItem.innerHTML = '<option value="">-- Select Item --</option>'; fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`); } }
-    async function recordPayment() { const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value }; if(!body.builderId || !body.amountPaid) return alert("Fill mandatory fields"); const res = await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); if(res.ok) { alert("Payment Recorded!"); loadLedger(); } }
-    function updateCategories() { const item = document.getElementById('itemName').value; const cat = document.getElementById('category'); cat.innerHTML = ''; const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] }; (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`); }
-    function showStock(id, label) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
     async function processTxn(type) { const prefix = type === 'dispatch' ? 'd' : 'r'; const body = { builderId: document.getElementById(`${prefix}Builder`).value, siteId: document.getElementById(`${prefix}Site`).value, itemId: document.getElementById(`${prefix}Item`).value, quantity: Number(document.getElementById(`${prefix}Qty`).value), rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0, date: document.getElementById(`${prefix}Date`).value }; const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); const result = await res.json(); if(res.ok) { alert(`Success! ${result.challanNo}`); lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${prefix}Builder`).options[document.getElementById(`${prefix}Builder`).selectedIndex].text, site: document.getElementById(`${prefix}Site`).options[document.getElementById(`${prefix}Site`).selectedIndex].text, item: document.getElementById(`${prefix}Item`).options[document.getElementById(`${prefix}Item`).selectedIndex].text }; document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block'; masterSync(); } else alert(result.message); }
-    function printChallan(type) { if(!lastTxn) return; const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN"; const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges"; const chargeAmt = type === 'DC' ? lastTxn.loadingCharges : lastTxn.unloadingCharges; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>'); win.document.write('<div class="header"><h1>YOUR COMPANY NAME</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>'); win.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>'); win.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>'); win.document.write('<p style="margin-top:20px;"><b>'+chargeLabel+':</b> ₹'+chargeAmt+'</p>'); win.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>'); win.document.close(); win.print(); }
+    function printChallan(type) { if(!lastTxn) return; const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN"; const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges"; const chargeAmt = type === 'DC' ? lastTxn.loadingCharges : lastTxn.unloadingCharges; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>'); win.document.write('<div class="header"><h1>COMPANY NAME</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>'); win.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>'); win.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>'); win.document.write('<p style="margin-top:20px;"><b>'+chargeLabel+':</b> ₹'+chargeAmt+'</p>'); win.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>'); win.document.close(); win.print(); }
     async function generateBill() { const siteId = document.getElementById('billSite').value; const res = await fetch(`${API_URL}/calculate-bill/${siteId}`); const data = await res.json(); currentBillData = data.billDetails; currentServiceTotal = data.serviceCharges; updateBillDisplay(); }
-    function updateBillDisplay() { let h = '<table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Amt</th></tr>'; let subRent = 0; currentBillData.forEach(i => { h += `<tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.amount}</td></tr>`; subRent += i.amount; }); let subtotal = subRent + currentServiceTotal; const gst = document.getElementById('gstToggle').checked ? subtotal * 0.18 : 0; document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box"><p>Total Rent: ₹${subRent}</p><p>Loading/Unloading: ₹${currentServiceTotal}</p>${document.getElementById('gstToggle').checked ? `<p>GST (18%): ₹${gst.toFixed(2)}</p>` : ''}<h3>Grand Total: ₹${(subtotal + gst).toFixed(2)}</h3></div>`; }
-    function printDoc(el, title) { const content = document.getElementById(el).innerHTML; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:10px;text-align:left;} th{background:#eee;} .header{text-align:center;margin-bottom:30px;}</style></head><body>'); win.document.write('<div class="header"><h1>YOUR COMPANY NAME</h1><h2>'+title+'</h2></div>' + content + '</body></html>'); win.document.close(); win.print(); }
+    function updateBillDisplay() { let h = '<table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Amt</th></tr>'; let subRent = 0; currentBillData.forEach(i => { h += `<tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.amount}</td></tr>`; subRent += i.amount; }); let subtotal = subRent + currentServiceTotal; const gst = document.getElementById('gstToggle').checked ? subtotal * 0.18 : 0; document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box"><p>Total Rent: ₹${subRent}</p><p>Loading/Unloading: ₹${currentServiceTotal}</p>${document.getElementById('gstToggle').checked ? `<p>GST (18%): ₹${gst.toFixed(2)}</p>` : ''}<h3>Grand Total: ₹${(subtotal + (gst || 0)).toFixed(2)}</h3></div>`; }
+    function printDoc(el, title) { const content = document.getElementById(el).innerHTML; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:10px;text-align:left;} th{background:#eee;} .header{text-align:center;margin-bottom:30px;}</style></head><body>'); win.document.write('<div class="header"><h1>COMPANY NAME</h1><h2>'+title+'</h2></div>' + content + '</body></html>'); win.document.close(); win.print(); }
     async function saveBuilder() { const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value }; await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); alert("Saved!"); masterSync(); }
     async function saveSite() { const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value }; await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); alert("Site Linked!"); }
     async function saveItem() { const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) }; await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); alert("Stock Added!"); masterSync(); }
+    function updateCategories() { const item = document.getElementById('itemName').value; const cat = document.getElementById('category'); cat.innerHTML = ''; const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] }; (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`); }
     async function loadReturnItems() { const siteId = document.getElementById('rSite').value; const res = await fetch(`${API_URL}/site-balance/${siteId}`); const data = await res.json(); const rItem = document.getElementById('rItem'); rItem.innerHTML = '<option value="">-- Select Item --</option>'; data.forEach(i => rItem.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) [Bal: ${i.currentBalance}]</option>`); }
     async function getSiteReport() { const siteId = document.getElementById('repSite').value; const res = await fetch(`${API_URL}/site-balance/${siteId}`); const data = await res.json(); let h = '<table><tr><th>Item</th><th>Qty on Site</th></tr>'; data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.currentBalance}</td></tr>`); document.getElementById('reportContainer').innerHTML = h + '</table>'; }
+    window.onload = masterSync;
 </script>
 </body>
 </html>
