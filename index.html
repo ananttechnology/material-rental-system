@@ -177,7 +177,7 @@
             // Check if value is null, undefined, or empty string after trimming
             if (fields[key] === null || fields[key] === undefined || fields[key].toString().trim() === "") {
                 msg.style.color = "red";
-                msg.innerHTML = "⚠️ Error: Please fill all compulsory boxes.";
+                msg.innerHTML = "⚠️ Error: Please fill all boxes compulsory.";
                 return false;
             }
         }
