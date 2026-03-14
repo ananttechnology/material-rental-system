@@ -115,6 +115,84 @@ app.post('/return', async (req, res) => {
     await new Transaction({...req.body, type: 'RC', challanNo}).save();
     res.json({challanNo});
 });
+app.get('/calculate-bill/:siteId', async (req, res) => {
+    try {
+        const { siteId } = req.params;
+        // 1. Get all transactions for this site
+        const txns = await Transaction.find({ siteId }).sort({ date: 1 });
+        const inventory = await Inventory.find();
+        
+        let itemBatches = {};
+        let totalServiceCharges = 0;
+
+        // 2. Sum up Loading/Unloading and group items
+        txns.forEach(t => {
+            totalServiceCharges += (Number(t.loadingCharges) || 0) + (Number(t.unloadingCharges) || 0);
+            if (!itemBatches[t.itemId]) itemBatches[t.itemId] = [];
+            itemBatches[t.itemId].push({ ...t._doc });
+        });
+
+        let bill = [];
+
+        // 3. FIFO Calculation
+        for (let id in itemBatches) {
+            let dcs = itemBatches[id].filter(x => x.type === 'DC');
+            let rcs = itemBatches[id].filter(x => x.type === 'RC');
+            const info = inventory.find(i => i._id.toString() === id) || { itemName: "Unknown", category: "N/A" };
+
+            rcs.forEach(r => {
+                let qty = r.quantity;
+                for (let d of dcs) {
+                    if (d.quantity > 0 && qty > 0) {
+                        let take = Math.min(d.quantity, qty);
+                        let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
+                        if (days < 1) days = 1; // Minimum 1 day billing
+                        bill.push({
+                            itemName: info.itemName,
+                            category: info.category,
+                            qty: take,
+                            dDate: new Date(d.date).toLocaleDateString(),
+                            rDate: new Date(r.date).toLocaleDateString(),
+                            days,
+                            rate: d.rate,
+                            amount: take * d.rate * days
+                        });
+                        d.quantity -= take;
+                        qty -= take;
+                    }
+                }
+            });
+
+            // Items still on site
+            dcs.forEach(d => {
+                if (d.quantity > 0) {
+                    let days = Math.floor((new Date() - new Date(d.date)) / 86400000) + 1;
+                    if (days < 1) days = 1;
+                    bill.push({
+                        itemName: info.itemName,
+                        category: info.category,
+                        qty: d.quantity,
+                        dDate: new Date(d.date).toLocaleDateString(),
+                        rDate: "On Site",
+                        days,
+                        rate: d.rate,
+                        amount: d.quantity * d.rate * days
+                    });
+                }
+            });
+        }
+
+        // 4. Always return a proper JSON object
+        res.status(200).json({
+            billDetails: bill,
+            serviceCharges: totalServiceCharges
+        });
+
+    } catch (e) {
+        console.error("Billing logic error:", e);
+        res.status(500).json({ billDetails: [], serviceCharges: 0, error: e.message });
+    }
+});
 
 app.get('/statement/:builderId', async (req, res) => {
     try {
