@@ -176,7 +176,7 @@
     let currentBillData = [];
     let currentServiceTotal = 0;
 
-    // --- UTILITY: Validation & Message Handler ---
+    // --- UTILITY: Validation, Message & Reset ---
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
         for (let key in fields) {
@@ -190,10 +190,15 @@
         return true;
     }
 
-    function showSuccess(msgId, text) {
+    function showSuccess(msgId, text, sectionIds = []) {
         const msg = document.getElementById(msgId);
         msg.style.color = "green";
         msg.innerHTML = "✅ " + text;
+        // Clear the input boxes for this section
+        sectionIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = ""; 
+        });
         setTimeout(() => msg.innerHTML = "", 5000);
     }
 
@@ -243,7 +248,7 @@
         };
         if (!validate(body, 'msg1')) return;
         await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg1', "Builder Profile Created!");
+        showSuccess('msg1', "Builder Profile Created!", ['compName', 'bMobile', 'bEmail', 'bGst', 'bAddr']);
         masterSync();
     }
 
@@ -255,7 +260,7 @@
         };
         if (!validate(body, 'msg2')) return;
         await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg2', "Site Linked to Builder!");
+        showSuccess('msg2', "Site Linked!", ['builderSelect', 'sName', 'sAddr']);
     }
 
     async function saveItem() {
@@ -267,7 +272,7 @@
         };
         if (!validate(body, 'msg3')) return;
         await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg3', `Stock added to ${body.godown} Godown!`);
+        showSuccess('msg3', `Stock added to ${body.godown}!`, ['itemName', 'category', 'iGodown', 'qty']);
         masterSync();
     }
 
@@ -288,13 +293,17 @@
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
         if(res.ok) {
-            showSuccess(msgId, `Confirmed! Challan: ${result.challanNo}`);
-            const itemText = document.getElementById(`${p}Item`).options[document.getElementById(`${p}Item`).selectedIndex].text;
-            lastTxn = { ...body, challanNo: result.challanNo, 
+            const itemSelect = document.getElementById(`${p}Item`);
+            const itemText = itemSelect.options[itemSelect.selectedIndex].text;
+            // Extract Godown name from the text "Item (Cat) - Godown [Stock]"
+            const godownPart = itemText.split('-')[1].split('[')[0].trim();
+
+            lastTxn = { ...body, challanNo: result.challanNo, godown: godownPart,
                 builder: document.getElementById(`${p}Builder`).options[document.getElementById(`${p}Builder`).selectedIndex].text,
                 site: document.getElementById(`${p}Site`).options[document.getElementById(`${p}Site`).selectedIndex].text,
-                item: itemText
+                item: itemText.split('-')[0].trim() 
             };
+            showSuccess(msgId, `Confirmed: ${result.challanNo}`, [`${p}Builder`, `${p}Site`, `${p}Item`, `${p}Qty`, `${p}Date`, `dRate`, `dLoading`, `rUnloading`]);
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
             masterSync();
         } else {
@@ -303,28 +312,27 @@
         }
     }
 
+    // --- REMAINING FUNCTIONS (Report, Bill, Payment) ---
     async function getSiteReport() {
         const siteId = document.getElementById('repSite').value;
-        const bId = document.getElementById('repBuilder').value;
-        if (!validate({bId, siteId}, 'msg6')) return;
+        if (!validate({siteId}, 'msg6')) return;
         const res = await fetch(`${API_URL}/site-balance/${siteId}`);
         const data = await res.json();
         let h = '<table><tr><th>Item (Godown)</th><th>Qty on Site</th></tr>';
         data.forEach(i => h += `<tr><td>${i.itemName} (${i.category}) - ${i.godown}</td><td>${i.currentBalance}</td></tr>`);
         document.getElementById('reportContainer').innerHTML = h + '</table>';
-        showSuccess('msg6', "Report Generated.");
+        showSuccess('msg6', "Report Loaded.");
     }
 
     async function generateBill() {
-        const bId = document.getElementById('billBuilder').value;
         const siteId = document.getElementById('billSite').value;
-        if (!validate({bId, siteId}, 'msg7')) return;
+        if (!validate({siteId}, 'msg7')) return;
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
         const data = await res.json();
         currentBillData = data.billDetails;
         currentServiceTotal = data.serviceCharges;
         updateBillDisplay();
-        showSuccess('msg7', "Bill Calculated Successfully.");
+        showSuccess('msg7', "Bill Ready.");
     }
 
     async function recordPayment() {
@@ -337,18 +345,13 @@
         };
         if (!validate(body, 'msg8')) return;
         await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg8', "Payment Recorded!");
+        showSuccess('msg8', "Payment Recorded!", ['pAmount', 'pMode', 'pRef', 'pDate']);
         loadLedger();
     }
 
     async function loadLedger() {
         const bId = document.getElementById('pBuilder').value;
-        if (!bId) {
-            document.getElementById('msg8').style.color = "red";
-            document.getElementById('msg8').innerHTML = "⚠️ Select Builder to view ledger.";
-            return;
-        }
-        document.getElementById('msg8').innerHTML = "";
+        if (!bId) return;
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
         let h = `<div class="total-box" style="text-align:left;"><p>Total Billed: ₹${data.totalBilled.toFixed(2)}</p><p>Total Paid: ₹${data.totalPaid.toFixed(2)}</p><h3>Outstanding: ₹${data.outstanding.toFixed(2)}</h3></div><h3>Payment History</h3><table><tr><th>Date</th><th>Mode</th><th>Ref</th><th>Amt</th></tr>`;
@@ -356,6 +359,7 @@
         document.getElementById('ledgerDisplay').innerHTML = h + '</table>';
     }
 
+    // Helpers for dynamic sites/categories
     async function loadSites(bId, sId) {
         const val = document.getElementById(bId).value;
         if(!val) return;
@@ -415,14 +419,15 @@
         const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN";
         const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges";
         const chargeAmt = type === 'DC' ? (lastTxn.loadingCharges || 0) : (lastTxn.unloadingCharges || 0);
+        
         const win = window.open('', '', 'height=600,width=800');
         win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:60px;display:flex;justify-content:space-between;text-align:center;}</style></head><body>');
         win.document.write('<div class="header"><h1>COMPANY NAME</h1><p>Material Rental & Scaffolding Solutions</p><h2>' + title + '</h2></div>');
         win.document.write('<p><b>Challan No:</b> ' + lastTxn.challanNo + ' | <b>Date:</b> ' + lastTxn.date + '</p>');
         win.document.write('<p><b>Builder:</b> ' + lastTxn.builder + '<br><b>Site Location:</b> ' + lastTxn.site + '</p>');
-        win.document.write('<table><tr><th>Description of Material</th><th>Quantity</th></tr>');
-        win.document.write('<tr><td>' + lastTxn.item + '</td><td>' + lastTxn.quantity + ' Nos.</td></tr>');
-        if(chargeAmt > 0) win.document.write('<tr><td style="text-align:right;"><b>' + chargeLabel + ':</b></td><td><b>₹' + chargeAmt + '</b></td></tr>');
+        win.document.write('<table><tr><th>Description of Material</th><th>Godown</th><th>Quantity</th></tr>');
+        win.document.write('<tr><td>' + lastTxn.item + '</td><td>' + lastTxn.godown + '</td><td>' + lastTxn.quantity + ' Nos.</td></tr>');
+        if(chargeAmt > 0) win.document.write('<tr><td colspan="2" style="text-align:right;"><b>' + chargeLabel + ':</b></td><td><b>₹' + chargeAmt + '</b></td></tr>');
         win.document.write('</table><div class="footer"><div><p>_________________</p><p>Driver/Transporter</p></div><div><p>_________________</p><p>Receiver Signature</p></div><div><p>_________________</p><p>Authorised Signatory</p></div></div></body></html>');
         win.document.close();
         win.print();
