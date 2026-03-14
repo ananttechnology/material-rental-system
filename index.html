@@ -260,20 +260,18 @@
     }
 
     async function initInventory() {
-        try {
-            const res = await fetch(`${API_URL}/inventory`);
-            fullInventory = await res.json();
-            const dropdowns = ['dItem', 'rItem'];
-            dropdowns.forEach(id => {
-                const el = document.getElementById(id);
-                if(el) {
-                    el.innerHTML = '<option value="">-- Select Item (Godown) --</option>';
-                    fullInventory.forEach(i => {
-                        el.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
-                    });
-                }
+    try {
+        const res = await fetch(`${API_URL}/inventory`);
+        fullInventory = await res.json();
+        const dItem = document.getElementById('dItem'); // Only target Dispatch dropdown here
+        if(dItem) {
+            dItem.innerHTML = '<option value="">-- Select Item (Godown) --</option>';
+            fullInventory.forEach(i => {
+                dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
             });
-        } catch (e) { console.error("Inventory Load Fail", e); }
+        }
+        // Notice we removed rItem from here
+    } catch (e) { console.error("Inventory Load Fail", e); }
     }
 
     async function saveBuilder() {
@@ -422,13 +420,29 @@
     }
 
     async function loadReturnItems() {
-        const siteId = document.getElementById('rSite').value;
-        if(!siteId) return;
+    const siteId = document.getElementById('rSite').value;
+    const msgId = 'msg5';
+    if(!siteId) return;
+
+    try {
         const res = await fetch(`${API_URL}/site-balance/${siteId}`);
         const data = await res.json();
         const rItem = document.getElementById('rItem');
-        rItem.innerHTML = '<option value="">-- Select Item (Godown) --</option>';
-        data.forEach(i => rItem.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
+        
+        rItem.innerHTML = '<option value="">-- Select Item to Return --</option>';
+        
+        if (data.length === 0) {
+            rItem.innerHTML = '<option value="">No items currently at this site</option>';
+            return;
+        }
+
+        data.forEach(i => {
+            // Displays: MS Plate (3x24) - Ankleshwar [Bal: 10]
+            rItem.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`;
+        });
+    } catch (e) {
+        console.error("Error loading return items", e);
+    }
     }
 
     function updateBillDisplay() {
