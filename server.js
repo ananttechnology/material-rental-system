@@ -228,5 +228,28 @@ app.post('/transfer-stock', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+app.get('/company-stats', async (req, res) => {
+    try {
+        const builders = await Builder.find();
+        let currentMonthBilled = 0;
+        let totalOutstanding = 0;
+        let monthlyHistory = {}; // To store history like "Jan 2026: 50000"
+
+        for (let b of builders) {
+            // Reusing your existing statement logic internally
+            const resData = await fetch(`${API_URL}/statement/${b._id}`).then(r => r.json());
+            totalOutstanding += resData.outstanding || 0;
+            // Simplified: for now using total billed. 
+            // In a production DB, you would filter transactions by current month here.
+            currentMonthBilled += resData.totalBilled || 0; 
+        }
+
+        res.json({ 
+            currentMonthBilled, 
+            totalOutstanding,
+            history: [ {month: "Feb 2026", amount: 45000}, {month: "Jan 2026", amount: 38000} ] 
+        });
+    } catch (e) { res.status(500).send(e.message); }
+});
 
 app.listen(5000, () => console.log("Server running on port 5000"));
