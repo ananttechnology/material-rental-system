@@ -413,13 +413,48 @@
 
     function printChallan(type) {
         if(!lastTxn) return;
+        
         const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN";
+        // Logic to pick the correct charge based on transaction type
+        const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges";
+        const chargeAmt = type === 'DC' ? (lastTxn.loadingCharges || 0) : (lastTxn.unloadingCharges || 0);
+        
         const win = window.open('', '', 'height=600,width=800');
-        win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>');
-        win.document.write('<div class="header"><h1>COMPANY NAME</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>');
-        win.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>');
-        win.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>');
-        win.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>');
+        win.document.write('<html><head><title>'+title+'</title><style>');
+        win.document.write('body{font-family:sans-serif;padding:40px;} ');
+        win.document.write('table{width:100%;border-collapse:collapse;margin-top:20px;} ');
+        win.document.write('th,td{border:1px solid #ddd;padding:12px;text-align:left;} ');
+        win.document.write('.header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} ');
+        win.document.write('.info-row{display:flex;justify-content:space-between;margin-bottom:10px;} ');
+        win.document.write('.footer{margin-top:60px;display:flex;justify-content:space-between;text-align:center;}');
+        win.document.write('</style></head><body>');
+        
+        // Header with Company Name
+        win.document.write('<div class="header"><h1>YOUR COMPANY NAME</h1><p>Material Rental & Scaffolding Solutions</p><h2>' + title + '</h2></div>');
+        
+        // Transaction Info
+        win.document.write('<div class="info-row"><div><b>Challan No:</b> ' + lastTxn.challanNo + '</div><div><b>Date:</b> ' + lastTxn.date + '</div></div>');
+        win.document.write('<div class="info-row"><div><b>Builder:</b> ' + lastTxn.builder + '</div><div><b>Site Location:</b> ' + lastTxn.site + '</div></div>');
+        
+        // Items Table
+        win.document.write('<table><tr><th>Description of Material</th><th>Quantity</th></tr>');
+        win.document.write('<tr><td>' + lastTxn.item + '</td><td>' + lastTxn.quantity + ' Nos.</td></tr>');
+        
+        // Service Charges Row
+        if(chargeAmt > 0) {
+            win.document.write('<tr><td style="text-align:right;"><b>' + chargeLabel + ':</b></td><td><b>₹' + chargeAmt + '</b></td></tr>');
+        }
+        
+        win.document.write('</table>');
+        
+        // Signature Footer
+        win.document.write('<div class="footer">');
+        win.document.write('<div><p>_________________</p><p>Driver/Transporter</p></div>');
+        win.document.write('<div><p>_________________</p><p>Receiver Signature</p></div>');
+        win.document.write('<div><p>_________________</p><p>Authorised Signatory</p></div>');
+        win.document.write('</div>');
+        
+        win.document.write('</body></html>');
         win.document.close();
         win.print();
     }
