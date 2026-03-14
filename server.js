@@ -197,5 +197,36 @@ app.get('/statement/:builderId', async (req, res) => {
         res.json({ payments, totalBilled, totalPaid: payments.reduce((s, p) => s + p.amountPaid, 0), outstanding: totalBilled - payments.reduce((s, p) => s + p.amountPaid, 0) });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+app.post('/transfer-stock', async (req, res) => {
+    try {
+        const { itemName, category, fromGodown, toGodown, quantity } = req.body;
+        const qty = Number(quantity);
+
+        // 1. Check Source Godown
+        let sourceItem = await Inventory.findOne({ itemName, category, godown: fromGodown });
+        if (!sourceItem || sourceItem.availableStock < qty) {
+            return res.status(400).json({ message: `Insufficient stock in ${fromGodown}` });
+        }
+
+        // 2. Find or Create Destination Item
+        let destItem = await Inventory.findOne({ itemName, category, godown: toGodown });
+        if (!destItem) {
+            destItem = new Inventory({ itemName, category, godown: toGodown, totalStock: 0, availableStock: 0 });
+        }
+
+        // 3. Move Stock
+        sourceItem.totalStock -= qty;
+        sourceItem.availableStock -= qty;
+        destItem.totalStock += qty;
+        destItem.availableStock += qty;
+
+        await sourceItem.save();
+        await destItem.save();
+
+        res.json({ message: "Transfer Successful" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 app.listen(5000, () => console.log("Server running on port 5000"));
