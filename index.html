@@ -59,124 +59,91 @@
     let currentBillData = [];
     let currentServiceTotal = 0;
 
-    async function masterSync() { await loadBuilders(); await initInventory(); }
+    async function masterSync() {
+        console.log("Syncing...");
+        await loadBuilders();
+        await initInventory();
+    }
 
     async function loadBuilders() {
-        const res = await fetch(`${API_URL}/builders`);
-        const data = await res.json();
-        ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
-            const s = document.getElementById(id);
-            if(s) {
-                s.innerHTML = '<option value="">-- Select Builder --</option>';
-                data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
-            }
-        });
-    }
-
-    async function loadLedger() {
-    const bId = document.getElementById('pBuilder').value;
-    if(!bId) return;
-    
-    document.getElementById('ledgerDisplay').innerHTML = "Calculating Statement...";
-    
-    try {
-        const res = await fetch(`${API_URL}/statement/${bId}`);
-        const data = await res.json();
-        
-        let h = `
-            <div class="total-box" style="text-align:left; background:#fff; border-left: 5px solid #e83e8c; margin-bottom:20px;">
-                <p><b>Total Accrued Rent + Charges:</b> ₹${data.totalBilled.toFixed(2)}</p>
-                <p><b>Total Amount Received:</b> ₹${data.totalPaid.toFixed(2)}</p>
-                <hr>
-                <h3 style="color:#dc3545;">Total Outstanding Balance: ₹${data.outstanding.toFixed(2)}</h3>
-            </div>
-            <h3>Payment History</h3>
-            <table>
-                <tr><th>Date</th><th>Mode</th><th>Ref No.</th><th>Amount</th></tr>`;
-        
-        if (data.payments.length === 0) {
-            h += `<tr><td colspan="4" style="text-align:center;">No payments recorded yet.</td></tr>`;
-        } else {
-            data.payments.forEach(p => {
-                h += `<tr>
-                    <td>${new Date(p.date).toLocaleDateString()}</td>
-                    <td>${p.paymentMode}</td>
-                    <td>${p.referenceNo || '-'}</td>
-                    <td>₹${p.amountPaid}</td>
-                </tr>`;
+        try {
+            const res = await fetch(`${API_URL}/builders`);
+            const data = await res.json();
+            ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
+                const s = document.getElementById(id);
+                if(s) {
+                    s.innerHTML = '<option value="">-- Select Builder --</option>';
+                    data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
+                }
             });
-        }
-        
-        document.getElementById('ledgerDisplay').innerHTML = h + `</table>`;
-    } catch (e) {
-        document.getElementById('ledgerDisplay').innerHTML = "Error loading ledger.";
-    }
-    }
-    async function recordPayment() {
-        const body = {
-            builderId: document.getElementById('pBuilder').value,
-            amountPaid: Number(document.getElementById('pAmount').value),
-            paymentMode: document.getElementById('pMode').value,
-            referenceNo: document.getElementById('pRef').value,
-            date: document.getElementById('pDate').value
-        };
-        if(!body.builderId || !body.amountPaid) return alert("Fill mandatory fields");
-        const res = await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) { alert("Payment Recorded!"); loadLedger(); }
+        } catch (e) { console.error("Builder Load Fail", e); }
     }
 
-    async function loadSites(bId, sId) { const val = document.getElementById(bId).value; const res = await fetch(`${API_URL}/sites/${val}`); const data = await res.json(); const s = document.getElementById(sId); s.innerHTML = '<option value="">-- Select Site --</option>'; data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`); }
-    async function initInventory() { const res = await fetch(`${API_URL}/inventory`); fullInventory = await res.json(); const dItem = document.getElementById('dItem'); if(dItem) { dItem.innerHTML = '<option value="">-- Select Item --</option>'; fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`); } }
-    async function processTxn(type) { const prefix = type === 'dispatch' ? 'd' : 'r'; const body = { builderId: document.getElementById(`${prefix}Builder`).value, siteId: document.getElementById(`${prefix}Site`).value, itemId: document.getElementById(`${prefix}Item`).value, quantity: Number(document.getElementById(`${prefix}Qty`).value), rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0, date: document.getElementById(`${prefix}Date`).value }; const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); const result = await res.json(); if(res.ok) { alert(`Success! ${result.challanNo}`); lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${prefix}Builder`).options[document.getElementById(`${prefix}Builder`).selectedIndex].text, site: document.getElementById(`${prefix}Site`).options[document.getElementById(`${prefix}Site`).selectedIndex].text, item: document.getElementById(`${prefix}Item`).options[document.getElementById(`${prefix}Item`).selectedIndex].text }; document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block'; masterSync(); } else alert(result.message); }
-    function printChallan(type) { if(!lastTxn) return; const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN"; const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges"; const chargeAmt = type === 'DC' ? lastTxn.loadingCharges : lastTxn.unloadingCharges; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>'); win.document.write('<div class="header"><h1>COMPANY NAME</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>'); win.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>'); win.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>'); win.document.write('<p style="margin-top:20px;"><b>'+chargeLabel+':</b> ₹'+chargeAmt+'</p>'); win.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>'); win.document.close(); win.print(); }
+    async function initInventory() {
+        try {
+            const res = await fetch(`${API_URL}/inventory`);
+            fullInventory = await res.json();
+            const dItem = document.getElementById('dItem');
+            if(dItem) {
+                dItem.innerHTML = '<option value="">-- Select Item --</option>';
+                fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category})</option>`);
+            }
+        } catch (e) { console.error("Inventory Load Fail", e); }
+    }
+
     async function generateBill() {
         const siteId = document.getElementById('billSite').value;
         if(!siteId) return alert("Please select a site");
-        
         try {
-            const res = await fetch(${API_URL}/calculate-bill/${siteId});
+            const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
             const data = await res.json();
-            
-            // FIX: Access the nested data correctly
             currentBillData = data.billDetails || []; 
             currentServiceTotal = data.serviceCharges || 0;
-            
             updateBillDisplay();
-        } catch (e) {
-            console.error("Billing Error:", e);
-            alert("Failed to generate bill. Check console for details.");
-        }
+        } catch (e) { alert("Billing Error: " + e.message); }
     }
-     function updateBillDisplay() {
+
+    function updateBillDisplay() {
         let h = '<table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Amt</th></tr>';
         let subRent = 0;
-        
-        if (currentBillData.length === 0) {
-            h += '<tr><td colspan="6" style="text-align:center;">No active materials at this site.</td></tr>';
-        } else {
-            currentBillData.forEach(i => {
-                h += <tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.amount}</td></tr>;
-                subRent += i.amount;
-            });
-        }
-        
+        currentBillData.forEach(i => {
+            h += `<tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.amount}</td></tr>`;
+            subRent += i.amount;
+        });
         let subtotal = subRent + currentServiceTotal;
         const gst = document.getElementById('gstToggle').checked ? subtotal * 0.18 : 0;
-        
-        document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box">
-            <p>Total Rent: ₹${subRent.toFixed(2)}</p>
-            <p>Loading/Unloading: ₹${currentServiceTotal.toFixed(2)}</p>
-            ${document.getElementById('gstToggle').checked ? <p>GST (18%): ₹${gst.toFixed(2)}</p> : ''}
-            <h3>Grand Total: ₹${(subtotal + gst).toFixed(2)}</h3>
-        </div>`;
+        document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box"><p>Total Rent: ₹${subRent.toFixed(2)}</p><p>Loading/Unloading: ₹${currentServiceTotal.toFixed(2)}</p>${document.getElementById('gstToggle').checked ? `<p>GST (18%): ₹${gst.toFixed(2)}</p>` : ''}<h3>Grand Total: ₹${(subtotal + gst).toFixed(2)}</h3></div>`;
     }
-    function printDoc(el, title) { const content = document.getElementById(el).innerHTML; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:10px;text-align:left;} th{background:#eee;} .header{text-align:center;margin-bottom:30px;}</style></head><body>'); win.document.write('<div class="header"><h1>COMPANY NAME</h1><h2>'+title+'</h2></div>' + content + '</body></html>'); win.document.close(); win.print(); }
+
+    async function loadLedger() {
+        const bId = document.getElementById('pBuilder').value;
+        if(!bId) return;
+        document.getElementById('ledgerDisplay').innerHTML = "Calculating...";
+        try {
+            const res = await fetch(`${API_URL}/statement/${bId}`);
+            const data = await res.json();
+            let h = `<div class="total-box" style="text-align:left; background:#fff; border-left: 5px solid #e83e8c; margin-bottom:20px;"><p><b>Total Accrued Rent + Charges:</b> ₹${data.totalBilled.toFixed(2)}</p><p><b>Total Amount Received:</b> ₹${data.totalPaid.toFixed(2)}</p><hr><h3 style="color:#dc3545;">Total Outstanding Balance: ₹${data.outstanding.toFixed(2)}</h3></div><h3>Payment History</h3><table><tr><th>Date</th><th>Mode</th><th>Ref No.</th><th>Amount</th></tr>`;
+            data.payments.forEach(p => {
+                h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>${p.referenceNo || '-'}</td><td>₹${p.amountPaid}</td></tr>`;
+            });
+            document.getElementById('ledgerDisplay').innerHTML = h + `</table>`;
+        } catch (e) { document.getElementById('ledgerDisplay').innerHTML = "Error loading ledger."; }
+    }
+
+    // Keep your other core functions below this...
+    async function loadSites(bId, sId) { const val = document.getElementById(bId).value; const res = await fetch(`${API_URL}/sites/${val}`); const data = await res.json(); const s = document.getElementById(sId); s.innerHTML = '<option value="">-- Select Site --</option>'; data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`); }
+    async function recordPayment() { const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value }; const res = await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); if(res.ok) { alert("Payment Recorded!"); loadLedger(); } }
+    async function processTxn(type) { const prefix = type === 'dispatch' ? 'd' : 'r'; const body = { builderId: document.getElementById(`${prefix}Builder`).value, siteId: document.getElementById(`${prefix}Site`).value, itemId: document.getElementById(`${prefix}Item`).value, quantity: Number(document.getElementById(`${prefix}Qty`).value), rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0, date: document.getElementById(`${prefix}Date`).value }; const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); const result = await res.json(); if(res.ok) { alert(`Success! ${result.challanNo}`); lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${prefix}Builder`).options[document.getElementById(`${prefix}Builder`).selectedIndex].text, site: document.getElementById(`${prefix}Site`).options[document.getElementById(`${prefix}Site`).selectedIndex].text, item: document.getElementById(`${prefix}Item`).options[document.getElementById(`${prefix}Item`).selectedIndex].text }; document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block'; masterSync(); } else alert(result.message); }
     async function saveBuilder() { const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value }; await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); alert("Saved!"); masterSync(); }
     async function saveSite() { const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value }; await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); alert("Site Linked!"); }
     async function saveItem() { const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, totalStock: Number(document.getElementById('qty').value) }; await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); alert("Stock Added!"); masterSync(); }
     function updateCategories() { const item = document.getElementById('itemName').value; const cat = document.getElementById('category'); cat.innerHTML = ''; const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] }; (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`); }
+    function showStock(id, label) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
     async function loadReturnItems() { const siteId = document.getElementById('rSite').value; const res = await fetch(`${API_URL}/site-balance/${siteId}`); const data = await res.json(); const rItem = document.getElementById('rItem'); rItem.innerHTML = '<option value="">-- Select Item --</option>'; data.forEach(i => rItem.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) [Bal: ${i.currentBalance}]</option>`); }
     async function getSiteReport() { const siteId = document.getElementById('repSite').value; const res = await fetch(`${API_URL}/site-balance/${siteId}`); const data = await res.json(); let h = '<table><tr><th>Item</th><th>Qty on Site</th></tr>'; data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.currentBalance}</td></tr>`); document.getElementById('reportContainer').innerHTML = h + '</table>'; }
+    function printDoc(el, title) { const content = document.getElementById(el).innerHTML; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:10px;text-align:left;} th{background:#eee;} .header{text-align:center;margin-bottom:30px;}</style></head><body>'); win.document.write('<div class="header"><h1>YOUR COMPANY NAME</h1><h2>'+title+'</h2></div>' + content + '</body></html>'); win.document.close(); win.print(); }
+    function printChallan(type) { if(!lastTxn) return; const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN"; const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges"; const chargeAmt = type === 'DC' ? lastTxn.loadingCharges : lastTxn.unloadingCharges; const win = window.open('', '', 'height=600,width=800'); win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:50px;display:flex;justify-content:space-between;}</style></head><body>'); win.document.write('<div class="header"><h1>COMPANY NAME</h1><p><b>Challan No:</b> '+lastTxn.challanNo+' | <b>Date:</b> '+lastTxn.date+'</p><h2>'+title+'</h2></div>'); win.document.write('<p><b>Builder:</b> '+lastTxn.builder+'<br><b>Site:</b> '+lastTxn.site+'</p>'); win.document.write('<table><tr><th>Description</th><th>Qty</th></tr><tr><td>'+lastTxn.item+'</td><td>'+lastTxn.quantity+'</td></tr></table>'); win.document.write('<p style="margin-top:20px;"><b>'+chargeLabel+':</b> ₹'+chargeAmt+'</p>'); win.document.write('<div class="footer"><div><p>_________________<br>Receiver</p></div><div><p>_________________<br>Authorised</p></div></div></body></html>'); win.document.close(); win.print(); }
+
     window.onload = masterSync;
 </script>
 </body>
