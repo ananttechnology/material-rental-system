@@ -52,15 +52,7 @@ const transactionSchema = new mongoose.Schema({
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
 // --- ROUTES ---
-// --- LOGIN ROUTE ---
-app.post('/login', (req, res) => {
-    const { password } = req.body;
-    if (password === "Admin@123") { // You can change this password
-        res.json({ success: true });
-    } else {
-        res.status(401).json({ success: false, message: "Wrong Password" });
-    }
-});
+
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
 app.get('/sites/:builderId', async (req, res) => res.json(await Site.find({builderId: req.params.builderId})));
 app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
