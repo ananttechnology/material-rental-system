@@ -168,6 +168,44 @@
     <div id="msg8" class="msg-area"></div>
     <div id="ledgerDisplay"></div>
 </div>
+<div class="section report-sec" style="border-top-color: #343a40;">
+    <h2>9. Inter-Godown Stock Transfer</h2>
+    <div class="grid">
+        <select id="tItemName" onchange="updateTransferCategories()">
+            <option value="">--Select Item--</option>
+            <option value="MS Plate">MS Plate</option>
+            <option value="MS Props Jack">MS Props Jack</option>
+            <option value="Cuplock Vertical">Cuplock Vertical</option>
+            <option value="MS Ledger">MS Ledger</option>
+            <option value="Ms Pipe">Ms Pipe</option>
+            <option value="Channel">Channel</option>
+            <option value="Ms Clamp">Ms Clamp</option>
+            <option value="Acrow Span">Acrow Span</option>
+            <option value="Base Jack">Base Jack</option>
+            <option value="U Jack">U Jack</option>
+            <option value="Joint Pin">Joint Pin</option>
+            <option value="Ms Khapeda">Ms Khapeda</option>
+            <option value="Wood Chavi">Wood Chavi</option>
+            <option value="Sikanja">Sikanja</option>
+        </select>
+        <select id="tCategory"><option value="N/A">N/A</option></select>
+    </div>
+    <div class="grid">
+        <select id="tFrom">
+            <option value="">From Godown *</option>
+            <option value="Ankleshwar">Ankleshwar</option>
+            <option value="Dahej">Dahej</option>
+        </select>
+        <select id="tTo">
+            <option value="">To Godown *</option>
+            <option value="Ankleshwar">Ankleshwar</option>
+            <option value="Dahej">Dahej</option>
+        </select>
+    </div>
+    <input type="number" id="tQty" placeholder="Quantity to Transfer">
+    <button style="background:#343a40" onclick="transferStock()">Confirm Transfer</button>
+    <div id="msg9" class="msg-area"></div>
+</div>
 
 <script>
     const API_URL = 'https://material-backend-trial.onrender.com';
@@ -431,6 +469,43 @@
         win.document.write('</table><div class="footer"><div><p>_________________</p><p>Driver/Transporter</p></div><div><p>_________________</p><p>Receiver Signature</p></div><div><p>_________________</p><p>Authorised Signatory</p></div></div></body></html>');
         win.document.close();
         win.print();
+    }
+    function updateTransferCategories() {
+        const item = document.getElementById('tItemName').value;
+        const cat = document.getElementById('tCategory');
+        cat.innerHTML = '';
+        const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
+        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
+    }
+
+    async function transferStock() {
+        const body = {
+            itemName: document.getElementById('tItemName').value,
+            category: document.getElementById('tCategory').value,
+            fromGodown: document.getElementById('tFrom').value,
+            toGodown: document.getElementById('tTo').value,
+            quantity: document.getElementById('tQty').value
+        };
+
+        if (body.fromGodown === body.toGodown) {
+            return showMessage('msg9', "⚠️ Source and Destination Godown cannot be the same.");
+        }
+        if (!validate(body, 'msg9')) return;
+
+        const res = await fetch(`${API_URL}/transfer-stock`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        const result = await res.json();
+
+        if (res.ok) {
+            showSuccess('msg9', `Successfully moved ${body.quantity} items to ${body.toGodown}`, ['tQty', 'tFrom', 'tTo', 'tItemName']);
+            masterSync(); // This refreshes dispatch/return stock lists instantly
+        } else {
+            document.getElementById('msg9').style.color = "red";
+            document.getElementById('msg9').innerHTML = "❌ " + result.message;
+        }
     }
 
     window.onload = masterSync;
