@@ -23,11 +23,10 @@ const Site = mongoose.model('Site', new mongoose.Schema({
   siteName: String, siteAddress: String
 }));
 
-// --- UPDATED SCHEMAS FOR GODOWN ---
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({
   itemName: String, 
   category: String, 
-  godown: String, // Added: 'Ankleshwar' or 'Dahej'
+  godown: String, // 'Ankleshwar' or 'Dahej'
   totalStock: Number, 
   availableStock: Number
 }));
@@ -38,7 +37,7 @@ const Transaction = mongoose.model('Transaction', new mongoose.Schema({
   builderId: mongoose.Schema.Types.ObjectId,
   siteId: mongoose.Schema.Types.ObjectId, 
   itemId: mongoose.Schema.Types.ObjectId,
-  godown: String, // Added to track which godown the material left/entered
+  godown: String, 
   quantity: Number, 
   rate: Number, 
   loadingCharges: { type: Number, default: 0 },
@@ -59,44 +58,50 @@ app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
 app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
 
-// --- UPDATED ROUTES FOR GODOWN ---
 app.post('/add-item', async (req, res) => {
-    const { itemName, category, totalStock, godown } = req.body;
-    // Look for item matching name, category AND godown
-    let item = await Inventory.findOne({ itemName, category, godown });
-    if (item) {
-        item.totalStock += Number(totalStock);
-        item.availableStock += Number(totalStock);
-        await item.save();
-    } else {
-        await new Inventory({ itemName, category, godown, totalStock, availableStock: totalStock }).save();
-    }
-    res.send("Success");
+    try {
+        const { itemName, category, totalStock, godown } = req.body;
+        let item = await Inventory.findOne({ itemName, category, godown });
+        if (item) {
+            item.totalStock += Number(totalStock);
+            item.availableStock += Number(totalStock);
+            await item.save();
+        } else {
+            await new Inventory({ itemName, category, godown, totalStock, availableStock: totalStock }).save();
+        }
+        res.send("Success");
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.post('/dispatch', async (req, res) => {
-    const { itemId, quantity } = req.body;
-    const item = await Inventory.findById(itemId);
-    if (!item || item.availableStock < quantity) {
-        return res.status(400).json({message: Insufficient Stock in ${item ? item.godown : 'Godown'}});
-    }
-    item.availableStock -= Number(quantity);
-    await item.save();
-    const count = await Transaction.countDocuments({type: 'DC'});
-    const challanNo = DC-${1001 + count};
-    await new Transaction({...req.body, type: 'DC', challanNo, godown: item.godown}).save();
-    res.json({challanNo});
+    try {
+        const { itemId, quantity } = req.body;
+        const item = await Inventory.findById(itemId);
+        if (!item || item.availableStock < quantity) {
+            return res.status(400).json({message: `Insufficient Stock in ${item ? item.godown : 'Godown'}`});
+        }
+        item.availableStock -= Number(quantity);
+        await item.save();
+        const count = await Transaction.countDocuments({type: 'DC'});
+        const challanNo = `DC-${1001 + count}`;
+        // Record godown in transaction for returns
+        await new Transaction({...req.body, type: 'DC', challanNo, godown: item.godown}).save();
+        res.json({challanNo});
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.post('/return', async (req, res) => {
-    const { itemId, quantity } = req.body;
-    const item = await Inventory.findById(itemId);
-    item.availableStock += Number(quantity);
-    await item.save();
-    const count = await Transaction.countDocuments({type: 'RC'});
-    const challanNo = `RC-${1001 + count}`;
-    await new Transaction({...req.body, type: 'RC', challanNo}).save();
-    res.json({challanNo});
+    try {
+        const { itemId, quantity } = req.body;
+        // In return, the itemId refers to the inventory item which already knows its godown
+        const item = await Inventory.findById(itemId);
+        item.availableStock += Number(quantity);
+        await item.save();
+        const count = await Transaction.countDocuments({type: 'RC'});
+        const challanNo = `RC-${1001 + count}`;
+        await new Transaction({...req.body, type: 'RC', challanNo, godown: item.godown}).save();
+        res.json({challanNo});
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.get('/site-balance/:siteId', async (req, res) => {
@@ -111,7 +116,7 @@ app.get('/site-balance/:siteId', async (req, res) => {
     for (let id in bal) {
         if (bal[id] > 0) {
             const item = await Inventory.findById(id);
-            result.push({ itemId: id, itemName: item.itemName, category: item.category, currentBalance: bal[id] });
+            if(item) result.push({ itemId: id, itemName: item.itemName, category: item.category, godown: item.godown, currentBalance: bal[id] });
         }
     }
     res.json(result);
@@ -160,7 +165,6 @@ app.get('/statement/:builderId', async (req, res) => {
         const sites = await Site.find({ builderId: req.params.builderId });
         let totalBilled = 0;
         const inv = await Inventory.find();
-
         for (let site of sites) {
             const txns = await Transaction.find({ siteId: site._id });
             let batches = {};
@@ -190,7 +194,7 @@ app.get('/statement/:builderId', async (req, res) => {
                 });
             }
         }
-        res.json({ payments, totalBilled, totalPaid: payments.reduce((s, p) => s + p.amountPaid, 0) });
+        res.json({ payments, totalBilled, totalPaid: payments.reduce((s, p) => s + p.amountPaid, 0), outstanding: totalBilled - payments.reduce((s, p) => s + p.amountPaid, 0) });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
