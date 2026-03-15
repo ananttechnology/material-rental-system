@@ -9,154 +9,183 @@
         :root {
             --primary: #2c3e50; --secondary: #34495e; --accent: #3498db;
             --success: #27ae60; --danger: #e74c3c; --warning: #f39c12;
-            --light: #ecf0f1; --sidebar-width: 260px;
+            --light: #f4f7f6; --sidebar-width: 260px;
         }
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; display: flex; height: 100vh; overflow: hidden; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--light); display: flex; height: 100vh; overflow: hidden; }
         
-        /* Sidebar Styles */
-        #sidebar { 
-            width: var(--sidebar-width); background: var(--primary); color: white; 
-            transition: 0.3s; display: flex; flex-direction: column; position: relative;
-        }
-        #sidebar.collapsed { width: 60px; }
-        .nav-header { padding: 20px; text-align: center; background: rgba(0,0,0,0.2); font-weight: bold; overflow: hidden; white-space: nowrap; }
-        .nav-item { 
-            padding: 15px 20px; cursor: pointer; display: flex; align-items: center; 
-            border-bottom: 1px solid rgba(255,255,255,0.05); transition: 0.2s;
-        }
-        .nav-item:hover { background: var(--secondary); }
-        .nav-item i { margin-right: 15px; width: 20px; text-align: center; }
-        #sidebar.collapsed .nav-item span { display: none; }
+        /* Sidebar */
+        #sidebar { width: var(--sidebar-width); background: var(--primary); color: white; transition: 0.3s; display: flex; flex-direction: column; position: relative; z-index: 10; }
+        #sidebar.collapsed { width: 70px; }
+        .nav-header { padding: 25px; text-align: center; background: rgba(0,0,0,0.2); font-weight: bold; font-size: 1.2rem; }
+        .nav-item { padding: 15px 25px; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); transition: 0.2s; white-space: nowrap; }
+        .nav-item:hover { background: var(--accent); }
+        .nav-item i { margin-right: 15px; width: 20px; font-size: 1.1rem; }
+        #sidebar.collapsed span { display: none; }
         #sidebar.collapsed .nav-item i { margin-right: 0; }
-        
-        #toggle-btn { 
-            position: absolute; bottom: 20px; right: -15px; background: var(--accent); 
-            color: white; border-radius: 50%; width: 30px; height: 30px; 
-            display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white;
-        }
+        #toggle-btn { position: absolute; bottom: 30px; right: -15px; background: var(--accent); color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; z-index: 20; }
 
         /* Main Content */
         #main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .top-bar { background: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .content-area { padding: 30px; }
+        .top-bar { background: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .content-area { padding: 30px 40px; }
 
-        /* Dashboard Cards */
-        .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid var(--accent); }
-        .card h3 { margin: 0; font-size: 0.9rem; color: #7f8c8d; text-transform: uppercase; }
-        .card .value { font-size: 1.8rem; font-weight: bold; margin: 10px 0; color: var(--primary); }
+        /* Cards */
+        .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-bottom: 4px solid var(--accent); cursor: pointer; transition: 0.3s; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0; font-size: 0.85rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; }
+        .card .value { font-size: 1.6rem; font-weight: bold; margin-top: 10px; color: var(--primary); display: flex; align-items: center; justify-content: space-between; }
+        .card i { color: var(--accent); opacity: 0.7; }
+
+        /* Sections */
+        .section { background: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border-top: 5px solid #eee; }
+        .dispatch-sec { border-top-color: var(--danger); }
+        .return-sec { border-top-color: var(--accent); }
+        .report-sec { border-top-color: var(--warning); }
+        .pay-sec { border-top-color: #e83e8c; }
         
-        /* Form Sections (Hidden by default, shown when selected) */
-        .page { display: none; }
-        .page.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .form-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); max-width: 800px; margin: 0 auto; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        button { background: var(--success); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        input, select, textarea { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; }
+        button { background: var(--success); color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
         button:hover { filter: brightness(1.1); }
+
+        /* Modal Popups */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; position: relative; animation: slideIn 0.3s ease-out; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .close-btn { position: absolute; top: 20px; right: 25px; font-size: 28px; cursor: pointer; color: #999; transition: 0.2s; line-height: 1; }
+        .close-btn:hover { color: var(--danger); }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; }
-        th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
-        th { background: #f8f9fa; color: var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #eee; padding: 15px; text-align: left; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .msg-area { margin-top: 15px; font-weight: bold; }
+        .page { display: none; }
+        .active { display: block; }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
-    <div class="nav-header">ERP PORTAL</div>
+    <div class="nav-header">CJ ERP</div>
     <div id="toggle-btn" onclick="toggleSidebar()"><i class="fas fa-chevron-left"></i></div>
-    
-    <div class="nav-item" onclick="showPage('dashboard')"><i class="fas fa-chart-line"></i><span>Dashboard</span></div>
-    <div class="nav-item" onclick="showPage('builder')"><i class="fas fa-user-plus"></i><span>Create Builder</span></div>
-    <div class="nav-item" onclick="showPage('site')"><i class="fas fa-map-marker-alt"></i><span>Add Site</span></div>
-    <div class="nav-item" onclick="showPage('inventory')"><i class="fas fa-boxes"></i><span>Inventory Entry</span></div>
-    <div class="nav-item" onclick="showPage('dispatch')"><i class="fas fa-truck-loading"></i><span>Dispatch (DC)</span></div>
-    <div class="nav-item" onclick="showPage('return')"><i class="fas fa-truck-pickup"></i><span>Return (RC)</span></div>
-    <div class="nav-item" onclick="showPage('transfer')"><i class="fas fa-exchange-alt"></i><span>Godown Transfer</span></div>
-    <div class="nav-item" onclick="showPage('payments')"><i class="fas fa-file-invoice-dollar"></i><span>Payment Tracking</span></div>
+    <div class="nav-item" onclick="showPage('dashboard')"><i class="fas fa-th-large"></i><span>Dashboard</span></div>
+    <div class="nav-item" onclick="showPage('builder')"><i class="fas fa-user-plus"></i><span>Builders</span></div>
+    <div class="nav-item" onclick="showPage('site')"><i class="fas fa-map-marked-alt"></i><span>Sites</span></div>
+    <div class="nav-item" onclick="showPage('inventory')"><i class="fas fa-box-open"></i><span>Inventory</span></div>
+    <div class="nav-item" onclick="showPage('transfer')"><i class="fas fa-exchange-alt"></i><span>Stock Transfer</span></div>
+    <div class="nav-item" onclick="showPage('billing')"><i class="fas fa-file-invoice"></i><span>Billing Engine</span></div>
 </div>
 
 <div id="main">
     <div class="top-bar">
-        <h2 id="page-title">Dashboard</h2>
-        <button class="sync-btn" onclick="masterSync()" style="width: auto; padding: 8px 15px; background: var(--secondary);">🔄 Sync Data</button>
+        <h2 id="page-title">Dashboard Overview</h2>
+        <button onclick="masterSync()" style="width: auto; padding: 10px 20px; background: var(--secondary);">🔄 Refresh Data</button>
     </div>
 
     <div class="content-area">
         <div id="dashboard" class="page active">
             <div class="dash-grid">
-    <div class="card" onclick="openStockModal('Ankleshwar')">
-        <h3>Ankleshwar Stock</h3>
-        <div class="value"><i class="fas fa-warehouse"></i> View List</div>
-    </div>
-    <div class="card" onclick="openStockModal('Dahej')">
-        <h3>Dahej Stock</h3>
-        <div class="value"><i class="fas fa-warehouse"></i> View List</div>
-    </div>
-    <div class="card" onclick="openMonthlyModal('billed')">
-        <h3>Current Month Billed</h3>
-        <div id="dash-billed" class="value">₹0</div>
-    </div>
-    <div class="card" onclick="openMonthlyModal('out')">
-        <h3>Total Outstanding</h3>
-        <div id="dash-out" class="value">₹0</div>
-    </div>
-</div>
-
-<div class="section dispatch-sec">
-    <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
-    ...
-    <div id="msg4" class="msg-area"></div>
-</div>
-
-<div class="section return-sec">
-    <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
-    ...
-    <div id="msg5" class="msg-area"></div>
-</div>
-
-<div class="section report-sec">
-    <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
-    <div class="grid">
-        <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select>
-        <select id="repSite"></select>
-    </div>
-    <button onclick="openSiteReportModal()">Generate Holding List</button>
-</div>
-
-<div class="section pay-sec">
-    <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
-    ...
-    <div id="msg8" class="msg-area"></div>
-</div>
-
-<div id="dataModal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="closeModal()">&times;</span>
-        <h2 id="modalTitle">Report</h2>
-        <div id="modalBody"></div>
-    </div>
-</div>
-        </div>
-
-        <div id="builder" class="page">
-            <div class="form-container">
-                <h2>Create Builder Profile</h2>
-                <div class="grid">
-                    <input type="text" id="compName" placeholder="Company Name *">
-                    <input type="text" id="bMobile" placeholder="Mobile Number">
-                    <input type="email" id="bEmail" placeholder="Email">
-                    <input type="text" id="bGst" placeholder="GST Number">
+                <div class="card" onclick="openStockModal('Ankleshwar')">
+                    <h3>Ankleshwar Godown</h3>
+                    <div class="value"><span id="stat-ank">0</span> <i class="fas fa-warehouse"></i></div>
                 </div>
-                <textarea id="bAddr" placeholder="Office Address"></textarea>
-                <button onclick="saveBuilder()">Save Builder</button>
-                <div id="msg1" class="msg-area"></div>
+                <div class="card" onclick="openStockModal('Dahej')">
+                    <h3>Dahej Godown</h3>
+                    <div class="value"><span id="stat-dah">0</span> <i class="fas fa-warehouse"></i></div>
+                </div>
+                <div class="card" onclick="openMonthlyModal('billed')">
+                    <h3>Month Billed</h3>
+                    <div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-alt"></i></div>
+                </div>
+                <div class="card" onclick="openMonthlyModal('out')">
+                    <h3>Total Outstanding</h3>
+                    <div class="value">₹<span id="dash-out">0</span> <i class="fas fa-money-bill-wave"></i></div>
+                </div>
+            </div>
+
+            <div class="section dispatch-sec">
+                <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
+                <div class="grid">
+                    <select id="dBuilder" onchange="loadSites('dBuilder','dSite')"></select>
+                    <select id="dSite"></select>
+                </div>
+                <div class="grid">
+                    <select id="dItem" onchange="showStock('dItem','stockStatus')"></select>
+                    <span id="stockStatus" style="font-weight: bold; color: var(--accent);">Available: 0</span>
+                </div>
+                <div class="grid">
+                    <input type="number" id="dQty" placeholder="Quantity">
+                    <input type="number" id="dRate" placeholder="Daily Rate (₹)">
+                </div>
+                <div class="grid">
+                    <input type="number" id="dLoading" placeholder="Loading Charges (₹)">
+                    <input type="date" id="dDate">
+                </div>
+                <button onclick="processTxn('dispatch')" style="background: var(--danger);">Confirm Dispatch</button>
+                <div id="msg4" class="msg-area"></div>
+                <button id="btnPrintDC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
+            </div>
+
+            <div class="section return-sec">
+                <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
+                <div class="grid">
+                    <select id="rBuilder" onchange="loadSites('rBuilder','rSite')"></select>
+                    <select id="rSite" onchange="loadReturnItems()"></select>
+                </div>
+                <select id="rItem"></select>
+                <div class="grid">
+                    <input type="number" id="rQty" placeholder="Qty Returned">
+                    <input type="number" id="rUnloading" placeholder="Unloading Charges (₹)">
+                </div>
+                <input type="date" id="rDate">
+                <button onclick="processTxn('return')" style="background: var(--accent);">Confirm Return</button>
+                <div id="msg5" class="msg-area"></div>
+                <button id="btnPrintRC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('RC')">🖨️ Print Return Challan</button>
+            </div>
+
+            <div class="section report-sec">
+                <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
+                <div class="grid">
+                    <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select>
+                    <select id="repSite"></select>
+                </div>
+                <button onclick="openSiteReportModal()" style="background: var(--warning); color: #000;">🔍 Generate Holding List</button>
+            </div>
+
+            <div class="section pay-sec">
+                <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
+                <select id="pBuilder" onchange="loadLedger()"><option value="">-- Select Builder --</option></select>
+                <div class="grid">
+                    <input type="number" id="pAmount" placeholder="Amount Paid (₹)">
+                    <select id="pMode">
+                        <option value="Cash">Cash</option>
+                        <option value="Online">Online / G-Pay</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Bank">Bank Transfer</option>
+                    </select>
+                </div>
+                <div class="grid"><input type="text" id="pRef" placeholder="Ref No."><input type="date" id="pDate"></div>
+                <button onclick="recordPayment()" style="background: #e83e8c;">Confirm Payment Receipt</button>
+                <div id="msg8" class="msg-area"></div>
+                <div id="ledgerDisplay"></div>
             </div>
         </div>
 
+        <div id="dataModal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <h2 id="modalTitle" style="color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px;">Report View</h2>
+                <div id="modalBody"></div>
+            </div>
         </div>
+
+        <div id="builder" class="page"><div class="form-container"><h2>New Builder</h2><input type="text" id="compName" placeholder="Name"><input type="text" id="bMobile" placeholder="Mobile"><input type="text" id="bGst" placeholder="GST"><textarea id="bAddr" placeholder="Address"></textarea><button onclick="saveBuilder()">Save</button><div id="msg1"></div></div></div>
+        <div id="site" class="page"><div class="form-container"><h2>Link New Site</h2><select id="builderSelect"></select><input type="text" id="sName" placeholder="Site Name"><textarea id="sAddr" placeholder="Site Address"></textarea><button onclick="saveSite()">Link</button><div id="msg2"></div></div></div>
+        <div id="inventory" class="page"><div class="form-container"><h2>Inventory Addition</h2><select id="itemName" onchange="updateCategories()"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Quantity"><button onclick="saveItem()">Add Stock</button><div id="msg3"></div></div></div>
+        <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateTransferCategories()"></select><select id="tCategory"></select><select id="tFrom"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="Dahej">Dahej</option><option value="Ankleshwar">Ankleshwar</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
+        <div id="billing" class="page"><div class="section bill-sec"><h2>Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><label><input type="checkbox" id="gstToggle" onchange="updateBillDisplay()"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="billDisplay"></div><button onclick="printDoc('billDisplay', 'INVOICE')" style="background: #343a40; margin-top: 10px;">🖨️ Print Bill</button><div id="msg7"></div></div></div>
+    </div>
 </div>
 
 <script>
@@ -166,102 +195,70 @@
     let currentBillData = [];
     let currentServiceTotal = 0;
 
-    // --- UTILITY: Validation, Message & Reset ---
-    function validate(fields, msgId) {
-        const msg = document.getElementById(msgId);
-        for (let key in fields) {
-            if (fields[key] === null || fields[key] === undefined || fields[key].toString().trim() === "") {
-                msg.style.color = "red";
-                msg.innerHTML = "⚠️ Error: Please fill all boxes compulsory.";
-                return false;
-            }
-        }
-        msg.innerHTML = "";
-        return true;
+    // Sidebar & Navigation
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
+    function showPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1) + " Section";
     }
 
-    function showSuccess(msgId, text, sectionIds = []) {
-        const msg = document.getElementById(msgId);
-        msg.style.color = "green";
-        msg.innerHTML = "✅ " + text;
-        // Clear the input boxes for this section
-        sectionIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = ""; 
+    // Modal Controls
+    function openModal(title, content) {
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('modalBody').innerHTML = content;
+        document.getElementById('dataModal').style.display = 'block';
+    }
+    function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
+    window.onclick = function(e) { if(e.target == document.getElementById('dataModal')) closeModal(); }
+
+    // Dashboard Interaction
+    function openStockModal(godown) {
+        let h = `<table><tr><th>Item</th><th>Category</th><th>Stock</th></tr>`;
+        fullInventory.filter(i => i.godown === godown).forEach(i => {
+            h += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.availableStock}</td></tr>`;
         });
-        setTimeout(() => msg.innerHTML = "", 5000);
+        openModal(godown + " Godown Stock", h + "</table>");
     }
 
-    async function masterSync() {
-        await loadBuilders();
-        await initInventory();
-    }
-
-    async function loadBuilders() {
-        const res = await fetch(`${API_URL}/builders`);
+    async function openMonthlyModal(type) {
+        const res = await fetch(`${API_URL}/company-stats`);
         const data = await res.json();
+        let h = `<table><tr><th>Month</th><th>Collection/Billed</th></tr>`;
+        data.history.forEach(r => h += `<tr><td>${r.month}</td><td>₹${r.amount}</td></tr>`);
+        openModal(type === 'billed' ? "Monthly Billed History" : "Outstanding Records", h + "</table>");
+    }
+
+    // Logic Functions
+    async function masterSync() {
+        const res = await fetch(`${API_URL}/builders`);
+        const b = await res.json();
         ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
             const s = document.getElementById(id);
             if(s) {
-                const currentVal = s.value;
                 s.innerHTML = '<option value="">-- Select Builder --</option>';
-                data.forEach(b => s.innerHTML += `<option value="${b._id}">${b.companyName}</option>`);
-                s.value = currentVal;
+                b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`);
             }
         });
-    }
 
-    async function initInventory() {
-    try {
-        const res = await fetch(`${API_URL}/inventory`);
-        fullInventory = await res.json();
-        const dItem = document.getElementById('dItem'); // Only target Dispatch dropdown here
+        const invRes = await fetch(`${API_URL}/inventory`);
+        fullInventory = await invRes.json();
+        const dItem = document.getElementById('dItem');
         if(dItem) {
-            dItem.innerHTML = '<option value="">-- Select Item (Godown) --</option>';
-            fullInventory.forEach(i => {
-                dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
-            });
+            dItem.innerHTML = '<option value="">-- Select Material --</option>';
+            fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`);
         }
-        // Notice we removed rItem from here
-    } catch (e) { console.error("Inventory Load Fail", e); }
-    }
+        
+        // Update Dash Stats
+        let ank = 0, dah = 0;
+        fullInventory.forEach(i => { if(i.godown === "Ankleshwar") ank += i.availableStock; else dah += i.availableStock; });
+        document.getElementById('stat-ank').innerText = ank;
+        document.getElementById('stat-dah').innerText = dah;
 
-    async function saveBuilder() {
-        const body = {
-            companyName: document.getElementById('compName').value,
-            mobile: document.getElementById('bMobile').value,
-            email: document.getElementById('bEmail').value,
-            gstNumber: document.getElementById('bGst').value,
-            address: document.getElementById('bAddr').value
-        };
-        if (!validate(body, 'msg1')) return;
-        await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg1', "Builder Profile Created!", ['compName', 'bMobile', 'bEmail', 'bGst', 'bAddr']);
-        masterSync();
-    }
-
-    async function saveSite() {
-        const body = {
-            builderId: document.getElementById('builderSelect').value,
-            siteName: document.getElementById('sName').value,
-            siteAddress: document.getElementById('sAddr').value
-        };
-        if (!validate(body, 'msg2')) return;
-        await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg2', "Site Linked!", ['builderSelect', 'sName', 'sAddr']);
-    }
-
-    async function saveItem() {
-        const body = {
-            itemName: document.getElementById('itemName').value,
-            category: document.getElementById('category').value,
-            godown: document.getElementById('iGodown').value,
-            totalStock: document.getElementById('qty').value
-        };
-        if (!validate(body, 'msg3')) return;
-        await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg3', `Stock added to ${body.godown}!`, ['itemName', 'category', 'iGodown', 'qty']);
-        masterSync();
+        const statRes = await fetch(`${API_URL}/company-stats`);
+        const stats = await statRes.json();
+        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
+        document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
     }
 
     async function processTxn(type) {
@@ -271,99 +268,70 @@
             builderId: document.getElementById(`${p}Builder`).value,
             siteId: document.getElementById(`${p}Site`).value,
             itemId: document.getElementById(`${p}Item`).value,
-            quantity: document.getElementById(`${p}Qty`).value,
+            quantity: Number(document.getElementById(`${p}Qty`).value),
             date: document.getElementById(`${p}Date`).value,
-            rate: type === 'dispatch' ? document.getElementById(`dRate`).value : 0,
-            loadingCharges: type === 'dispatch' ? document.getElementById(`dLoading`).value : 0,
-            unloadingCharges: type === 'return' ? document.getElementById(`rUnloading`).value : 0
+            rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0,
+            loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0,
+            unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0
         };
-        if (!validate(body, msgId)) return;
+        
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
         if(res.ok) {
-            const itemSelect = document.getElementById(`${p}Item`);
-            const itemText = itemSelect.options[itemSelect.selectedIndex].text;
-            // Extract Godown name from the text "Item (Cat) - Godown [Stock]"
-            const godownPart = itemText.split('-')[1].split('[')[0].trim();
-
-            lastTxn = { ...body, challanNo: result.challanNo, godown: godownPart,
+            const itemText = document.getElementById(`${p}Item`).options[document.getElementById(`${p}Item`).selectedIndex].text;
+            lastTxn = { ...body, challanNo: result.challanNo, godown: itemText.split('-')[1].split('[')[0].trim(),
                 builder: document.getElementById(`${p}Builder`).options[document.getElementById(`${p}Builder`).selectedIndex].text,
                 site: document.getElementById(`${p}Site`).options[document.getElementById(`${p}Site`).selectedIndex].text,
                 item: itemText.split('-')[0].trim() 
             };
-            showSuccess(msgId, `Confirmed: ${result.challanNo}`, [`${p}Builder`, `${p}Site`, `${p}Item`, `${p}Qty`, `${p}Date`, `dRate`, `dLoading`, `rUnloading`]);
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
+            document.getElementById(msgId).innerHTML = "✅ Success: " + result.challanNo;
             masterSync();
         } else {
-            document.getElementById(msgId).style.color = "red";
-            document.getElementById(msgId).innerHTML = "❌ " + result.message;
+            alert(result.message);
         }
     }
 
-    // --- REMAINING FUNCTIONS (Report, Bill, Payment) ---
-    async function getSiteReport() {
-        const siteId = document.getElementById('repSite').value;
-        if (!validate({siteId}, 'msg6')) return;
-        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+    async function loadReturnItems() {
+        const res = await fetch(`${API_URL}/site-balance/${document.getElementById('rSite').value}`);
         const data = await res.json();
-        let h = '<table><tr><th>Item (Godown)</th><th>Qty on Site</th></tr>';
-        data.forEach(i => h += `<tr><td>${i.itemName} (${i.category}) - ${i.godown}</td><td>${i.currentBalance}</td></tr>`);
-        document.getElementById('reportContainer').innerHTML = h + '</table>';
-        showSuccess('msg6', "Report Loaded.");
+        const r = document.getElementById('rItem');
+        r.innerHTML = '<option value="">-- Material on Site --</option>';
+        data.forEach(i => r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
     }
 
-    async function generateBill() {
-        const siteId = document.getElementById('billSite').value;
-        if (!validate({siteId}, 'msg7')) return;
-        const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
+    async function openSiteReportModal() {
+        const res = await fetch(`${API_URL}/site-balance/${document.getElementById('repSite').value}`);
         const data = await res.json();
-        currentBillData = data.billDetails;
-        currentServiceTotal = data.serviceCharges;
-        updateBillDisplay();
-        showSuccess('msg7', "Bill Ready.");
+        let h = `<table><tr><th>Item</th><th>Godown</th><th>Quantity</th></tr>`;
+        data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
+        openModal("Site Holding Report", h + "</table>");
     }
 
     async function recordPayment() {
-        const body = {
-            builderId: document.getElementById('pBuilder').value,
-            amountPaid: document.getElementById('pAmount').value,
-            paymentMode: document.getElementById('pMode').value,
-            referenceNo: document.getElementById('pRef').value,
-            date: document.getElementById('pDate').value
-        };
-        if (!validate(body, 'msg8')) return;
+        const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value };
         await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        showSuccess('msg8', "Payment Recorded!", ['pAmount', 'pMode', 'pRef', 'pDate']);
+        document.getElementById('msg8').innerHTML = "✅ Payment Recorded";
         loadLedger();
+        masterSync();
     }
 
     async function loadLedger() {
-        const bId = document.getElementById('pBuilder').value;
-        if (!bId) return;
-        const res = await fetch(`${API_URL}/statement/${bId}`);
+        const res = await fetch(`${API_URL}/statement/${document.getElementById('pBuilder').value}`);
         const data = await res.json();
-        let h = `<div class="total-box" style="text-align:left;"><p>Total Billed: ₹${data.totalBilled.toFixed(2)}</p><p>Total Paid: ₹${data.totalPaid.toFixed(2)}</p><h3>Outstanding: ₹${data.outstanding.toFixed(2)}</h3></div><h3>Payment History</h3><table><tr><th>Date</th><th>Mode</th><th>Ref</th><th>Amt</th></tr>`;
-        data.payments.forEach(p => h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>${p.referenceNo}</td><td>₹${p.amountPaid}</td></tr>`);
-        document.getElementById('ledgerDisplay').innerHTML = h + '</table>';
+        let h = `<div style="background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;"><h3>Outstanding Balance: ₹${data.outstanding.toLocaleString()}</h3></div>`;
+        h += `<table><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
+        data.payments.forEach(p => h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`);
+        document.getElementById('ledgerDisplay').innerHTML = h + "</table>";
     }
 
-    // Helpers for dynamic sites/categories
+    // Shared UI Helpers
     async function loadSites(bId, sId) {
-        const val = document.getElementById(bId).value;
-        if(!val) return;
-        const res = await fetch(`${API_URL}/sites/${val}`);
+        const res = await fetch(`${API_URL}/sites/${document.getElementById(bId).value}`);
         const data = await res.json();
         const s = document.getElementById(sId);
         s.innerHTML = '<option value="">-- Select Site --</option>';
-        data.forEach(site => s.innerHTML += `<option value="${site._id}">${site.siteName}</option>`);
-    }
-
-    function updateCategories() {
-        const item = document.getElementById('itemName').value;
-        const cat = document.getElementById('category');
-        cat.innerHTML = '';
-        const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
-        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
+        data.forEach(x => s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`);
     }
 
     function showStock(id, label) {
@@ -371,184 +339,34 @@
         document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
     }
 
-    async function loadReturnItems() {
-    const siteId = document.getElementById('rSite').value;
-    const msgId = 'msg5';
-    if(!siteId) return;
-
-    try {
-        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-        const data = await res.json();
-        const rItem = document.getElementById('rItem');
-        
-        rItem.innerHTML = '<option value="">-- Select Item to Return --</option>';
-        
-        if (data.length === 0) {
-            rItem.innerHTML = '<option value="">No items currently at this site</option>';
-            return;
-        }
-
-        data.forEach(i => {
-            // Displays: MS Plate (3x24) - Ankleshwar [Bal: 10]
-            rItem.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`;
-        });
-    } catch (e) {
-        console.error("Error loading return items", e);
-    }
-    }
-
-    function updateBillDisplay() {
-        let h = '<table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Amt</th></tr>';
-        let subRent = 0;
-        currentBillData.forEach(i => {
-            h += `<tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.amount}</td></tr>`;
-            subRent += i.amount;
-        });
-        let subtotal = subRent + currentServiceTotal;
-        const gst = document.getElementById('gstToggle').checked ? subtotal * 0.18 : 0;
-        document.getElementById('billDisplay').innerHTML = h + `</table><div class="total-box"><p>Total Rent: ₹${subRent.toFixed(2)}</p><p>Loading/Unloading: ₹${currentServiceTotal.toFixed(2)}</p>${document.getElementById('gstToggle').checked ? `<p>GST (18%): ₹${gst.toFixed(2)}</p>` : ''}<h3>Grand Total: ₹${(subtotal + gst).toFixed(2)}</h3></div>`;
-    }
-
-    function printDoc(el, title) {
-        const content = document.getElementById(el).innerHTML;
-        const win = window.open('', '', 'height=600,width=800');
-        win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:10px;text-align:left;} th{background:#eee;} .header{text-align:center;margin-bottom:30px;}</style></head><body>');
-        win.document.write('<div class="header"><h1>COMPANY NAME</h1><h2>'+title+'</h2></div>' + content + '</body></html>');
-        win.document.close();
-        win.print();
+    function updateCategories() {
+        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3M','2.5M','2M','1.5M','1M','0.5M'], 'MS Ledger': ['900mm','1200mm','1500mm'] };
+        const item = document.getElementById('itemName').value;
+        const cat = document.getElementById('category');
+        cat.innerHTML = '';
+        (list[item] || ['N/A']).forEach(c => cat.innerHTML += `<option value="${c}">${c}</option>`);
     }
 
     function printChallan(type) {
-        if(!lastTxn) return;
-        const title = type === 'DC' ? "DISPATCH CHALLAN" : "RETURN CHALLAN";
-        const chargeLabel = type === 'DC' ? "Loading Charges" : "Unloading Charges";
-        const chargeAmt = type === 'DC' ? (lastTxn.loadingCharges || 0) : (lastTxn.unloadingCharges || 0);
-        
         const win = window.open('', '', 'height=600,width=800');
-        win.document.write('<html><head><title>'+title+'</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} .header{text-align:center;border-bottom:2px solid #333;margin-bottom:20px;} .footer{margin-top:60px;display:flex;justify-content:space-between;text-align:center;}</style></head><body>');
-        win.document.write('<div class="header"><h1>COMPANY NAME</h1><p>Material Rental & Scaffolding Solutions</p><h2>' + title + '</h2></div>');
-        win.document.write('<p><b>Challan No:</b> ' + lastTxn.challanNo + ' | <b>Date:</b> ' + lastTxn.date + '</p>');
-        win.document.write('<p><b>Builder:</b> ' + lastTxn.builder + '<br><b>Site Location:</b> ' + lastTxn.site + '</p>');
-        win.document.write('<table><tr><th>Description of Material</th><th>Godown</th><th>Quantity</th></tr>');
-        win.document.write('<tr><td>' + lastTxn.item + '</td><td>' + lastTxn.godown + '</td><td>' + lastTxn.quantity + ' Nos.</td></tr>');
-        if(chargeAmt > 0) win.document.write('<tr><td colspan="2" style="text-align:right;"><b>' + chargeLabel + ':</b></td><td><b>₹' + chargeAmt + '</b></td></tr>');
-        win.document.write('</table><div class="footer"><div><p>_________________</p><p>Driver/Transporter</p></div><div><p>_________________</p><p>Receiver Signature</p></div><div><p>_________________</p><p>Authorised Signatory</p></div></div></body></html>');
+        win.document.write(`<html><head><title>Challan</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:12px;}</style></head><body>`);
+        win.document.write(`<h2>${type === 'DC' ? 'DISPATCH' : 'RETURN'} CHALLAN</h2>`);
+        win.document.write(`<p><b>Challan:</b> ${lastTxn.challanNo} | <b>Date:</b> ${lastTxn.date}</p>`);
+        win.document.write(`<p><b>Builder:</b> ${lastTxn.builder}<br><b>Site:</b> ${lastTxn.site}</p>`);
+        win.document.write(`<table><tr><th>Material</th><th>Godown</th><th>Qty</th></tr><tr><td>${lastTxn.item}</td><td>${lastTxn.godown}</td><td>${lastTxn.quantity}</td></tr></table>`);
+        win.document.write(`</body></html>`);
         win.document.close();
         win.print();
     }
-    function updateTransferCategories() {
-        const item = document.getElementById('tItemName').value;
-        const cat = document.getElementById('tCategory');
-        cat.innerHTML = '';
-        const data = { 'MS Plate': ['3 x 24', '3 x 21', '3 x 18', '3 x 15', '3 x 12', '3 x 9', '3 x 6'], 'MS Props Jack': ['3 x 3', '2.5 x 2.5', '2 x 2'], 'Cuplock Vertical': ['3 Mtr', '2.5 Mtr', '2 Mtr', '1.5 Mtr', '1 Mtr', '0.5 Mtr'], 'MS Ledger': ['900 mm', '1200 mm', '1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
-        (data[item] || ['N/A']).forEach(s => cat.innerHTML += `<option value="${s}">${s}</option>`);
-    }
 
-    async function transferStock() {
-        const body = {
-            itemName: document.getElementById('tItemName').value,
-            category: document.getElementById('tCategory').value,
-            fromGodown: document.getElementById('tFrom').value,
-            toGodown: document.getElementById('tTo').value,
-            quantity: document.getElementById('tQty').value
-        };
-
-        if (body.fromGodown === body.toGodown) {
-            return showMessage('msg9', "⚠️ Source and Destination Godown cannot be the same.");
-        }
-        if (!validate(body, 'msg9')) return;
-
-        const res = await fetch(`${API_URL}/transfer-stock`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
+    window.onload = () => {
+        masterSync();
+        const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
+        ['itemName', 'tItemName'].forEach(id => {
+            const el = document.getElementById(id);
+            items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
         });
-        const result = await res.json();
-
-        if (res.ok) {
-            showSuccess('msg9', `Successfully moved ${body.quantity} items to ${body.toGodown}`, ['tQty', 'tFrom', 'tTo', 'tItemName']);
-            masterSync(); // This refreshes dispatch/return stock lists instantly
-        } else {
-            document.getElementById('msg9').style.color = "red";
-            document.getElementById('msg9').innerHTML = "❌ " + result.message;
-        }
     }
-    function toggleSidebar() {
-    const sb = document.getElementById('sidebar');
-    const icon = document.querySelector('#toggle-btn i');
-    sb.classList.toggle('collapsed');
-    icon.classList.toggle('fa-chevron-left');
-    icon.classList.toggle('fa-chevron-right');
-    }
-
-    function showPage(pageId) {
-    // Hide all pages
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    // Show selected
-    document.getElementById(pageId).classList.add('active');
-    // Update Title
-    document.getElementById('page-title').innerText = pageId.charAt(0).toUpperCase() + pageId.slice(1);
-    }
-
-// Enhance MasterSync to update Dashboard Stats
-    async function updateDashboardStats() {
-    let ank = 0, dah = 0;
-    fullInventory.forEach(i => {
-        if(i.godown === "Ankleshwar") ank += i.availableStock;
-        if(i.godown === "Dahej") dah += i.availableStock;
-    });
-    document.getElementById('stat-ank').innerText = ank;
-    document.getElementById('stat-dah').innerText = dah;
-    
-    // Note: To get Total Billed/Outstanding globally, we would need 
-    // a small backend change, but for now, we can update these when a builder is selected.
-}
-    function openStockModal(godownName) {
-    document.getElementById('modalTitle').innerText = godownName + " Godown Stock";
-    let h = `<table><tr><th>Item</th><th>Category</th><th>Available</th></tr>`;
-    fullInventory.filter(i => i.godown === godownName).forEach(item => {
-        h += `<tr><td>${item.itemName}</td><td>${item.category}</td><td>${item.availableStock}</td></tr>`;
-    });
-    document.getElementById('modalBody').innerHTML = h + `</table>`;
-    document.getElementById('dataModal').style.display = 'block';
-}
-
-async function openMonthlyModal(type) {
-    document.getElementById('modalTitle').innerText = type === 'billed' ? "Monthly Billing History" : "Monthly Outstanding History";
-    // Fetch history from /company-stats
-    const res = await fetch(`${API_URL}/company-stats`);
-    const data = await res.json();
-    let h = `<table><tr><th>Month</th><th>Amount</th></tr>`;
-    data.history.forEach(row => {
-        h += `<tr><td>${row.month}</td><td>₹${row.amount}</td></tr>`;
-    });
-    document.getElementById('modalBody').innerHTML = h + `</table>`;
-    document.getElementById('dataModal').style.display = 'block';
-}
-
-async function openSiteReportModal() {
-    const siteId = document.getElementById('repSite').value;
-    if(!siteId) return alert("Select site first");
-    
-    document.getElementById('modalTitle').innerText = "Current Site Holdings";
-    const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-    const data = await res.json();
-    let h = '<table><tr><th>Item</th><th>Qty on Site</th></tr>';
-    data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.currentBalance}</td></tr>`);
-    document.getElementById('modalBody').innerHTML = h + '</table>';
-    document.getElementById('dataModal').style.display = 'block';
-}
-
-function closeModal() {
-    document.getElementById('dataModal').style.display = 'none';
-}
-
-// Close modal if user clicks outside the box
-window.onclick = function(event) {
-    if (event.target == document.getElementById('dataModal')) closeModal();
-}
-
-    window.onload = masterSync;
 </script>
 </body>
 </html>
