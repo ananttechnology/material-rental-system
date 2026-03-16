@@ -198,79 +198,135 @@
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1) + " Section";
+        document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1);
     }
 
-    function openModal(title, content) {
-        document.getElementById('modalTitle').innerText = title;
-        document.getElementById('modalBody').innerHTML = content;
-        document.getElementById('dataModal').style.display = 'block';
+    function openModal(title, content) { 
+        document.getElementById('modalTitle').innerText = title; 
+        document.getElementById('modalBody').innerHTML = content; 
+        document.getElementById('dataModal').style.display = 'block'; 
     }
     
     function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
 
     async function masterSync() {
-        const res = await fetch(`${API_URL}/builders`);
-        const b = await res.json();
-        ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
-            const s = document.getElementById(id);
-            if(s) {
-                s.innerHTML = '<option value="">-- Select Builder --</option>';
-                b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`);
+        try {
+            const res = await fetch(`${API_URL}/builders`);
+            const b = await res.json();
+            ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
+                const s = document.getElementById(id);
+                if(s) {
+                    s.innerHTML = '<option value="">-- Select Builder --</option>';
+                    b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`);
+                }
+            });
+
+            const invRes = await fetch(`${API_URL}/inventory`);
+            fullInventory = await invRes.json();
+            const dItem = document.getElementById('dItem');
+            if(dItem) {
+                dItem.innerHTML = '<option value="">-- Select Material --</option>';
+                fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`);
             }
-        });
+            
+            let ank = 0, dah = 0;
+            fullInventory.forEach(i => { if(i.godown === "Ankleshwar") ank += i.availableStock; else dah += i.availableStock; });
+            document.getElementById('stat-ank').innerText = ank;
+            document.getElementById('stat-dah').innerText = dah;
 
-        const invRes = await fetch(`${API_URL}/inventory`);
-        fullInventory = await invRes.json();
-        const dItem = document.getElementById('dItem');
-        if(dItem) {
-            dItem.innerHTML = '<option value="">-- Select Material --</option>';
-            fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`);
-        }
-        
-        let ank = 0, dah = 0;
-        fullInventory.forEach(i => { if(i.godown === "Ankleshwar") ank += i.availableStock; else dah += i.availableStock; });
-        document.getElementById('stat-ank').innerText = ank;
-        document.getElementById('stat-dah').innerText = dah;
-
-        const statRes = await fetch(`${API_URL}/company-stats`);
-        const stats = await statRes.json();
-        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
-        document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
+            const statRes = await fetch(`${API_URL}/company-stats`);
+            const stats = await statRes.json();
+            document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
+            document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
+        } catch (e) { console.error("Sync Error:", e); }
     }
 
-    // --- RESTORED ENTRY FUNCTIONS ---
+    // --- BUILDER SECTION ---
     async function saveBuilder() {
-        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, email: document.getElementById('bEmail').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
+        const body = { 
+            companyName: document.getElementById('compName').value, 
+            mobile: document.getElementById('bMobile').value, 
+            gstNumber: document.getElementById('bGst').value, 
+            address: document.getElementById('bAddr').value 
+        };
         await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg1').innerHTML = "✅ Saved"; masterSync();
+        document.getElementById('msg1').innerHTML = "✅ Builder Saved Successfully"; 
+        masterSync();
     }
 
+    // --- SITE SECTION ---
     async function saveSite() {
-        const body = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value };
+        const body = { 
+            builderId: document.getElementById('builderSelect').value, 
+            siteName: document.getElementById('sName').value, 
+            siteAddress: document.getElementById('sAddr').value 
+        };
         await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg2').innerHTML = "✅ Linked"; masterSync();
+        document.getElementById('msg2').innerHTML = "✅ Site Linked Successfully"; 
+        masterSync();
     }
 
+    // --- INVENTORY SECTION ---
     async function saveItem() {
-        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, godown: document.getElementById('iGodown').value, totalStock: Number(document.getElementById('qty').value) };
+        const body = { 
+            itemName: document.getElementById('itemName').value, 
+            category: document.getElementById('category').value, 
+            godown: document.getElementById('iGodown').value, 
+            totalStock: Number(document.getElementById('qty').value) 
+        };
         await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg3').innerHTML = "✅ Stock Added"; masterSync();
+        document.getElementById('msg3').innerHTML = "✅ Stock Added Successfully"; 
+        masterSync();
     }
 
+    // --- TRANSFER SECTION ---
     async function transferStock() {
-        const body = { itemName: document.getElementById('tItemName').value, category: document.getElementById('tCategory').value, fromGodown: document.getElementById('tFrom').value, toGodown: document.getElementById('tTo').value, quantity: document.getElementById('tQty').value };
+        const body = { 
+            itemName: document.getElementById('tItemName').value, 
+            category: document.getElementById('tCategory').value, 
+            fromGodown: document.getElementById('tFrom').value, 
+            toGodown: document.getElementById('tTo').value, 
+            quantity: document.getElementById('tQty').value 
+        };
         const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg9').innerHTML = res.ok ? "✅ Transferred" : "❌ Error"; masterSync();
+        const result = await res.json();
+        document.getElementById('msg9').innerHTML = res.ok ? "✅ Stock Transferred" : "❌ " + result.message;
+        masterSync();
     }
 
+    // --- BILLING ENGINE ---
+    async function generateBill() {
+        const siteId = document.getElementById('billSite').value;
+        if(!siteId) return;
+        const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
+        const data = await res.json();
+        let h = '<table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Amt</th></tr>';
+        let subtotal = 0;
+        data.billDetails.forEach(i => {
+            h += `<tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.days} days</td><td>₹${i.amount}</td></tr>`;
+            subtotal += i.amount;
+        });
+        const final = subtotal + data.serviceCharges;
+        document.getElementById('billDisplay').innerHTML = h + `</table><h3>Total: ₹${final}</h3>`;
+    }
+
+    // --- TRANSACTION LOGIC (Dispatch/Return) ---
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
-        const body = { builderId: document.getElementById(`${p}Builder`).value, siteId: document.getElementById(`${p}Site`).value, itemId: document.getElementById(`${p}Item`).value, quantity: Number(document.getElementById(`${p}Qty`).value), date: document.getElementById(`${p}Date`).value, rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 };
+        const body = { 
+            builderId: document.getElementById(`${p}Builder`).value, 
+            siteId: document.getElementById(`${p}Site`).value, 
+            itemId: document.getElementById(`${p}Item`).value, 
+            quantity: Number(document.getElementById(`${p}Qty`).value), 
+            date: document.getElementById(`${p}Date`).value, 
+            rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, 
+            loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
+            unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 
+        };
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
         if(res.ok) {
-            const itemText = document.getElementById(`${p}Item`).options[document.getElementById(`${p}Item`).selectedIndex].text;
+            const itemText = document.getElementById(`${p}Item`).selectedOptions[0].text;
             lastTxn = { ...body, challanNo: result.challanNo, godown: itemText.split('-')[1].split('[')[0].trim(), builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: itemText.split('-')[0].trim() };
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
             document.getElementById(`msg${type === 'dispatch' ? '4' : '5'}`).innerHTML = "✅ " + result.challanNo;
@@ -278,6 +334,7 @@
         } else alert(result.message);
     }
 
+    // --- SITE HOLDING & LEDGER ---
     async function loadReturnItems() {
         const res = await fetch(`${API_URL}/site-balance/${document.getElementById('rSite').value}`);
         const data = await res.json();
@@ -297,24 +354,31 @@
     async function recordPayment() {
         const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value };
         await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg8').innerHTML = "✅ Recorded"; loadLedger(); masterSync();
+        document.getElementById('msg8').innerHTML = "✅ Payment Recorded"; 
+        loadLedger(); masterSync();
     }
 
     async function loadLedger() {
         const res = await fetch(`${API_URL}/statement/${document.getElementById('pBuilder').value}`);
         const data = await res.json();
-        let h = `<div style="background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;"><h3>Outstanding: ₹${data.outstanding.toLocaleString()}</h3></div>`;
+        let h = `<div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-top:15px;"><h4>Outstanding: ₹${data.outstanding.toLocaleString()}</h4></div>`;
         h += `<table><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
         data.payments.forEach(p => h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`);
         document.getElementById('ledgerDisplay').innerHTML = h + "</table>";
     }
 
+    // --- SHARED HELPERS ---
     async function loadSites(bId, sId) {
         const res = await fetch(`${API_URL}/sites/${document.getElementById(bId).value}`);
         const data = await res.json();
         const s = document.getElementById(sId);
         s.innerHTML = '<option value="">-- Select Site --</option>';
         data.forEach(x => s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`);
+    }
+
+    function showStock(id, label) {
+        const item = fullInventory.find(i => i._id === document.getElementById(id).value);
+        document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
     }
 
     function openStockModal(godown) {
@@ -325,37 +389,32 @@
 
     function openMonthlyModal(type) { openModal("Month History", "<p>Current stats are live on dashboard cards.</p>"); }
 
-    function showStock(id, label) {
-        const item = fullInventory.find(i => i._id === document.getElementById(id).value);
-        document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
-    }
-
     function updateCategories() {
-        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3M','2.5M','2M','1.5M','1M','0.5M'] };
+        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3M','2.5M','2M','1.5M','1M','0.5M'], 'MS Ledger': ['900mm','1200mm','1500mm'] };
         const item = document.getElementById('itemName').value;
         const cat = document.getElementById('category'); cat.innerHTML = '';
         (list[item] || ['N/A']).forEach(c => cat.innerHTML += `<option value="${c}">${c}</option>`);
     }
 
     function updateTransferCategories() {
+        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3M','2.5M','2M','1.5M','1M','0.5M'], 'MS Ledger': ['900mm','1200mm','1500mm'] };
         const item = document.getElementById('tItemName').value;
         const cat = document.getElementById('tCategory'); cat.innerHTML = '';
-        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3M','2.5M','2M','1.5M','1M','0.5M'] };
         (list[item] || ['N/A']).forEach(c => cat.innerHTML += `<option value="${c}">${c}</option>`);
     }
 
     function printChallan(type) {
         const win = window.open('', '', 'height=600,width=800');
-        win.document.write(`<html><body><h2>CHALLAN</h2><p>${lastTxn.challanNo}</p><p>${lastTxn.builder}</p></body></html>`);
+        win.document.write(`<html><head><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:10px;}</style></head><body><h2>CHALLAN: ${lastTxn.challanNo}</h2><p>Builder: ${lastTxn.builder}</p><table><tr><th>Item</th><th>Qty</th></tr><tr><td>${lastTxn.item}</td><td>${lastTxn.quantity}</td></tr></table></body></html>`);
         win.document.close(); win.print();
     }
 
     window.onload = () => {
         masterSync();
-        const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical'];
+        const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
         ['itemName', 'tItemName'].forEach(id => {
             const el = document.getElementById(id);
-            items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
+            if(el) items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
         });
     }
 </script>
