@@ -452,7 +452,7 @@
         
         if (list[itemVal]) {
             list[itemVal].forEach(c => {
-                catSelect.innerHTML += <option value="${c}"${c}</option>;
+                catSelect.innerHTML += <option value="${c}">${c}</option>;
             });
         } else if (itemVal !== "") {
             catSelect.innerHTML += <option value="N/A">N/A</option>;
