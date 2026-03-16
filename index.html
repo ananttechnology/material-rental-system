@@ -346,12 +346,33 @@
     }
 
     function updateCategories(idPrefix = '') {
-        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
-        const itemVal = document.getElementById(idPrefix === 't' ? 'tItemName' : 'itemName').value;
-        const catSelect = document.getElementById(idPrefix === 't' ? 'tCategory' : 'category');
-        catSelect.innerHTML = '<option value="">-- Select Type --</option>';
-        (list[itemVal] || ['Standard']).forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    const list = { 
+        'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 
+        'MS Props Jack': ['3x3','2.5x2.5','2x2'], 
+        'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'],
+        'MS Ledger': ['900 mm','1200 mm','1500 mm'],
+        'Ms Pipe': ['6 mtr', '3 mtr'],
+        'Channel': ['6 mtr', '3 mtr'],
+        'Ms Clamp': ['Fix', 'Round (360°)'] 
+    };
+
+    // This line determines if we are looking at 'itemName' or 'tItemName'
+    const itemVal = document.getElementById(idPrefix === 't' ? 'tItemName' : 'itemName').value;
+    // This line determines if we are filling 'category' or 'tCategory'
+    const catSelect = document.getElementById(idPrefix === 't' ? 'tCategory' : 'category');
+    
+    if (!catSelect) return;
+
+    catSelect.innerHTML = '<option value="">-- Select Type --</option>';
+    
+    if (list[itemVal]) {
+        list[itemVal].forEach(c => {
+            catSelect.innerHTML += <option value="${c}">${c}</option>;
+        });
+    } else if (itemVal !== "") {
+        catSelect.innerHTML += <option value="Standard">Standard</option>;
     }
+}
 
     function openStockModal(godown) {
         let h = `<table><tr><th>Item</th><th>Stock</th></tr>`;
