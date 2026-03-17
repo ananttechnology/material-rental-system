@@ -237,19 +237,64 @@
 }
 
     async function saveItem() {
-        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, godown: document.getElementById('iGodown').value, totalStock: Number(document.getElementById('qty').value) };
-        if (!validate(body, 'msg3')) return;
-        await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg3').innerHTML = "✅ Updated"; masterSync();
+    const body = { 
+        itemName: document.getElementById('itemName').value, 
+        category: document.getElementById('category').value, 
+        godown: document.getElementById('iGodown').value, 
+        totalStock: Number(document.getElementById('qty').value) 
+    };
+    if (!validate(body, 'msg3')) return;
+    
+    const res = await fetch(`${API_URL}/add-item`, { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify(body) 
+    });
+
+    if (res.ok) {
+        document.getElementById('msg3').innerHTML = "✅ Updated";
+        
+        // --- RESET FIELDS ---
+        document.getElementById('qty').value = "";
+        document.getElementById('itemName').value = "";
+        document.getElementById('category').innerHTML = '<option value="">-- Select Type --</option>';
+        
+        masterSync();
     }
+}
 
     async function transferStock() {
-        const body = { itemName: document.getElementById('tItemName').value, category: document.getElementById('tCategory').value, fromGodown: document.getElementById('tFrom').value, toGodown: document.getElementById('tTo').value, quantity: Number(document.getElementById('tQty').value) };
-        if (!validate(body, 'msg9')) return;
-        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) { document.getElementById('msg9').innerHTML = "✅ Transferred"; masterSync(); }
-        else { const r = await res.json(); alert(r.message); }
+    const body = { 
+        itemName: document.getElementById('tItemName').value, 
+        category: document.getElementById('tCategory').value, 
+        fromGodown: document.getElementById('tFrom').value, 
+        toGodown: document.getElementById('tTo').value, 
+        quantity: Number(document.getElementById('tQty').value) 
+    };
+    if (!validate(body, 'msg9')) return;
+    
+    const res = await fetch(`${API_URL}/transfer-stock`, { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify(body) 
+    });
+
+    if(res.ok) { 
+        document.getElementById('msg9').innerHTML = "✅ Transferred";
+        
+        // --- RESET FIELDS ---
+        document.getElementById('tQty').value = "";
+        document.getElementById('tItemName').value = "";
+        document.getElementById('tCategory').innerHTML = '<option value="">-- Select Type --</option>';
+        document.getElementById('tFrom').value = "";
+        document.getElementById('tTo').value = "";
+        
+        masterSync(); 
+    } else { 
+        const r = await res.json(); 
+        alert(r.message); 
     }
+}
 
     async function processTxn(type) {
     const btn = event.target; // Gets the button you clicked
