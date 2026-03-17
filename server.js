@@ -178,15 +178,43 @@ app.get('/company-stats', async (req, res) => {
 });
 
 app.post('/transfer-stock', async (req, res) => {
-    const { itemName, category, fromGodown, toGodown, quantity } = req.body;
-    let src = await Inventory.findOne({ itemName, category, godown: fromGodown });
-    if (!src || src.availableStock < Number(quantity)) return res.status(400).json({message: "No Stock"});
-    let dst = await Inventory.findOne({ itemName, category, godown: toGodown });
-    if (!dst) dst = new Inventory({ itemName, category, godown: toGodown, totalStock: 0, availableStock: 0 });
-    src.availableStock -= Number(quantity); src.totalStock -= Number(quantity);
-    dst.availableStock += Number(quantity); dst.totalStock += Number(quantity);
-    await src.save(); await dst.save();
-    res.json({message: "Success"});
+    try {
+        const { itemName, category, fromGodown, toGodown, quantity } = req.body;
+        const qty = Number(quantity);
+
+        // Find source with Case-Insensitive search to catch "old" stock
+        let src = await Inventory.findOne({ 
+            itemName: { $regex: new RegExp("^" + itemName.trim() + "$", "i") },
+            category: { $regex: new RegExp("^" + category.trim() + "$", "i") },
+            godown: fromGodown 
+        });
+
+        if (!src || src.availableStock < qty) {
+            return res.status(400).json({ message: `No Stock found in ${fromGodown}` });
+        }
+
+        // Find or Create Destination
+        let dst = await Inventory.findOne({ 
+            itemName: { $regex: new RegExp("^" + itemName.trim() + "$", "i") },
+            category: { $regex: new RegExp("^" + category.trim() + "$", "i") },
+            godown: toGodown 
+        });
+
+        if (!dst) {
+            dst = new Inventory({ itemName, category, godown: toGodown, totalStock: 0, availableStock: 0 });
+        }
+
+        // Execute Move
+        src.availableStock -= qty;
+        src.totalStock -= qty;
+        dst.availableStock += qty;
+        dst.totalStock += qty;
+
+        await src.save();
+        await dst.save();
+
+        res.json({ message: "Success" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("Saved"); });
