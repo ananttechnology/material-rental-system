@@ -9,13 +9,13 @@ app.use(express.json());
 const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; 
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ DB Connected Successfully"))
-  .catch((err) => console.error("❌ DB Connection Error:", err));
+  .then(() => console.log("✅ DB Connected"))
+  .catch((err) => console.error("❌ DB Error:", err));
 
 // --- SCHEMAS ---
 const Builder = mongoose.model('Builder', new mongoose.Schema({
   companyName: { type: String, required: true },
-  mobile: String, email: String, gstNumber: String, address: String
+  mobile: String, gstNumber: String, address: String
 }));
 
 const Site = mongoose.model('Site', new mongoose.Schema({
@@ -42,32 +42,30 @@ const Payment = mongoose.model('Payment', new mongoose.Schema({
   paymentMode: String, referenceNo: String, date: { type: Date, default: Date.now }
 }));
 
-// --- INTERNAL FINANCIAL LOGIC (Fixes the 0 Dashboard issue) ---
+// --- BILLING LOGIC ---
 async function calculateFinancials(builderId) {
     const sites = await Site.find({ builderId });
     const payments = await Payment.find({ builderId });
     let totalBilled = 0;
-
     for (let site of sites) {
         const txns = await Transaction.find({ siteId: site._id }).sort({ date: 1 });
-        let itemBatches = {};
+        let batches = {};
         txns.forEach(t => {
             totalBilled += (Number(t.loadingCharges) || 0) + (Number(t.unloadingCharges) || 0);
-            if (!itemBatches[t.itemId]) itemBatches[t.itemId] = [];
-            itemBatches[t.itemId].push({ ...t._doc });
+            if (!batches[t.itemId]) batches[t.itemId] = [];
+            batches[t.itemId].push({ ...t._doc });
         });
-
-        for (let id in itemBatches) {
-            let dcs = itemBatches[id].filter(x => x.type === 'DC');
-            let rcs = itemBatches[id].filter(x => x.type === 'RC');
+        for (let id in batches) {
+            let dcs = batches[id].filter(x => x.type === 'DC');
+            let rcs = batches[id].filter(x => x.type === 'RC');
             rcs.forEach(r => {
-                let qty = r.quantity;
+                let q = r.quantity;
                 for (let d of dcs) {
-                    if (d.quantity > 0 && qty > 0) {
-                        let take = Math.min(d.quantity, qty);
+                    if (d.quantity > 0 && q > 0) {
+                        let take = Math.min(d.quantity, q);
                         let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
                         totalBilled += (take * d.rate * (days < 1 ? 1 : days));
-                        d.quantity -= take; qty -= take;
+                        d.quantity -= take; q -= take;
                     }
                 }
             });
@@ -79,7 +77,7 @@ async function calculateFinancials(builderId) {
             });
         }
     }
-    const totalPaid = payments.reduce((sum, p) => sum + p.amountPaid, 0);
+    const totalPaid = payments.reduce((s, p) => s + p.amountPaid, 0);
     return { totalBilled, totalPaid, outstanding: totalBilled - totalPaid, payments };
 }
 
@@ -91,39 +89,48 @@ app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
 app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
 
-// --- DEEP CLEAN ADD ITEM ---
 app.post('/add-item', async (req, res) => {
     try {
-        // Clean the data: Remove ALL spaces and make Uppercase
-        // "3 x 3" becomes "3X3" and "3x3" becomes "3X3"
-        const cleanName = req.body.itemName.replace(/\s+/g, '').toUpperCase();
-        const cleanCat = req.body.category.replace(/\s+/g, '').toUpperCase();
-        const godown = req.body.godown;
-        const totalStock = Number(req.body.totalStock);
-
-        // Find existing using a Regex that ignores spaces
+        const { itemName, category, totalStock, godown } = req.body;
         let item = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + req.body.itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            category: { $regex: new RegExp("^" + req.body.category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
             godown: godown 
         });
-
         if (item) {
-            item.totalStock += totalStock;
-            item.availableStock += totalStock;
+            item.totalStock += Number(totalStock);
+            item.availableStock += Number(totalStock);
             await item.save();
-            res.send("Merged successfully");
         } else {
-            await new Inventory({ 
-                itemName: req.body.itemName.trim(), 
-                category: req.body.category.trim(), 
-                godown, 
-                totalStock, 
-                availableStock: totalStock 
-            }).save();
-            res.send("Created successfully");
+            await new Inventory({ itemName, category, godown, totalStock, availableStock: totalStock }).save();
         }
+        res.send("Success");
     } catch (e) { res.status(500).send(e.message); }
+});
+
+app.post('/transfer-stock', async (req, res) => {
+    try {
+        const { itemName, category, fromGodown, toGodown, quantity } = req.body;
+        const qty = Number(quantity);
+        let src = await Inventory.findOne({ 
+            itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            godown: fromGodown 
+        });
+        if (!src || src.availableStock < qty) return res.status(400).json({ message: "No Stock Found" });
+        let dst = await Inventory.findOne({ 
+            itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            godown: toGodown 
+        });
+        if (!dst) {
+            dst = new Inventory({ itemName: src.itemName, category: src.category, godown: toGodown, totalStock: 0, availableStock: 0 });
+        }
+        src.availableStock -= qty; src.totalStock -= qty;
+        dst.availableStock += qty; dst.totalStock += qty;
+        await src.save(); await dst.save();
+        res.json({ message: "Success" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/dispatch', async (req, res) => {
@@ -167,127 +174,19 @@ app.get('/site-balance/:siteId', async (req, res) => {
     res.json(result);
 });
 
-app.get('/statement/:builderId', async (req, res) => {
-    const data = await calculateFinancials(req.params.builderId);
-    res.json(data);
-});
+app.get('/statement/:builderId', async (req, res) => res.json(await calculateFinancials(req.params.builderId)));
 
 app.get('/company-stats', async (req, res) => {
     const builders = await Builder.find();
-    let totalBilled = 0;
-    let totalOutstanding = 0;
+    let totalBilled = 0, totalOut = 0;
     for (let b of builders) {
         const stats = await calculateFinancials(b._id);
         totalBilled += stats.totalBilled;
-        totalOutstanding += stats.outstanding;
+        totalOut += stats.outstanding;
     }
-    res.json({ 
-        currentMonthBilled: totalBilled, 
-        totalOutstanding: totalOutstanding,
-        history: [{ month: "March 2026", amount: totalBilled }] 
-    });
+    res.json({ currentMonthBilled: totalBilled, totalOutstanding: totalOut, history: [{month: "March 2026", amount: totalBilled}] });
 });
 
-// --- DEEP CLEAN TRANSFER ---
-app.post('/transfer-stock', async (req, res) => {
-    try {
-        const { fromGodown, toGodown } = req.body;
-        const qty = Number(req.body.quantity);
-
-        // Smart Find Source: Ignores spaces between numbers/letters
-        let src = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + req.body.itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            category: { $regex: new RegExp("^" + req.body.category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            godown: fromGodown 
-        });
-
-        if (!src || src.availableStock < qty) {
-            return res.status(400).json({ message: No stock found for this item in ${fromGodown} });
-        }
-
-        // Smart Find Destination
-        let dst = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + req.body.itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            category: { $regex: new RegExp("^" + req.body.category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            godown: toGodown 
-        });
-
-        if (!dst) {
-            dst = new Inventory({ 
-                itemName: src.itemName, 
-                category: src.category, 
-                godown: toGodown, 
-                totalStock: 0, 
-                availableStock: 0 
-            });
-        }
-
-        src.availableStock -= qty;
-        src.totalStock -= qty;
-        dst.availableStock += qty;
-        dst.totalStock += qty;
-
-        await src.save();
-        await dst.save();
-        res.json({ message: "Success" });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get('/calculate-bill/:siteId', async (req, res) => {
-    try {
-        const txns = await Transaction.find({ siteId: req.params.siteId }).sort({ date: 1 });
-        const inv = await Inventory.find();
-        let batches = {}, service = 0, bill = [];
-
-        txns.forEach(t => {
-            service += (Number(t.loadingCharges) || 0) + (Number(t.unloadingCharges) || 0);
-            if (!batches[t.itemId]) batches[t.itemId] = [];
-            batches[t.itemId].push({ ...t._doc });
-        });
-
-        for (let id in batches) {
-            let dcs = batches[id].filter(x => x.type === 'DC');
-            let rcs = batches[id].filter(x => x.type === 'RC');
-            
-            const info = inv.find(i => i._id.toString() === id) || { itemName: "Material", category: "N/A" };
-
-            rcs.forEach(r => {
-                let q = r.quantity;
-                for (let d of dcs) {
-                    if (d.quantity > 0 && q > 0) {
-                        let take = Math.min(d.quantity, q);
-                        let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
-                        bill.push({ 
-                            itemName: info.itemName, 
-                            qty: take, 
-                            dDate: new Date(d.date).toLocaleDateString(), 
-                            rDate: new Date(r.date).toLocaleDateString(), 
-                            days: days < 1 ? 1 : days, 
-                            rate: d.rate, 
-                            amount: take * d.rate * (days < 1 ? 1 : days) 
-                        });
-                        d.quantity -= take; q -= take;
-                    }
-                }
-            });
-
-            dcs.forEach(d => {
-                if (d.quantity > 0) {
-                    let days = Math.floor((new Date() - new Date(d.date)) / 86400000) + 1;
-                    bill.push({ 
-                        itemName: info.itemName, 
-                        qty: d.quantity, 
-                        dDate: new Date(d.date).toLocaleDateString(), 
-                        rDate: "On Site", 
-                        days: days < 1 ? 1 : days, 
-                        rate: d.rate, 
-                        amount: d.quantity * d.rate * (days < 1 ? 1 : days) 
-                    });
-                }
-            });
-        }
-        res.json({ billDetails: bill, serviceCharges: service });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
 app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("Saved"); });
 
 app.listen(5000, () => console.log("Server running"));
