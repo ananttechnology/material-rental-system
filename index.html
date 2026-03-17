@@ -257,7 +257,7 @@
         const body = { builderId: document.getElementById(`${p}Builder`).value, siteId: document.getElementById(`${p}Site`).value, itemId: document.getElementById(`${p}Item`).value, quantity: Number(document.getElementById(`${p}Qty`).value), date: document.getElementById(`${p}Date`).value, rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 };
          // --- MISSING STEP START ---
     // 2. You MUST send the data and wait for the response (res)
-    const res = await fetch(${API_URL}/${type}, { 
+    const res = await fetch(`${API_URL}/${type}`, { 
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify(body) 
