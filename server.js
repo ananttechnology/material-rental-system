@@ -232,6 +232,62 @@ app.post('/transfer-stock', async (req, res) => {
         res.json({ message: "Success" });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+app.get('/calculate-bill/:siteId', async (req, res) => {
+    try {
+        const txns = await Transaction.find({ siteId: req.params.siteId }).sort({ date: 1 });
+        const inv = await Inventory.find();
+        let batches = {}, service = 0, bill = [];
+
+        txns.forEach(t => {
+            service += (Number(t.loadingCharges) || 0) + (Number(t.unloadingCharges) || 0);
+            if (!batches[t.itemId]) batches[t.itemId] = [];
+            batches[t.itemId].push({ ...t._doc });
+        });
+
+        for (let id in batches) {
+            let dcs = batches[id].filter(x => x.type === 'DC');
+            let rcs = batches[id].filter(x => x.type === 'RC');
+            
+            const info = inv.find(i => i._id.toString() === id) || { itemName: "Material", category: "N/A" };
+
+            rcs.forEach(r => {
+                let q = r.quantity;
+                for (let d of dcs) {
+                    if (d.quantity > 0 && q > 0) {
+                        let take = Math.min(d.quantity, q);
+                        let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
+                        bill.push({ 
+                            itemName: info.itemName, 
+                            qty: take, 
+                            dDate: new Date(d.date).toLocaleDateString(), 
+                            rDate: new Date(r.date).toLocaleDateString(), 
+                            days: days < 1 ? 1 : days, 
+                            rate: d.rate, 
+                            amount: take * d.rate * (days < 1 ? 1 : days) 
+                        });
+                        d.quantity -= take; q -= take;
+                    }
+                }
+            });
+
+            dcs.forEach(d => {
+                if (d.quantity > 0) {
+                    let days = Math.floor((new Date() - new Date(d.date)) / 86400000) + 1;
+                    bill.push({ 
+                        itemName: info.itemName, 
+                        qty: d.quantity, 
+                        dDate: new Date(d.date).toLocaleDateString(), 
+                        rDate: "On Site", 
+                        days: days < 1 ? 1 : days, 
+                        rate: d.rate, 
+                        amount: d.quantity * d.rate * (days < 1 ? 1 : days) 
+                    });
+                }
+            });
+        }
+        res.json({ billDetails: bill, serviceCharges: service });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("Saved"); });
 
 app.listen(5000, () => console.log("Server running"));
