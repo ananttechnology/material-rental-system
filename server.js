@@ -83,15 +83,53 @@ app.post('/transfer-stock', async (req, res) => {
     try {
         const { itemName, category, fromGodown, toGodown, quantity } = req.body;
         const qty = Number(quantity);
-        let src = await Inventory.findOne({ itemName: itemName.trim(), category: category.trim(), godown: fromGodown });
-        if (!src || src.availableStock < qty) return res.status(400).json({ message: "Insufficient Stock" });
-        let dst = await Inventory.findOne({ itemName: itemName.trim(), category: category.trim(), godown: toGodown });
-        if (!dst) dst = new Inventory({ itemName: src.itemName, category: src.category, godown: toGodown, totalStock: 0, availableStock: 0 });
-        src.availableStock -= qty; src.totalStock -= qty;
-        dst.availableStock += qty; dst.totalStock += qty;
-        await src.save(); await dst.save();
-        res.json({ message: "Success" });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+
+        if (!qty || qty <= 0) return res.status(400).json({ message: "Invalid quantity" });
+
+        // 1. Find Source Stock (Exact match only)
+        let src = await Inventory.findOne({ 
+            itemName: itemName.trim(),
+            category: category.trim(),
+            godown: fromGodown 
+        });
+
+        // 2. Strict Stock Check
+        if (!src || src.availableStock < qty) {
+            return res.status(400).json({ 
+                message: `Insufficient stock! ${fromGodown} only has ${src ? src.availableStock : 0} units.` 
+            });
+        }
+
+        // 3. Find or Create Destination
+        let dst = await Inventory.findOne({ 
+            itemName: itemName.trim(),
+            category: category.trim(),
+            godown: toGodown 
+        });
+
+        if (!dst) {
+            dst = new Inventory({ 
+                itemName: src.itemName, 
+                category: src.category, 
+                godown: toGodown, 
+                totalStock: 0, 
+                availableStock: 0 
+            });
+        }
+
+        // 4. Atomic Update
+        src.availableStock -= qty;
+        src.totalStock -= qty;
+        dst.availableStock += qty;
+        dst.totalStock += qty;
+
+        await src.save();
+        await dst.save();
+
+        res.json({ message: "Transfer Successful" });
+    } catch (e) {
+        res.status(500).json({ message: "Server Error: " + e.message });
+    }
 });
 
 app.post('/dispatch', async (req, res) => {
