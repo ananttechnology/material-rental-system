@@ -92,16 +92,27 @@ app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(
 app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
 
 app.post('/add-item', async (req, res) => {
-    const { itemName, category, totalStock, godown } = req.body;
-    let item = await Inventory.findOne({ itemName, category, godown });
-    if (item) {
-        item.totalStock += Number(totalStock);
-        item.availableStock += Number(totalStock);
-        await item.save();
-    } else {
-        await new Inventory({ itemName, category, godown, totalStock, availableStock: totalStock }).save();
-    }
-    res.send("Success");
+    try {
+        const { itemName, category, totalStock, godown } = req.body;
+        // Search for exact match to update instead of create
+        let item = await Inventory.findOne({ itemName, category, godown });
+        
+        if (item) {
+            item.totalStock += Number(totalStock);
+            item.availableStock += Number(totalStock);
+            await item.save();
+            res.send("Updated Successfully");
+        } else {
+            await new Inventory({ 
+                itemName, 
+                category, 
+                godown, 
+                totalStock: Number(totalStock), 
+                availableStock: Number(totalStock) 
+            }).save();
+            res.send("Created Successfully");
+        }
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.post('/dispatch', async (req, res) => {
