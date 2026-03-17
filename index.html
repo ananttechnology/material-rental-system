@@ -117,24 +117,7 @@
         <div id="site" class="page"><div class="form-container"><h2>Link New Site</h2><select id="builderSelect"></select><input type="text" id="sName" placeholder="Site Name"><textarea id="sAddr" placeholder="Site Address"></textarea><button onclick="saveSite()">Link Site</button><div id="msg2"></div></div></div>
         <div id="inventory" class="page"><div class="form-container"><h2>Inventory Addition</h2><select id="itemName" onchange="updateCategories('')"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Quantity"><button onclick="saveItem()">Add Stock</button><div id="msg3"></div></div></div>
         <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateCategories('t')"></select><select id="tCategory"></select><select id="tFrom"><option value="">From Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="">To Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
-        <div id="billing" class="page">
-    <div class="section">
-        <h2>Billing Engine</h2>
-        <div class="grid">
-            <select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select>
-            <select id="billSite"></select>
-        </div>
-        <div class="grid" style="margin-top:10px;">
-            <input type="date" id="billStart" placeholder="From Date">
-            <input type="date" id="billEnd" placeholder="To Date">
-        </div>
-        <label style="display:block; margin: 15px 0;">
-            <input type="checkbox" id="gstToggle"> GST 18%
-        </label>
-        <button onclick="generateBill()">Generate Bill</button>
-        <div id="billDisplay"></div>
-    </div>
-</div>
+        <div id="billing" class="page"><div class="section"><h2>Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><div class="grid" style="margin-top:10px;"><input type="date" id="billStart" placeholder="From Date"><input type="date" id="billEnd" placeholder="To Date"></div><label style="display:block; margin: 15px 0;"><input type="checkbox" id="gstToggle"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="holdingDisplay" style="margin-top: 20px;"></div><div id="billDisplay" style="margin-top: 20px;"></div></div></div>
         <div id="dataModal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal()">&times;</span><h2 id="modalTitle">Report</h2><div id="modalBody"></div></div></div>
     </div>
 </div>
@@ -472,50 +455,92 @@
     function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
 
     async function generateBill() {
-    const builderId = document.getElementById('billBuilder').value;
-    const siteId = document.getElementById('billSite').value;
+    const bId = document.getElementById('billBuilder').value;
+    const sId = document.getElementById('billSite').value;
     const start = document.getElementById('billStart').value;
     const end = document.getElementById('billEnd').value;
 
-    if (!siteId || !start || !end) return alert("Please fill Builder, Site/Total, and Date Range.");
+    if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes: Builder, Site, and Date Range.");
 
-    // We pass builderId in the URL for "ALL" logic
-    const res = await fetch(`${API_URL}/calculate-bill/${siteId}?start=${start}&end=${end}&builderId=${builderId}`);
-    const data = await res.json();
-    
-    let h = "";
-    if (data.isConsolidated) {
-        // Render Total Bill grouped by Site
-        data.sites.forEach(site => {
-            h += `<h3 style="background:#f4f4f4; padding:10px; border-left:5px solid var(--accent);">Site: ${site.siteName}</h3>`;
-            h += renderBillTable(site.bill);
-            h += `<p style="text-align:right;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p><hr>`;
-        });
-        const sub = data.totalSubtotal;
-        const ser = data.totalService;
-        const gst = document.getElementById('gstToggle').checked ? (sub + ser) * 0.18 : 0;
-        h += renderBillSummary(sub, ser, gst);
-    } else {
-        // Render Single Site Bill
-        h += renderBillTable(data.bill);
-        const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
-        h += renderBillSummary(data.subtotal, data.service, gst);
+    try {
+        // --- 1. FETCH & RENDER HOLDINGS (Current Stock) ---
+        let holdingH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
+        
+        if (sId === 'ALL') {
+            const resSites = await fetch(`${API_URL}/sites/${bId}`);
+            const sites = await resSites.json();
+            for (let s of sites) {
+                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
+                const bal = await resBal.json();
+                holdingH += `<h4 style="margin-bottom:5px; color:var(--secondary);">Site: ${s.siteName}</h4>`;
+                holdingH += renderHoldingTable(bal);
+            }
+        } else {
+            const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
+            const bal = await resBal.json();
+            holdingH += renderHoldingTable(bal);
+        }
+        document.getElementById('holdingDisplay').innerHTML = holdingH;
+
+        // --- 2. FETCH & RENDER BILLING (Rental Money) ---
+        const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
+        const data = await resBill.json();
+        
+        let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:30px;">💰 Calculated Bill</h2>`;
+        if (data.isConsolidated) {
+            data.sites.forEach(site => {
+                if(site.bill.length > 0) {
+                    billH += `<h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger);">Site: ${site.siteName}</h4>`;
+                    billH += renderBillTable(site.bill);
+                    billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>`;
+                }
+            });
+            const gst = document.getElementById('gstToggle').checked ? (data.totalSubtotal + data.totalService) * 0.18 : 0;
+            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst);
+        } else {
+            billH += renderBillTable(data.bill);
+            const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
+            billH += renderBillSummary(data.subtotal, data.service, gst);
+        }
+        
+        // Add the Print Button at the very end
+        billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
+        
+        document.getElementById('billDisplay').innerHTML = billH;
+
+    } catch (e) {
+        console.error(e);
+        alert("❌ Error generating report. Check console.");
     }
-    document.getElementById('billDisplay').innerHTML = h;
     }
 
-    // Helper functions to keep code clean and undisturbed
+    // Helper: Render the Holding Table
+    function renderHoldingTable(data) {
+    if (data.length === 0) return `<p style="color:gray; font-style:italic;">No items currently held on this site.</p>`;
+    let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
+             <tr style="background:#eee;"><th>Item</th><th>Type</th><th>Qty on Site</th></tr>`;
+    data.forEach(i => { t += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`; });
+    return t + `</table>`;
+    }
+
+    // Helper: Render the Bill Table
     function renderBillTable(billItems) {
-    let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
+    if (billItems.length === 0) return `<p style="color:gray;">No rental activity found for this period.</p>`;
+    let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+             <tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
     billItems.forEach(i => { t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${i.duration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; });
     return t + `</table>`;
     }
 
+    // Helper: Render the Summary
     function renderBillSummary(sub, ser, gst) {
     return `<div style="text-align:right; margin-top:15px; border-top:2px solid #333; padding-top:10px;">
-          <p>Rent: ₹${sub.toLocaleString()}</p><p>Service: ₹${ser.toLocaleString()}</p>
-          <p>GST: ₹${gst.toLocaleString()}</p><h3>Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
+          <p>Rent Subtotal: ₹${sub.toLocaleString()}</p>
+          <p>Service Charges: ₹${ser.toLocaleString()}</p>
+          <p>GST (18%): ₹${gst.toLocaleString()}</p>
+          <h3 style="color:var(--danger);">Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
     }
+    
     async function printHoldingReport() {
     const siteId = document.getElementById('repSite').value;
     const builderName = document.getElementById('repBuilder').selectedOptions[0].text;
