@@ -130,7 +130,6 @@
     function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
     function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; }
     function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
-    window.onclick = function(e) { if(e.target == document.getElementById('dataModal')) closeModal(); }
 
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
@@ -174,64 +173,12 @@
     }
 
     async function transferStock() {
-    const btn = event.target;
-    const msg = document.getElementById('msg9');
-    
-    const body = { 
-        itemName: document.getElementById('tItemName').value, 
-        category: document.getElementById('tCategory').value, 
-        fromGodown: document.getElementById('tFrom').value, 
-        toGodown: document.getElementById('tTo').value, 
-        quantity: document.getElementById('tQty').value 
-    };
-
-    // 1. Validation Check
-    if (!validate(body, 'msg9')) return;
-
-    if (body.fromGodown === body.toGodown) {
-        msg.style.color = "red";
-        msg.innerHTML = "⚠️ Error: Source and Destination must be different.";
-        return;
+        const body = { itemName: document.getElementById('tItemName').value, category: document.getElementById('tCategory').value, fromGodown: document.getElementById('tFrom').value, toGodown: document.getElementById('tTo').value, quantity: Number(document.getElementById('tQty').value) };
+        if (!validate(body, 'msg9')) return;
+        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        if(res.ok) { document.getElementById('msg9').innerHTML = "✅ Transferred"; masterSync(); }
+        else { const r = await res.json(); alert(r.message); }
     }
-
-    // Disable button to prevent double-clicks
-    btn.disabled = true;
-    btn.innerHTML = "Processing...";
-
-    try {
-        const res = await fetch(`${API_URL}/transfer-stock`, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(body) 
-        });
-        
-        const result = await res.json();
-
-        if (res.ok) {
-            msg.style.color = "green";
-            msg.innerHTML = `✅ Successfully moved ${body.quantity} units to ${body.toGodown}`;
-            
-            // 2. STRICT RESET: Return all boxes to original position
-            document.getElementById('tItemName').value = "";
-            document.getElementById('tCategory').innerHTML = '<option value="">-- Select Type --</option>';
-            document.getElementById('tFrom').value = "";
-            document.getElementById('tTo').value = "";
-            document.getElementById('tQty').value = "";
-            
-            masterSync(); // Refresh stock data
-        } else {
-            // 3. SHOW ERROR BELOW BUTTON (Not in browser tab)
-            msg.style.color = "red";
-            msg.innerHTML = "❌ " + result.message;
-        }
-    } catch (e) {
-        msg.style.color = "red";
-        msg.innerHTML = "❌ Connection Error. Try again.";
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = "Confirm Transfer";
-    }
-}
 
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
@@ -240,7 +187,11 @@
         if (!validate(body, msgId)) return;
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
-        if(res.ok) { lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] }; document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block'; document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; masterSync(); }
+        if(res.ok) {
+            lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] };
+            document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
+            document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; masterSync();
+        } else { alert(result.message); }
     }
 
     function openStockModal(godown) {
@@ -258,15 +209,12 @@
     }
 
     async function loadLedger() {
-        const bId = document.getElementById('pBuilder').value;
-        if (!bId) return;
+        const bId = document.getElementById('pBuilder').value; if (!bId) return;
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
-        let h = `<h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
-        data.payments.forEach(p => {
-            h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`;
-        });
-        h += `</table><div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;"><p>Total Billed: ₹${data.totalBilled.toLocaleString()}</p><p>Total Paid: ₹${data.totalPaid.toLocaleString()}</p><hr><h3>Outstanding: ₹${data.outstanding.toLocaleString()}</h3></div>`;
+        let h = `<h4>History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
+        data.payments.forEach(p => h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`);
+        h += `</table><div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;"><p>Outstanding: ₹${data.outstanding.toLocaleString()}</p></div>`;
         document.getElementById('ledgerDisplay').innerHTML = h;
     }
 
@@ -279,20 +227,20 @@
     }
 
     async function loadReturnItems() {
-        const res = await fetch(`${API_URL}/site-balance/${document.getElementById('rSite').value}`);
+        const siteId = document.getElementById('rSite').value; if(!siteId) return;
+        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
         const data = await res.json();
         const r = document.getElementById('rItem');
-        r.innerHTML = '<option value="">-- Material on Site --</option>';
+        r.innerHTML = '<option value="">-- Items on Site --</option>';
         data.forEach(i => r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
     }
 
     async function openSiteReportModal() {
-        const siteId = document.getElementById('repSite').value;
-        if (!siteId) return alert("Select Site");
+        const siteId = document.getElementById('repSite').value; if (!siteId) return alert("Select Site");
         const res = await fetch(`${API_URL}/site-balance/${siteId}`);
         const data = await res.json();
         let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-        data.forEach(i => h += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`);
+        data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
         openModal("Site Holdings", h + "</table>");
     }
 
@@ -306,11 +254,10 @@
         (list[val] || ['N/A']).forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
     }
 
-    function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>Challan No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
+    function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
 
     async function generateBill() {
-        const siteId = document.getElementById('billSite').value;
-        if (!siteId) return alert("Select Site");
+        const siteId = document.getElementById('billSite').value; if (!siteId) return alert("Select Site");
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
         const data = await res.json();
         let h = `<table style="width:100%; border-collapse:collapse;"><tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
