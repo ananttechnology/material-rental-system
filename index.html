@@ -174,12 +174,64 @@
     }
 
     async function transferStock() {
-        const body = { itemName: document.getElementById('tItemName').value, category: document.getElementById('tCategory').value, fromGodown: document.getElementById('tFrom').value, toGodown: document.getElementById('tTo').value, quantity: Number(document.getElementById('tQty').value) };
-        if (!validate(body, 'msg9')) return;
-        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) { document.getElementById('msg9').innerHTML = "✅ Transferred"; masterSync(); }
-        else { const r = await res.json(); alert(r.message); }
+    const btn = event.target;
+    const msg = document.getElementById('msg9');
+    
+    const body = { 
+        itemName: document.getElementById('tItemName').value, 
+        category: document.getElementById('tCategory').value, 
+        fromGodown: document.getElementById('tFrom').value, 
+        toGodown: document.getElementById('tTo').value, 
+        quantity: document.getElementById('tQty').value 
+    };
+
+    // 1. Validation Check
+    if (!validate(body, 'msg9')) return;
+
+    if (body.fromGodown === body.toGodown) {
+        msg.style.color = "red";
+        msg.innerHTML = "⚠️ Error: Source and Destination must be different.";
+        return;
     }
+
+    // Disable button to prevent double-clicks
+    btn.disabled = true;
+    btn.innerHTML = "Processing...";
+
+    try {
+        const res = await fetch(`${API_URL}/transfer-stock`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(body) 
+        });
+        
+        const result = await res.json();
+
+        if (res.ok) {
+            msg.style.color = "green";
+            msg.innerHTML = `✅ Successfully moved ${body.quantity} units to ${body.toGodown}`;
+            
+            // 2. STRICT RESET: Return all boxes to original position
+            document.getElementById('tItemName').value = "";
+            document.getElementById('tCategory').innerHTML = '<option value="">-- Select Type --</option>';
+            document.getElementById('tFrom').value = "";
+            document.getElementById('tTo').value = "";
+            document.getElementById('tQty').value = "";
+            
+            masterSync(); // Refresh stock data
+        } else {
+            // 3. SHOW ERROR BELOW BUTTON (Not in browser tab)
+            msg.style.color = "red";
+            msg.innerHTML = "❌ " + result.message;
+        }
+    } catch (e) {
+        msg.style.color = "red";
+        msg.innerHTML = "❌ Connection Error. Try again.";
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "Confirm Transfer";
+    }
+}
 
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
