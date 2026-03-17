@@ -217,7 +217,6 @@
     let fullInventory = [];
     let lastTxn = null;
 
-    // UI Helpers
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -230,24 +229,17 @@
         document.getElementById('dataModal').style.display = 'block'; 
     }
     function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
-    window.onclick = function(e) { if(e.target == document.getElementById('dataModal')) closeModal(); }
 
-    // Logic: Validation & Reset
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
         for (let key in fields) {
             if (fields[key] === null || fields[key] === undefined || fields[key].toString().trim() === "") {
-                msg.style.color = "red"; msg.innerHTML = "⚠️ Error: Please fill all boxes."; return false;
+                msg.style.color = "red"; msg.innerHTML = "⚠️ Error: Fill all boxes."; return false;
             }
         }
         msg.innerHTML = ""; return true;
     }
 
-    function resetFields(ids) {
-        ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-    }
-
-    // Core Data Sync
     async function masterSync() {
         try {
             const res = await fetch(`${API_URL}/builders`);
@@ -255,159 +247,84 @@
             ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
                 const s = document.getElementById(id);
                 if(s) {
-                    const current = s.value;
+                    const cur = s.value;
                     s.innerHTML = '<option value="">-- Select Builder --</option>';
                     b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`);
-                    s.value = current;
+                    s.value = cur;
                 }
             });
-
             const invRes = await fetch(`${API_URL}/inventory`);
             fullInventory = await invRes.json();
-            
             const dItem = document.getElementById('dItem');
             if(dItem) {
                 dItem.innerHTML = '<option value="">-- Select Material --</option>';
-                fullInventory.forEach(i => {
-                    if(i.availableStock > 0)
-                        dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
-                });
+                fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`);
             }
-            
             document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
             document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
-
             const statRes = await fetch(`${API_URL}/company-stats`);
             const stats = await statRes.json();
             document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
             document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
-        } catch (e) { console.error("Sync Fail", e); }
+        } catch (e) { console.error(e); }
     }
 
-    // Operation Functions
     async function saveBuilder() {
         const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
         if (!validate(body, 'msg1')) return;
         await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg1').style.color = "green"; document.getElementById('msg1').innerHTML = "✅ Saved";
-        resetFields(['compName', 'bMobile', 'bGst', 'bAddr']); masterSync();
+        document.getElementById('msg1').innerHTML = "✅ Saved"; masterSync();
     }
 
     async function saveItem() {
         const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, godown: document.getElementById('iGodown').value, totalStock: Number(document.getElementById('qty').value) };
         if (!validate(body, 'msg3')) return;
         await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg3').style.color = "green"; document.getElementById('msg3').innerHTML = "✅ Stock Merged";
-        resetFields(['qty']); masterSync();
+        document.getElementById('msg3').innerHTML = "✅ Updated"; masterSync();
     }
 
     async function transferStock() {
-    const body = { 
-        itemName: document.getElementById('tItemName').value, 
-        category: document.getElementById('tCategory').value, 
-        fromGodown: document.getElementById('tFrom').value, 
-        toGodown: document.getElementById('tTo').value, 
-        quantity: document.getElementById('tQty').value 
-    };
-
-    if (!validate(body, 'msg9')) return;
-
-    try {
-        const res = await fetch(`${API_URL}/transfer-stock`, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(body) 
-        });
-        
-        const result = await res.json();
-
-        if(res.ok) {
-            document.getElementById('msg9').style.color = "green";
-            document.getElementById('msg9').innerHTML = "✅ Transferred Successfully";
-            
-            // RESET BOXES TO ORIGINAL POSITION
-            document.getElementById('tQty').value = "";
-            document.getElementById('tItemName').value = "";
-            document.getElementById('tCategory').innerHTML = '<option value="">-- Select Type --</option>';
-            document.getElementById('tFrom').value = "";
-            document.getElementById('tTo').value = "";
-            
-            masterSync(); // Refresh Dashboard and Modals
-        } else {
-            document.getElementById('msg9').style.color = "red";
-            document.getElementById('msg9').innerHTML = "❌ " + result.message;
-        }
-    } catch (e) {
-        document.getElementById('msg9').innerHTML = "❌ Connection Error";
+        const body = { itemName: document.getElementById('tItemName').value, category: document.getElementById('tCategory').value, fromGodown: document.getElementById('tFrom').value, toGodown: document.getElementById('tTo').value, quantity: Number(document.getElementById('tQty').value) };
+        if (!validate(body, 'msg9')) return;
+        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        if(res.ok) { document.getElementById('msg9').innerHTML = "✅ Transferred"; masterSync(); }
+        else { const r = await res.json(); alert(r.message); }
     }
-}
 
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
         const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
-        
-        const body = { 
-            builderId: document.getElementById(${p}Builder).value, 
-            siteId: document.getElementById(${p}Site).value, 
-            itemId: document.getElementById(${p}Item).value, 
-            quantity: Number(document.getElementById(${p}Qty).value), 
-            date: document.getElementById(${p}Date).value, 
-            rate: type === 'dispatch' ? Number(document.getElementById(dRate).value) : 0, 
-            loadingCharges: type === 'dispatch' ? Number(document.getElementById(dLoading).value) : 0, 
-            unloadingCharges: type === 'return' ? Number(document.getElementById(rUnloading).value) : 0 
-        };
-
+        const body = { builderId: document.getElementById(`${p}Builder`).value, siteId: document.getElementById(`${p}Site`).value, itemId: document.getElementById(`${p}Item`).value, quantity: Number(document.getElementById(`${p}Qty`).value), date: document.getElementById(`${p}Date`).value, rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 };
         if (!validate(body, msgId)) return;
-
-        const res = await fetch(${API_URL}/${type}, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
-        
         if(res.ok) {
-            // SAVE TO lastTxn BEFORE RESETTING FIELDS
-            const itemText = document.getElementById(${p}Item).selectedOptions[0].text;
-            lastTxn = { 
-                ...body, 
-                challanNo: result.challanNo, 
-                builder: document.getElementById(${p}Builder).selectedOptions[0].text, 
-                site: document.getElementById(${p}Site).selectedOptions[0].text, 
-                item: itemText.split('-')[0].trim(),
-                godown: itemText.split('-')[1].split('[')[0].trim()
-            };
-
+            lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] };
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
-            document.getElementById(msgId).style.color = "green"; 
-            document.getElementById(msgId).innerHTML = "✅ Confirmed: " + result.challanNo;
-            
-            // Note: We don't reset the Item selection so you can see what you just did for printing
-            masterSync();
-        } else {
-            document.getElementById(msgId).style.color = "red";
-            document.getElementById(msgId).innerHTML = "❌ " + result.message;
+            document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; masterSync();
         }
     }
 
-    // Modal List Functions
     function openStockModal(godown) {
         const items = fullInventory.filter(i => i.godown === godown && i.availableStock > 0);
-        if(!items.length) return openModal(godown, "<p>No stock here.</p>");
         let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
         items.forEach(i => h += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.availableStock}</td></tr>`);
-        openModal(godown + " Godown Stock", h + "</table>");
+        openModal(godown + " Stock", h + "</table>");
     }
 
-    async function openSiteReportModal() {
-        const siteId = document.getElementById('repSite').value;
-        if(!siteId) return alert("Select site");
-        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+    async function recordPayment() {
+        const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value };
+        if (!validate(body, 'msg8')) return;
+        await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        document.getElementById('msg8').innerHTML = "✅ Recorded"; masterSync();
+    }
+
+    async function loadLedger() {
+        const res = await fetch(`${API_URL}/statement/${document.getElementById('pBuilder').value}`);
         const data = await res.json();
-        let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-        data.forEach(i => h += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`);
-        openModal("Site Holdings", h + "</table>");
+        document.getElementById('ledgerDisplay').innerHTML = `<h4>Outstanding: ₹${data.outstanding.toLocaleString()}</h4>`;
     }
 
-    function openMonthlyModal() { openModal("Financial History", "<p>Live company data is calculated from all builder statements.</p>"); }
-
-    // Helpers
     async function loadSites(bId, sId) {
         const res = await fetch(`${API_URL}/sites/${document.getElementById(bId).value}`);
         const data = await res.json();
@@ -424,52 +341,23 @@
         data.forEach(i => r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
     }
 
-    function showStock(id, label) {
+    function showStock(id, lab) {
         const item = fullInventory.find(i => i._id === document.getElementById(id).value);
-        document.getElementById(label).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
+        document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
     }
 
-    function updateCategories(idPrefix = '') {
-        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
-        const itemVal = document.getElementById(idPrefix === 't' ? 'tItemName' : 'itemName').value;
-        const catSelect = document.getElementById(idPrefix === 't' ? 'tCategory' : 'category');
-        if (!catSelect) return;
-        catSelect.innerHTML = '<option value="">-- Select Type --</option>';
-        if (list[itemVal]) {
-            list[itemVal].forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
-        } else if (itemVal !== "") {
-            catSelect.innerHTML += `<option value="N/A">N/A</option>`;
-        }
+    function updateCategories(pref = '') {
+        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'] };
+        const val = document.getElementById(pref === 't' ? 'tItemName' : 'itemName').value;
+        const sel = document.getElementById(pref === 't' ? 'tCategory' : 'category');
+        sel.innerHTML = '<option value="">-- Select Type --</option>';
+        (list[val] || ['N/A']).forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
     }
-    async function generateBill() {
-        const siteId = document.getElementById('billSite').value;
-        if (!siteId) return alert("Please select Builder and Site");
-        
-        const res = await fetch(${API_URL}/calculate-bill/${siteId});
-        const data = await res.json();
-        
-        let h = <table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>;
-        let subtotal = 0;
-        
-        data.billDetails.forEach(i => {
-            h += <tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.amount.toLocaleString()}</td></tr>;
-            subtotal += i.amount;
-        });
 
-        const totalRent = subtotal;
-        const service = data.serviceCharges;
-        const isGst = document.getElementById('gstToggle').checked;
-        const gst = isGst ? (totalRent + service) * 0.18 : 0;
-        const grandTotal = totalRent + service + gst;
-
-        h += `</table><div style="text-align:right; margin-top:20px; font-weight:bold;">
-                <p>Subtotal Rent: ₹${totalRent.toLocaleString()}</p>
-                <p>Loading/Unloading: ₹${service.toLocaleString()}</p>
-                ${isGst ? <p>GST (18%): ₹${gst.toLocaleString()}</p> : ''}
-                <h3>Grand Total: ₹${grandTotal.toLocaleString()}</h3>
-              </div>`;
-        
-        document.getElementById('billDisplay').innerHTML = h;
+    function printChallan(type) {
+        const win = window.open('', '', 'height=600,width=800');
+        win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>Challan No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`);
+        win.document.close(); win.print();
     }
 
     window.onload = () => {
@@ -482,7 +370,6 @@
                 items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
             }
         });
-        updateCategories(''); updateCategories('t');
     };
 </script>
 </body>
