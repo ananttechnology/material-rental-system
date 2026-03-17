@@ -315,26 +315,6 @@
     }
 }
 
-    // 3. You MUST convert that response into data (result)
-    const result = await res.json();
-    // --- MISSING STEP END ---
-
-    // 4. Now 'res' exists, so this line will finally work
-        if(res.ok) {
-            lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] };
-            document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
-            document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; 
-            
-            // RESET ALL BOXES TO ORIGINAL POSITION
-            resetFields([`${p}Qty`, `${p}Date`, `dRate`, `dLoading`, `rUnloading`]);
-            if(type === 'return') {
-                document.getElementById('rItem').innerHTML = '<option value="">-- Items on Site --</option>';
-            }
-            
-            masterSync();
-        }
-    }
-
     function openStockModal(godown) {
         const items = fullInventory.filter(i => i.godown === godown && i.availableStock > 0);
         let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
