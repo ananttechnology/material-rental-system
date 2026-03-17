@@ -230,11 +230,10 @@
     
     function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
 
-    // --- VALIDATION HELPER (Allows N/A for transfer and inventory) ---
+    // --- VALIDATION (Fixed to allow N/A and prevent empty) ---
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
         for (let key in fields) {
-            // We only block if the field is truly empty or undefined
             if (fields[key] === null || fields[key] === undefined || fields[key].toString().trim() === "") {
                 msg.style.color = "red";
                 msg.innerHTML = "⚠️ Error: Please fill all boxes compulsory.";
@@ -245,6 +244,14 @@
         return true;
     }
 
+    // --- FORM RESET HELPER ---
+    function resetFields(ids) {
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = (el.tagName === "SELECT") ? "" : "";
+        });
+    }
+
     async function masterSync() {
         try {
             const res = await fetch(`${API_URL}/builders`);
@@ -252,10 +259,10 @@
             ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
                 const s = document.getElementById(id);
                 if(s) {
+                    const currentVal = s.value;
                     s.innerHTML = '<option value="">-- Select Builder --</option>';
-                    b.forEach(x => {
-                        s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`;
-                    });
+                    b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`);
+                    s.value = currentVal;
                 }
             });
 
@@ -269,13 +276,8 @@
                 });
             }
             
-            let ank = 0, dah = 0;
-            fullInventory.forEach(i => { 
-                if(i.godown === "Ankleshwar") ank += i.availableStock; 
-                else dah += i.availableStock; 
-            });
-            document.getElementById('stat-ank').innerText = ank;
-            document.getElementById('stat-dah').innerText = dah;
+            document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
+            document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
 
             const statRes = await fetch(`${API_URL}/company-stats`);
             const stats = await statRes.json();
@@ -285,47 +287,25 @@
     }
 
     async function saveBuilder() {
-        const body = { 
-            companyName: document.getElementById('compName').value, 
-            mobile: document.getElementById('bMobile').value, 
-            gstNumber: document.getElementById('bGst').value, 
-            address: document.getElementById('bAddr').value 
-        };
+        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
         if (!validate(body, 'msg1')) return;
         await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         document.getElementById('msg1').style.color = "green";
-        document.getElementById('msg1').innerHTML = "✅ Builder Saved"; 
-        masterSync();
-    }
-
-    async function saveSite() {
-        const body = { 
-            builderId: document.getElementById('builderSelect').value, 
-            siteName: document.getElementById('sName').value, 
-            siteAddress: document.getElementById('sAddr').value 
-        };
-        if (!validate(body, 'msg2')) return;
-        await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg2').style.color = "green";
-        document.getElementById('msg2').innerHTML = "✅ Site Linked"; 
+        document.getElementById('msg1').innerHTML = "✅ Builder Saved";
+        resetFields(['compName', 'bMobile', 'bGst', 'bAddr']);
         masterSync();
     }
 
     async function saveItem() {
-        const body = { 
-            itemName: document.getElementById('itemName').value, 
-            category: document.getElementById('category').value, 
-            godown: document.getElementById('iGodown').value, 
-            totalStock: document.getElementById('qty').value 
-        };
+        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, godown: document.getElementById('iGodown').value, totalStock: Number(document.getElementById('qty').value) };
         if (!validate(body, 'msg3')) return;
         await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         document.getElementById('msg3').style.color = "green";
-        document.getElementById('msg3').innerHTML = "✅ Stock Added"; 
+        document.getElementById('msg3').innerHTML = "✅ Stock Updated";
+        resetFields(['itemName', 'category', 'qty']);
         masterSync();
     }
 
-    // --- TRANSFER STOCK (Fixed Syntax and Logic) ---
     async function transferStock() {
         const body = { 
             itemName: document.getElementById('tItemName').value, 
@@ -334,51 +314,24 @@
             toGodown: document.getElementById('tTo').value, 
             quantity: Number(document.getElementById('tQty').value) 
         };
-
         if (!validate(body, 'msg9')) return;
-
-        if (body.fromGodown === body.toGodown) {
+        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        const result = await res.json();
+        if(res.ok) {
+            document.getElementById('msg9').style.color = "green";
+            document.getElementById('msg9').innerHTML = "✅ Transferred Successfully";
+            resetFields(['tItemName', 'tCategory', 'tQty']);
+            masterSync();
+        } else {
             document.getElementById('msg9').style.color = "red";
-            document.getElementById('msg9').innerHTML = "⚠️ Error: Godowns must be different.";
-            return;
-        }
-
-        try {
-            const res = await fetch(`${API_URL}/transfer-stock`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(body) 
-            });
-            
-            const result = await res.json();
-
-            if(res.ok) { 
-                document.getElementById('msg9').style.color = "green"; 
-                document.getElementById('msg9').innerHTML = "✅ Stock Transferred Successfully"; 
-                document.getElementById('tQty').value = "";
-                masterSync(); 
-            } else {
-                document.getElementById('msg9').style.color = "red";
-                document.getElementById('msg9').innerHTML = "❌ " + (result.message || "Transfer Failed");
-            }
-        } catch (e) {
-            document.getElementById('msg9').innerHTML = "❌ Server Error";
+            document.getElementById('msg9').innerHTML = "❌ " + result.message;
         }
     }
 
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
         const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
-        const body = { 
-            builderId: document.getElementById(`${p}Builder`).value, 
-            siteId: document.getElementById(`${p}Site`).value, 
-            itemId: document.getElementById(`${p}Item`).value, 
-            quantity: Number(document.getElementById(`${p}Qty`).value), 
-            date: document.getElementById(`${p}Date`).value, 
-            rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, 
-            loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
-            unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 
-        };
+        const body = { builderId: document.getElementById(`${p}Builder`).value, siteId: document.getElementById(`${p}Site`).value, itemId: document.getElementById(`${p}Item`).value, quantity: Number(document.getElementById(`${p}Qty`).value), date: document.getElementById(`${p}Date`).value, rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 };
         if (!validate(body, msgId)) return;
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
@@ -386,71 +339,33 @@
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
             document.getElementById(msgId).style.color = "green";
             document.getElementById(msgId).innerHTML = "✅ " + result.challanNo;
+            resetFields([`${p}Qty`, `${p}Date`, `dRate`, `dLoading`, `rUnloading`]);
             masterSync();
-        } else {
-            document.getElementById(msgId).style.color = "red";
-            document.getElementById(msgId).innerHTML = "❌ " + result.message;
         }
     }
 
-    async function openSiteReportModal() {
-        const siteId = document.getElementById('repSite').value;
-        if (!siteId) { alert("Please select site first"); return; }
-        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-        const data = await res.json();
-        let h = `<table><tr><th>Item</th><th>Godown</th><th>Qty</th></tr>`;
-        data.forEach(i => {
-            h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
-        });
-        openModal("Site Holdings", h + "</table>");
-    }
-
     async function recordPayment() {
-        const body = { 
-            builderId: document.getElementById('pBuilder').value, 
-            amountPaid: Number(document.getElementById('pAmount').value), 
-            paymentMode: document.getElementById('pMode').value, 
-            referenceNo: document.getElementById('pRef').value, 
-            date: document.getElementById('pDate').value 
-        };
+        const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value };
         if (!validate(body, 'msg8')) return;
         await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg8').style.color = "green";
-        document.getElementById('msg8').innerHTML = "✅ Recorded"; 
-        loadLedger(); 
+        document.getElementById('msg8').innerHTML = "✅ Recorded";
+        resetFields(['pAmount', 'pRef', 'pDate']);
+        loadLedger();
         masterSync();
     }
 
     async function loadLedger() {
-        const bId = document.getElementById('pBuilder').value;
-        if(!bId) return;
-        const res = await fetch(`${API_URL}/statement/${bId}`);
+        const res = await fetch(`${API_URL}/statement/${document.getElementById('pBuilder').value}`);
         const data = await res.json();
         document.getElementById('ledgerDisplay').innerHTML = `<h4>Outstanding: ₹${data.outstanding.toLocaleString()}</h4>`;
     }
 
     async function loadSites(bId, sId) {
-        const val = document.getElementById(bId).value;
-        if(!val) return;
-        const res = await fetch(`${API_URL}/sites/${val}`);
+        const res = await fetch(`${API_URL}/sites/${document.getElementById(bId).value}`);
         const data = await res.json();
         const s = document.getElementById(sId);
         s.innerHTML = '<option value="">-- Select Site --</option>';
-        data.forEach(x => {
-            s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`;
-        });
-    }
-
-    async function loadReturnItems() {
-        const sId = document.getElementById('rSite').value;
-        if(!sId) return;
-        const res = await fetch(`${API_URL}/site-balance/${sId}`);
-        const data = await res.json();
-        const r = document.getElementById('rItem');
-        r.innerHTML = '<option value="">-- Material on Site --</option>';
-        data.forEach(i => {
-            r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`;
-        });
+        data.forEach(x => s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`);
     }
 
     function showStock(id, label) {
@@ -459,35 +374,17 @@
     }
 
     function updateCategories(idPrefix = '') {
-        const list = { 
-            'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 
-            'MS Props Jack': ['3x3','2.5x2.5','2x2'], 
-            'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 
-            'MS Ledger': ['900 mm','1200 mm','1500 mm'], 
-            'Ms Pipe': ['6 mtr', '3 mtr'], 
-            'Channel': ['6 mtr', '3 mtr'], 
-            'Ms Clamp': ['Fix', 'Round (360°)'] 
-        };
+        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Channel': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Round (360°)'] };
         const itemVal = document.getElementById(idPrefix === 't' ? 'tItemName' : 'itemName').value;
         const catSelect = document.getElementById(idPrefix === 't' ? 'tCategory' : 'category');
         if (!catSelect) return;
         catSelect.innerHTML = '<option value="">-- Select Type --</option>';
         if (list[itemVal]) {
-            list[itemVal].forEach(c => { catSelect.innerHTML += `<option value="${c}">${c}</option>`; });
+            list[itemVal].forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
         } else if (itemVal !== "") {
             catSelect.innerHTML += `<option value="N/A">N/A</option>`;
         }
     }
-
-    function openStockModal(godown) {
-        let h = `<table><tr><th>Item</th><th>Stock</th></tr>`;
-        fullInventory.filter(i => i.godown === godown).forEach(i => {
-            h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.availableStock}</td></tr>`;
-        });
-        openModal(godown + " Stock", h + "</table>");
-    }
-
-    function openMonthlyModal() { openModal("Month History", "<p>Current stats are live on dashboard cards.</p>"); }
 
     window.onload = () => {
         masterSync();
@@ -496,11 +393,9 @@
             const el = document.getElementById(id);
             if(el) {
                 el.innerHTML = '<option value="">-- Select Item --</option>';
-                items.forEach(i => { el.innerHTML += `<option value="${i}">${i}</option>`; });
+                items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
             }
         });
-        updateCategories('');
-        updateCategories('t');
     };
 </script>
 </body>
