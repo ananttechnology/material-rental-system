@@ -100,6 +100,27 @@ app.post('/return', async (req, res) => {
     const challan = await new Transaction({ ...req.body, type: 'RC', challanNo: `RC-${1001 + count}`, godown: item.godown }).save();
     res.json(challan);
 });
+// Add this right below your other app.post routes in server.js
+app.post('/add-builder', async (req, res) => {
+    try {
+        const builder = new Builder(req.body);
+        await builder.save();
+        res.status(200).json({ message: "Builder saved successfully" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Also add the missing Site route while you are there
+app.post('/add-site', async (req, res) => {
+    try {
+        const site = new Site(req.body);
+        await site.save();
+        res.status(200).json({ message: "Site linked successfully" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 app.get('/site-balance/:siteId', async (req, res) => {
     const txns = await Transaction.find({ siteId: req.params.siteId });
