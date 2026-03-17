@@ -198,7 +198,10 @@ app.get('/site-balance/:siteId', async (req, res) => {
     res.json(out);
 });
 
-app.get('/calculate-bill/:siteId', async (req, res) => res.json(await calculateSiteBill(req.params.siteId)));
+app.get('/calculate-bill/:siteId', async (req, res) => {
+    const { start, end } = req.query; // Get dates from URL
+    res.json(await calculateSiteBill(req.params.siteId, start, end));
+});
 app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("OK"); });
 app.get('/statement/:builderId', async (req, res) => {
     const sites = await Site.find({ builderId: req.params.builderId });
