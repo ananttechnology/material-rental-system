@@ -3,81 +3,57 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
-app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"], allowedHeaders: ["Content-Type", "Authorization"] }));
+app.use(cors());
 app.use(express.json());
 
 const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; 
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ DB Connected"))
-  .catch((err) => console.error("❌ DB Error:", err));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ DB Connected"));
 
-// --- SCHEMAS ---
-const Builder = mongoose.model('Builder', new mongoose.Schema({
-  companyName: { type: String, required: true },
-  mobile: String, gstNumber: String, address: String
-}));
+// --- MODELS ---
+const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: String, mobile: String, gstNumber: String, address: String }));
+const Site = mongoose.model('Site', new mongoose.Schema({ builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' }, siteName: String, siteAddress: String }));
+const Inventory = mongoose.model('Inventory', new mongoose.Schema({ itemName: String, category: String, godown: String, totalStock: Number, availableStock: Number }));
+const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, itemId: mongoose.Schema.Types.ObjectId, godown: String, quantity: Number, rate: { type: Number, default: 0 }, loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
+const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: String, date: { type: Date, default: Date.now } }));
 
-const Site = mongoose.model('Site', new mongoose.Schema({
-  builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' },
-  siteName: String, siteAddress: String
-}));
-
-const Inventory = mongoose.model('Inventory', new mongoose.Schema({
-  itemName: String, category: String, godown: String,
-  totalStock: Number, availableStock: Number
-}));
-
-const Transaction = mongoose.model('Transaction', new mongoose.Schema({
-  type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId,
-  siteId: mongoose.Schema.Types.ObjectId, itemId: mongoose.Schema.Types.ObjectId,
-  godown: String, quantity: Number, rate: Number,
-  loadingCharges: { type: Number, default: 0 },
-  unloadingCharges: { type: Number, default: 0 }, 
-  date: { type: Date, default: Date.now }
-}));
-
-const Payment = mongoose.model('Payment', new mongoose.Schema({
-  builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number,
-  paymentMode: String, referenceNo: String, date: { type: Date, default: Date.now }
-}));
-
-// --- BILLING LOGIC ---
-async function calculateFinancials(builderId) {
+// --- SHARED CALCULATION FUNCTION ---
+async function getBuilderStats(builderId) {
     const sites = await Site.find({ builderId });
     const payments = await Payment.find({ builderId });
     let totalBilled = 0;
+
     for (let site of sites) {
         const txns = await Transaction.find({ siteId: site._id }).sort({ date: 1 });
-        let batches = {};
+        let items = {};
         txns.forEach(t => {
             totalBilled += (Number(t.loadingCharges) || 0) + (Number(t.unloadingCharges) || 0);
-            if (!batches[t.itemId]) batches[t.itemId] = [];
-            batches[t.itemId].push({ ...t._doc });
+            if (!items[t.itemId]) items[t.itemId] = { dc: [], rc: [] };
+            t.type === 'DC' ? items[t.itemId].dc.push({...t._doc}) : items[t.itemId].rc.push({...t._doc});
         });
-        for (let id in batches) {
-            let dcs = batches[id].filter(x => x.type === 'DC');
-            let rcs = batches[id].filter(x => x.type === 'RC');
+
+        for (let id in items) {
+            let dcs = items[id].dc, rcs = items[id].rc;
             rcs.forEach(r => {
-                let q = r.quantity;
-                for (let d of dcs) {
-                    if (d.quantity > 0 && q > 0) {
-                        let take = Math.min(d.quantity, q);
-                        let days = Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1;
-                        totalBilled += (take * d.rate * (days < 1 ? 1 : days));
-                        d.quantity -= take; q -= take;
+                let qty = r.quantity;
+                dcs.forEach(d => {
+                    if (d.quantity > 0 && qty > 0) {
+                        let take = Math.min(d.quantity, qty);
+                        let days = Math.max(1, Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1);
+                        totalBilled += (take * d.rate * days);
+                        d.quantity -= take; qty -= take;
                     }
-                }
+                });
             });
             dcs.forEach(d => {
                 if (d.quantity > 0) {
-                    let days = Math.floor((new Date() - new Date(d.date)) / 86400000) + 1;
-                    totalBilled += (d.quantity * d.rate * (days < 1 ? 1 : days));
+                    let days = Math.max(1, Math.floor((new Date() - new Date(d.date)) / 86400000) + 1);
+                    totalBilled += (d.quantity * d.rate * days);
                 }
             });
         }
     }
-    const totalPaid = payments.reduce((s, p) => s + p.amountPaid, 0);
+    const totalPaid = payments.reduce((sum, p) => sum + p.amountPaid, 0);
     return { totalBilled, totalPaid, outstanding: totalBilled - totalPaid, payments };
 }
 
@@ -86,107 +62,95 @@ app.get('/builders', async (req, res) => res.json(await Builder.find()));
 app.get('/sites/:builderId', async (req, res) => res.json(await Site.find({builderId: req.params.builderId})));
 app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 
-app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
-app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
-
 app.post('/add-item', async (req, res) => {
-    try {
-        const { itemName, category, totalStock, godown } = req.body;
-        let item = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            godown: godown 
-        });
-        if (item) {
-            item.totalStock += Number(totalStock);
-            item.availableStock += Number(totalStock);
-            await item.save();
-        } else {
-            await new Inventory({ itemName, category, godown, totalStock, availableStock: totalStock }).save();
-        }
-        res.send("Success");
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-app.post('/transfer-stock', async (req, res) => {
-    try {
-        const { itemName, category, fromGodown, toGodown, quantity } = req.body;
-        const qty = Number(quantity);
-        let src = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            godown: fromGodown 
-        });
-        if (!src || src.availableStock < qty) return res.status(400).json({ message: "No Stock Found" });
-        let dst = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-            godown: toGodown 
-        });
-        if (!dst) {
-            dst = new Inventory({ itemName: src.itemName, category: src.category, godown: toGodown, totalStock: 0, availableStock: 0 });
-        }
-        src.availableStock -= qty; src.totalStock -= qty;
-        dst.availableStock += qty; dst.totalStock += qty;
-        await src.save(); await dst.save();
-        res.json({ message: "Success" });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    const { itemName, category, godown, totalStock } = req.body;
+    let item = await Inventory.findOne({ 
+        itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+        category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+        godown 
+    });
+    if (item) {
+        item.totalStock += Number(totalStock); item.availableStock += Number(totalStock);
+        await item.save();
+    } else { await new Inventory({ ...req.body, availableStock: totalStock }).save(); }
+    res.send("OK");
 });
 
 app.post('/dispatch', async (req, res) => {
-    const { itemId, quantity } = req.body;
-    const item = await Inventory.findById(itemId);
-    if (!item || item.availableStock < quantity) return res.status(400).json({message: "No Stock"});
-    item.availableStock -= Number(quantity);
-    await item.save();
-    const count = await Transaction.countDocuments({type: 'DC'});
-    const challanNo = `DC-${1001 + count}`;
-    await new Transaction({...req.body, type: 'DC', challanNo, godown: item.godown}).save();
-    res.json({challanNo});
+    const item = await Inventory.findById(req.body.itemId);
+    if (!item || item.availableStock < req.body.quantity) return res.status(400).send("No Stock");
+    item.availableStock -= req.body.quantity; await item.save();
+    const count = await Transaction.countDocuments({type:'DC'});
+    const challan = await new Transaction({...req.body, type:'DC', challanNo: `DC-${1001+count}`, godown: item.godown}).save();
+    res.json(challan);
 });
 
 app.post('/return', async (req, res) => {
-    const { itemId, quantity } = req.body;
-    const item = await Inventory.findById(itemId);
-    item.availableStock += Number(quantity);
-    await item.save();
-    const count = await Transaction.countDocuments({type: 'RC'});
-    const challanNo = `RC-${1001 + count}`;
-    await new Transaction({...req.body, type: 'RC', challanNo, godown: item.godown}).save();
-    res.json({challanNo});
+    const item = await Inventory.findById(req.body.itemId);
+    item.availableStock += Number(req.body.quantity); await item.save();
+    const count = await Transaction.countDocuments({type:'RC'});
+    const challan = await new Transaction({...req.body, type:'RC', challanNo: `RC-${1001+count}`, godown: item.godown}).save();
+    res.json(challan);
 });
 
 app.get('/site-balance/:siteId', async (req, res) => {
     const txns = await Transaction.find({ siteId: req.params.siteId });
     let bal = {};
-    txns.forEach(t => {
-        const k = t.itemId.toString();
-        if (!bal[k]) bal[k] = 0;
-        t.type === 'DC' ? bal[k] += t.quantity : bal[k] -= t.quantity;
-    });
-    let result = [];
+    for (let t of txns) {
+        bal[t.itemId] = (bal[t.itemId] || 0) + (t.type === 'DC' ? t.quantity : -t.quantity);
+    }
+    let out = [];
     for (let id in bal) {
         if (bal[id] > 0) {
-            const item = await Inventory.findById(id);
-            if(item) result.push({ itemId: id, itemName: item.itemName, category: item.category, godown: item.godown, currentBalance: bal[id] });
+            const info = await Inventory.findById(id);
+            if (info) out.push({ itemName: info.itemName, category: info.category, currentBalance: bal[id] });
         }
     }
-    res.json(result);
+    res.json(out);
 });
 
-app.get('/statement/:builderId', async (req, res) => res.json(await calculateFinancials(req.params.builderId)));
+app.get('/calculate-bill/:siteId', async (req, res) => {
+    const txns = await Transaction.find({ siteId: req.params.siteId }).sort({date:1});
+    let service = 0, bill = [], items = {};
+    txns.forEach(t => {
+        service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+        if(!items[t.itemId]) items[t.itemId] = { dc:[], rc:[] };
+        t.type === 'DC' ? items[t.itemId].dc.push({...t._doc}) : items[t.itemId].rc.push({...t._doc});
+    });
+    for (let id in items) {
+        const info = await Inventory.findById(id);
+        items[id].rc.forEach(r => {
+            let q = r.quantity;
+            items[id].dc.forEach(d => {
+                if (d.quantity > 0 && q > 0) {
+                    let take = Math.min(d.quantity, q);
+                    let days = Math.max(1, Math.floor((new Date(r.date) - new Date(d.date))/86400000)+1);
+                    bill.push({ name: info.itemName, cat: info.category, qty: take, days, rate: d.rate, total: take*d.rate*days });
+                    d.quantity -= take; q -= take;
+                }
+            });
+        });
+        items[id].dc.forEach(d => {
+            if (d.quantity > 0) {
+                let days = Math.max(1, Math.floor((new Date() - new Date(d.date))/86400000)+1);
+                bill.push({ name: info.itemName, cat: info.category, qty: d.quantity, days, rate: d.rate, total: d.quantity*d.rate*days });
+            }
+        });
+    }
+    res.json({ bill, service });
+});
+
+app.get('/statement/:builderId', async (req, res) => res.json(await getBuilderStats(req.params.builderId)));
+app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("OK"); });
 
 app.get('/company-stats', async (req, res) => {
     const builders = await Builder.find();
-    let totalBilled = 0, totalOut = 0;
+    let billed = 0, out = 0;
     for (let b of builders) {
-        const stats = await calculateFinancials(b._id);
-        totalBilled += stats.totalBilled;
-        totalOut += stats.outstanding;
+        const s = await getBuilderStats(b._id);
+        billed += s.totalBilled; out += s.outstanding;
     }
-    res.json({ currentMonthBilled: totalBilled, totalOutstanding: totalOut, history: [{month: "March 2026", amount: totalBilled}] });
+    res.json({ currentMonthBilled: billed, totalOutstanding: out });
 });
 
-app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("Saved"); });
-
-app.listen(5000, () => console.log("Server running"));
+app.listen(5000);
