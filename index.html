@@ -230,19 +230,20 @@
     
     function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
 
-    // --- VALIDATION HELPER ---
-    function validate(fields, msgId) {
-        const msg = document.getElementById(msgId);
-        for (let key in fields) {
-            if (!fields[key] || fields[key].toString().trim() === "" || fields[key] === "N/A") {
-                msg.style.color = "red";
-                msg.innerHTML = "⚠️ Error: Please fill all boxes compulsory.";
-                return false;
-            }
+    // --- UPDATED VALIDATION (Allows N/A) ---
+function validate(fields, msgId) {
+    const msg = document.getElementById(msgId);
+    for (let key in fields) {
+        // We removed the check for "N/A" so it now accepts it as a valid value
+        if (!fields[key] || fields[key].toString().trim() === "") {
+            msg.style.color = "red";
+            msg.innerHTML = "⚠️ Error: Please fill all boxes compulsory.";
+            return false;
         }
-        msg.innerHTML = "";
-        return true;
     }
+    msg.innerHTML = "";
+    return true;
+}
 
     async function masterSync() {
         try {
@@ -324,49 +325,48 @@
         masterSync();
     }
 
-    async function transferStock() {
-        const body = { 
-            itemName: document.getElementById('tItemName').value, 
-            category: document.getElementById('tCategory').value, 
-            fromGodown: document.getElementById('tFrom').value, 
-            toGodown: document.getElementById('tTo').value, 
-            quantity: Number(document.getElementById('tQty').value) 
-        };
+    // --- UPDATED TRANSFER STOCK (Fixes 'No Stock' error) ---
+async function transferStock() {
+    const body = { 
+        itemName: document.getElementById('tItemName').value, 
+        category: document.getElementById('tCategory').value, 
+        fromGodown: document.getElementById('tFrom').value, 
+        toGodown: document.getElementById('tTo').value, 
+        // We ensure quantity is a Number here
+        quantity: Number(document.getElementById('tQty').value) 
+    };
 
-        // Validate fields
-        if (!validate(body, 'msg9')) return;
+    if (!validate(body, 'msg9')) return;
 
-        // Ensure godowns are different
-        if (body.fromGodown === body.toGodown) {
-            document.getElementById('msg9').style.color = "red";
-            document.getElementById('msg9').innerHTML = "⚠️ Error: Godowns must be different.";
-            return;
-        }
-
-        try {
-            const res = await fetch(`${API_URL}/transfer-stock`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(body) 
-            });
-            
-            const result = await res.json();
-
-            if(res.ok) { 
-                document.getElementById('msg9').style.color = "green"; 
-                document.getElementById('msg9').innerHTML = "✅ Stock Transferred Successfully"; 
-                // Clear the quantity box after success
-                document.getElementById('tQty').value = "";
-                masterSync(); 
-            } else {
-                document.getElementById('msg9').style.color = "red";
-                document.getElementById('msg9').innerHTML = "❌ " + (result.message || "Transfer Failed");
-            }
-        } catch (e) {
-            console.error("Transfer Error:", e);
-            document.getElementById('msg9').innerHTML = "❌ Server Error";
-        }
+    if (body.fromGodown === body.toGodown) {
+        document.getElementById('msg9').style.color = "red";
+        document.getElementById('msg9').innerHTML = "⚠️ Error: Godowns must be different.";
+        return;
     }
+
+    try {
+        const res = await fetch(${API_URL}/transfer-stock, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(body) 
+        });
+        
+        const result = await res.json();
+
+        if(res.ok) { 
+            document.getElementById('msg9').style.color = "green"; 
+            document.getElementById('msg9').innerHTML = "✅ Stock Transferred Successfully"; 
+            document.getElementById('tQty').value = "";
+            masterSync(); 
+        } else {
+            document.getElementById('msg9').style.color = "red";
+            // This will now correctly show if there is actually 'Insufficient Stock'
+            document.getElementById('msg9').innerHTML = "❌ " + (result.message || "Transfer Failed");
+        }
+    } catch (e) {
+        document.getElementById('msg9').innerHTML = "❌ Server Error";
+    }
+}
 
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
