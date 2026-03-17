@@ -330,19 +330,41 @@
             category: document.getElementById('tCategory').value, 
             fromGodown: document.getElementById('tFrom').value, 
             toGodown: document.getElementById('tTo').value, 
-            quantity: document.getElementById('tQty').value 
+            quantity: Number(document.getElementById('tQty').value) 
         };
+
+        // Validate fields
         if (!validate(body, 'msg9')) return;
+
+        // Ensure godowns are different
         if (body.fromGodown === body.toGodown) {
             document.getElementById('msg9').style.color = "red";
             document.getElementById('msg9').innerHTML = "⚠️ Error: Godowns must be different.";
             return;
         }
-        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        if(res.ok) { 
-            document.getElementById('msg9').style.color = "green"; 
-            document.getElementById('msg9').innerHTML = "✅ Transferred Successfully"; 
-            masterSync(); 
+
+        try {
+            const res = await fetch(`${API_URL}/transfer-stock`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(body) 
+            });
+            
+            const result = await res.json();
+
+            if(res.ok) { 
+                document.getElementById('msg9').style.color = "green"; 
+                document.getElementById('msg9').innerHTML = "✅ Stock Transferred Successfully"; 
+                // Clear the quantity box after success
+                document.getElementById('tQty').value = "";
+                masterSync(); 
+            } else {
+                document.getElementById('msg9').style.color = "red";
+                document.getElementById('msg9').innerHTML = "❌ " + (result.message || "Transfer Failed");
+            }
+        } catch (e) {
+            console.error("Transfer Error:", e);
+            document.getElementById('msg9').innerHTML = "❌ Server Error";
         }
     }
 
