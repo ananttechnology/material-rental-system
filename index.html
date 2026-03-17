@@ -567,6 +567,62 @@
     win.print();
     }
 
+    function printInvoice() {
+    // 1. Get the data currently visible on your screen
+    const builderName = document.getElementById('billBuilder').selectedOptions[0].text;
+    const siteName = document.getElementById('billSite').selectedOptions[0].text;
+    const start = document.getElementById('billStart').value;
+    const end = document.getElementById('billEnd').value;
+    
+    const holdingContent = document.getElementById('holdingDisplay').innerHTML;
+    const billContent = document.getElementById('billDisplay').innerHTML;
+
+    // 2. Open a clean window for the printer
+    const win = window.open('', '', 'height=900,width=1000');
+    
+    let html = `<html><head><title>Invoice - ${builderName}</title>`;
+    html += `<style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 30px; color: #333; }
+        .header { text-align: center; border-bottom: 3px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
+        .details { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+        th { background: #f2f2f2; }
+        h2 { font-size: 1.2rem; margin-top: 30px; color: #2c3e50; border-bottom: 1px solid #eee; }
+        h4 { background: #f9f9f9; padding: 5px; margin-bottom: 5px; border-left: 3px solid #3498db; }
+        button { display: none; } /* Hide the print button on paper */
+        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+    </style></head><body>`;
+
+    // Header logic
+    html += `<div class="header"><h1>CJ CONSTRUCTION</h1><p>Material Rental & ERP Management</p></div>`;
+    
+    html += `<div class="details">
+                <div><strong>To:</strong> ${builderName}<br><strong>Site:</strong> ${siteName}</div>
+                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
+             </div>`;
+
+    // Include both Holdings and the Money calculation
+    html += `<div>${holdingContent}</div>`;
+    html += `<div>${billContent}</div>`;
+
+    // Signatory Area
+    html += `<div class="footer">
+                <div><p>Receiver's Signature</p></div>
+                <div style="text-align:right;"><p>_______________________<br>Authorized Signatory</p></div>
+             </div>`;
+
+    html += `</body></html>`;
+
+    win.document.write(html);
+    win.document.close();
+    
+    // Slight delay to ensure images/styles load before print dialog opens
+    setTimeout(() => {
+        win.print();
+    }, 500);
+    }
+
     window.onload = () => {
         masterSync();
         const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
