@@ -183,7 +183,28 @@
         <div id="builder" class="page"><div class="form-container"><h2>New Builder</h2><input type="text" id="compName" placeholder="Name"><input type="text" id="bMobile" placeholder="Mobile"><input type="text" id="bGst" placeholder="GST"><textarea id="bAddr" placeholder="Address"></textarea><button onclick="saveBuilder()">Save</button><div id="msg1"></div></div></div>
         <div id="site" class="page"><div class="form-container"><h2>Link New Site</h2><select id="builderSelect"></select><input type="text" id="sName" placeholder="Site Name"><textarea id="sAddr" placeholder="Site Address"></textarea><button onclick="saveSite()">Link</button><div id="msg2"></div></div></div>
         <div id="inventory" class="page"><div class="form-container"><h2>Inventory Addition</h2><select id="itemName" onchange="updateCategories('')"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Quantity"><button onclick="saveItem()">Add Stock</button><div id="msg3"></div></div></div>
-        <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateCategories('t')"></select><select id="tCategory"></select><select id="tFrom"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="Dahej">Dahej</option><option value="Ankleshwar">Ankleshwar</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
+        <div id="transfer" class="page">
+    <div class="form-container">
+        <h2>Inter-Godown Transfer</h2>
+        <select id="tItemName" onchange="updateCategories('t')"></select>
+        <select id="tCategory"><option value="">-- Select Type --</option></select>
+        
+        <select id="tFrom">
+            <option value="">From Godown *</option>
+            <option value="Ankleshwar">Ankleshwar</option>
+            <option value="Dahej">Dahej</option>
+        </select>
+        <select id="tTo">
+            <option value="">To Godown *</option>
+            <option value="Ankleshwar">Ankleshwar</option>
+            <option value="Dahej">Dahej</option>
+        </select>
+        
+        <input type="number" id="tQty" placeholder="Quantity">
+        <button onclick="transferStock()" style="background:#343a40">Confirm Move</button>
+        <div id="msg9" class="msg-area"></div>
+    </div>
+</div>
         <div id="billing" class="page"><div class="section bill-sec"><h2>Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><label><input type="checkbox" id="gstToggle" onchange="updateBillDisplay()"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="billDisplay"></div><button onclick="printDoc('billDisplay', 'INVOICE')" style="background: #343a40; margin-top: 10px;">🖨️ Print Bill</button><div id="msg7"></div></div></div>
     </div>
 </div>
