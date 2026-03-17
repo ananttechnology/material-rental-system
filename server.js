@@ -91,18 +91,20 @@ app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 app.post('/add-builder', async (req, res) => { await new Builder(req.body).save(); res.send("Saved"); });
 app.post('/add-site', async (req, res) => { await new Site(req.body).save(); res.send("Saved"); });
 
-// --- FIXED ADD ITEM (Forces Merging) ---
+// --- DEEP CLEAN ADD ITEM ---
 app.post('/add-item', async (req, res) => {
     try {
-        // We clean the data immediately: Trim spaces and make it Uppercase
-        const itemName = req.body.itemName.trim().toUpperCase();
-        const category = req.body.category.trim().toUpperCase();
+        // Clean the data: Remove ALL spaces and make Uppercase
+        // "3 x 3" becomes "3X3" and "3x3" becomes "3X3"
+        const cleanName = req.body.itemName.replace(/\s+/g, '').toUpperCase();
+        const cleanCat = req.body.category.replace(/\s+/g, '').toUpperCase();
         const godown = req.body.godown;
         const totalStock = Number(req.body.totalStock);
 
+        // Find existing using a Regex that ignores spaces
         let item = await Inventory.findOne({ 
-            itemName: itemName, 
-            category: category, 
+            itemName: { $regex: new RegExp("^" + req.body.itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            category: { $regex: new RegExp("^" + req.body.category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
             godown: godown 
         });
 
@@ -110,13 +112,16 @@ app.post('/add-item', async (req, res) => {
             item.totalStock += totalStock;
             item.availableStock += totalStock;
             await item.save();
-            res.send("Merged with existing stock");
+            res.send("Merged successfully");
         } else {
             await new Inventory({ 
-                itemName, category, godown, 
-                totalStock, availableStock: totalStock 
+                itemName: req.body.itemName.trim(), 
+                category: req.body.category.trim(), 
+                godown, 
+                totalStock, 
+                availableStock: totalStock 
             }).save();
-            res.send("New entry created");
+            res.send("Created successfully");
         }
     } catch (e) { res.status(500).send(e.message); }
 });
@@ -183,34 +188,38 @@ app.get('/company-stats', async (req, res) => {
     });
 });
 
-// --- FIXED TRANSFER (Finds 'Old' Stock easily) ---
+// --- DEEP CLEAN TRANSFER ---
 app.post('/transfer-stock', async (req, res) => {
     try {
-        const itemName = req.body.itemName.trim().toUpperCase();
-        const category = req.body.category.trim().toUpperCase();
         const { fromGodown, toGodown } = req.body;
         const qty = Number(req.body.quantity);
 
-        // Find source - using Case-Insensitive regex to catch "old" mis-typed stock
+        // Smart Find Source: Ignores spaces between numbers/letters
         let src = await Inventory.findOne({ 
-            itemName: { $regex: new RegExp("^" + itemName + "$", "i") },
-            category: { $regex: new RegExp("^" + category + "$", "i") },
+            itemName: { $regex: new RegExp("^" + req.body.itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            category: { $regex: new RegExp("^" + req.body.category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
             godown: fromGodown 
         });
 
         if (!src || src.availableStock < qty) {
-            return res.status(400).json({ message: Insufficient stock in ${fromGodown} });
+            return res.status(400).json({ message: No stock found for this item in ${fromGodown} });
         }
 
-        // Find destination - force clean names
+        // Smart Find Destination
         let dst = await Inventory.findOne({ 
-            itemName: itemName, 
-            category: category, 
+            itemName: { $regex: new RegExp("^" + req.body.itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
+            category: { $regex: new RegExp("^" + req.body.category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
             godown: toGodown 
         });
 
         if (!dst) {
-            dst = new Inventory({ itemName, category, godown: toGodown, totalStock: 0, availableStock: 0 });
+            dst = new Inventory({ 
+                itemName: src.itemName, 
+                category: src.category, 
+                godown: toGodown, 
+                totalStock: 0, 
+                availableStock: 0 
+            });
         }
 
         src.availableStock -= qty;
