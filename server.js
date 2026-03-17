@@ -23,34 +23,67 @@ const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: St
 const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: String, date: { type: Date, default: Date.now } }));
 
 // --- BILLING ENGINE LOGIC ---
-async function calculateSiteBill(siteId) {
+async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const txns = await Transaction.find({ siteId }).sort({ date: 1 });
     let service = 0, bill = [], items = {};
+    
+    // Convert strings to Date objects if they exist
+    const filterStart = startDate ? new Date(startDate) : null;
+    const filterEnd = endDate ? new Date(endDate) : new Date();
+
     txns.forEach(t => {
-        service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+        // Only count service charges (loading/unloading) if they fall within the range
+        if (!filterStart || (new Date(t.date) >= filterStart && new Date(t.date) <= filterEnd)) {
+            service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+        }
         const key = t.itemId.toString();
         if (!items[key]) items[key] = { dc: [], rc: [] };
         t.type === 'DC' ? items[key].dc.push({ ...t._doc }) : items[key].rc.push({ ...t._doc });
     });
+
     for (let id in items) {
         const info = await Inventory.findById(id);
         if(!info) continue;
         let dcs = items[id].dc, rcs = items[id].rc;
+
         rcs.forEach(r => {
             let q = r.quantity;
             dcs.forEach(d => {
                 if (d.quantity > 0 && q > 0) {
                     let take = Math.min(d.quantity, q);
-                    let days = Math.max(1, Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1);
-                    bill.push({ name: info.itemName, cat: info.category, qty: take, days, rate: d.rate, total: take * d.rate * days, duration: `${new Date(d.date).toLocaleDateString()} to ${new Date(r.date).toLocaleDateString()}` });
+                    
+                    // Logic: Start rent at (Dispatch Date OR Filter Start), End at (Return Date)
+                    let rentStart = filterStart && new Date(d.date) < filterStart ? filterStart : new Date(d.date);
+                    let rentEnd = new Date(r.date);
+
+                    if (rentStart <= rentEnd && (!filterEnd || rentStart <= filterEnd)) {
+                        let actualEnd = filterEnd && rentEnd > filterEnd ? filterEnd : rentEnd;
+                        let days = Math.max(1, Math.floor((actualEnd - rentStart) / 86400000) + 1);
+                        
+                        bill.push({ 
+                            name: info.itemName, cat: info.category, qty: take, days, rate: d.rate, 
+                            total: take * d.rate * days, 
+                            duration: `${rentStart.toLocaleDateString()} to ${actualEnd.toLocaleDateString()}` 
+                        });
+                    }
                     d.quantity -= take; q -= take;
                 }
             });
         });
+
         dcs.forEach(d => {
             if (d.quantity > 0) {
-                let days = Math.max(1, Math.floor((new Date() - new Date(d.date)) / 86400000) + 1);
-                bill.push({ name: info.itemName, cat: info.category, qty: d.quantity, days, rate: d.rate, total: d.quantity * d.rate * days, duration: `${new Date(d.date).toLocaleDateString()} to On Site` });
+                let rentStart = filterStart && new Date(d.date) < filterStart ? filterStart : new Date(d.date);
+                let rentEnd = filterEnd; // For items on site, we stop at the filter end date
+
+                if (rentStart <= rentEnd) {
+                    let days = Math.max(1, Math.floor((rentEnd - rentStart) / 86400000) + 1);
+                    bill.push({ 
+                        name: info.itemName, cat: info.category, qty: d.quantity, days, rate: d.rate, 
+                        total: d.quantity * d.rate * days, 
+                        duration: `${rentStart.toLocaleDateString()} to ${filterEnd ? filterEnd.toLocaleDateString() : 'On Site'}` 
+                    });
+                }
             }
         });
     }
