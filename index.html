@@ -159,10 +159,40 @@
     }
 
     async function saveBuilder() {
-        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
+        const body = { 
+            companyName: document.getElementById('compName').value, 
+            mobile: document.getElementById('bMobile').value, 
+            gstNumber: document.getElementById('bGst').value, 
+            address: document.getElementById('bAddr').value 
+        };
+        
         if (!validate(body, 'msg1')) return;
-        await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg1').innerHTML = "✅ Saved"; masterSync();
+
+        try {
+            const res = await fetch(`${API_URL}/add-builder`, { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(body) 
+            });
+
+            if (res.ok) {
+                document.getElementById('msg1').style.color = "green";
+                document.getElementById('msg1').innerHTML = "✅ Builder Saved Successfully"; 
+                // Clear boxes
+                document.getElementById('compName').value = "";
+                document.getElementById('bMobile').value = "";
+                document.getElementById('bGst').value = "";
+                document.getElementById('bAddr').value = "";
+                
+                await masterSync(); // Refresh dropdowns immediately
+            } else {
+                document.getElementById('msg1').style.color = "red";
+                document.getElementById('msg1').innerHTML = "❌ Server rejected the data.";
+            }
+        } catch (e) {
+            document.getElementById('msg1').style.color = "red";
+            document.getElementById('msg1').innerHTML = "❌ Connection Error: Cannot reach server.";
+        }
     }
 
     async function saveItem() {
