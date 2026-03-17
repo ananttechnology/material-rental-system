@@ -93,12 +93,38 @@ app.post('/dispatch', async (req, res) => {
 });
 
 app.post('/return', async (req, res) => {
-    const item = await Inventory.findById(req.body.itemId);
-    if(!item) return res.status(400).json({message: "Item Record Not Found"});
-    item.availableStock += Number(req.body.quantity); await item.save();
-    const count = await Transaction.countDocuments({ type: 'RC' });
-    const challan = await new Transaction({ ...req.body, type: 'RC', challanNo: `RC-${1001 + count}`, godown: item.godown }).save();
-    res.json(challan);
+    try {
+        const { itemId, siteId, quantity } = req.body;
+        const qty = Number(quantity);
+
+        // 1. VALIDATION: Check if site actually holds this much
+        const txns = await Transaction.find({ siteId: siteId, itemId: itemId });
+        let currentSiteBalance = 0;
+        txns.forEach(t => {
+            currentSiteBalance += (t.type === 'DC' ? t.quantity : -t.quantity);
+        });
+
+        if (qty > currentSiteBalance) {
+            return res.status(400).json({ message: `Return failed! Site only has ${currentSiteBalance} units remaining.` });
+        }
+
+        // 2. PROCESS RETURN: If valid, update inventory
+        const item = await Inventory.findById(itemId);
+        if(!item) return res.status(404).json({message: "Item not found"});
+        
+        item.availableStock += qty;
+        await item.save();
+
+        const count = await Transaction.countDocuments({ type: 'RC' });
+        const challanNo = `RC-${1001 + count}`;
+        
+        const newTxn = new Transaction({ ...req.body, type: 'RC', challanNo, godown: item.godown });
+        await newTxn.save();
+
+        res.json({ challanNo });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 // Add this right below your other app.post routes in server.js
 app.post('/add-builder', async (req, res) => {
