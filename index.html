@@ -345,14 +345,44 @@
     async function processTxn(type) {
         const p = type === 'dispatch' ? 'd' : 'r';
         const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
-        const body = { builderId: document.getElementById(`${p}Builder`).value, siteId: document.getElementById(`${p}Site`).value, itemId: document.getElementById(`${p}Item`).value, quantity: Number(document.getElementById(`${p}Qty`).value), date: document.getElementById(`${p}Date`).value, rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 };
+        
+        const body = { 
+            builderId: document.getElementById(${p}Builder).value, 
+            siteId: document.getElementById(${p}Site).value, 
+            itemId: document.getElementById(${p}Item).value, 
+            quantity: Number(document.getElementById(${p}Qty).value), 
+            date: document.getElementById(${p}Date).value, 
+            rate: type === 'dispatch' ? Number(document.getElementById(dRate).value) : 0, 
+            loadingCharges: type === 'dispatch' ? Number(document.getElementById(dLoading).value) : 0, 
+            unloadingCharges: type === 'return' ? Number(document.getElementById(rUnloading).value) : 0 
+        };
+
         if (!validate(body, msgId)) return;
-        const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+
+        const res = await fetch(${API_URL}/${type}, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
+        
         if(res.ok) {
+            // SAVE TO lastTxn BEFORE RESETTING FIELDS
+            const itemText = document.getElementById(${p}Item).selectedOptions[0].text;
+            lastTxn = { 
+                ...body, 
+                challanNo: result.challanNo, 
+                builder: document.getElementById(${p}Builder).selectedOptions[0].text, 
+                site: document.getElementById(${p}Site).selectedOptions[0].text, 
+                item: itemText.split('-')[0].trim(),
+                godown: itemText.split('-')[1].split('[')[0].trim()
+            };
+
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
-            document.getElementById(msgId).style.color = "green"; document.getElementById(msgId).innerHTML = "✅ " + result.challanNo;
-            resetFields([`${p}Qty`, `${p}Date`, `dRate`, `dLoading`, `rUnloading`]); masterSync();
+            document.getElementById(msgId).style.color = "green"; 
+            document.getElementById(msgId).innerHTML = "✅ Confirmed: " + result.challanNo;
+            
+            // Note: We don't reset the Item selection so you can see what you just did for printing
+            masterSync();
+        } else {
+            document.getElementById(msgId).style.color = "red";
+            document.getElementById(msgId).innerHTML = "❌ " + result.message;
         }
     }
 
@@ -410,6 +440,36 @@
         } else if (itemVal !== "") {
             catSelect.innerHTML += `<option value="N/A">N/A</option>`;
         }
+    }
+    async function generateBill() {
+        const siteId = document.getElementById('billSite').value;
+        if (!siteId) return alert("Please select Builder and Site");
+        
+        const res = await fetch(${API_URL}/calculate-bill/${siteId});
+        const data = await res.json();
+        
+        let h = <table><tr><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>;
+        let subtotal = 0;
+        
+        data.billDetails.forEach(i => {
+            h += <tr><td>${i.itemName}</td><td>${i.qty}</td><td>${i.dDate} to ${i.rDate}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.amount.toLocaleString()}</td></tr>;
+            subtotal += i.amount;
+        });
+
+        const totalRent = subtotal;
+        const service = data.serviceCharges;
+        const isGst = document.getElementById('gstToggle').checked;
+        const gst = isGst ? (totalRent + service) * 0.18 : 0;
+        const grandTotal = totalRent + service + gst;
+
+        h += `</table><div style="text-align:right; margin-top:20px; font-weight:bold;">
+                <p>Subtotal Rent: ₹${totalRent.toLocaleString()}</p>
+                <p>Loading/Unloading: ₹${service.toLocaleString()}</p>
+                ${isGst ? <p>GST (18%): ₹${gst.toLocaleString()}</p> : ''}
+                <h3>Grand Total: ₹${grandTotal.toLocaleString()}</h3>
+              </div>`;
+        
+        document.getElementById('billDisplay').innerHTML = h;
     }
 
     window.onload = () => {
