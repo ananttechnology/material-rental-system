@@ -22,53 +22,56 @@ async function getBuilderStats(builderId) {
     const sites = await Site.find({ builderId });
     const payments = await Payment.find({ builderId });
     let totalBilled = 0;
-
     for (let site of sites) {
-        const txns = await Transaction.find({ siteId: site._id }).sort({ date: 1 });
-        let items = {};
-        txns.forEach(t => {
-            totalBilled += (Number(t.loadingCharges) || 0) + (Number(t.unloadingCharges) || 0);
-            if (!items[t.itemId]) items[t.itemId] = { dc: [], rc: [] };
-            t.type === 'DC' ? items[t.itemId].dc.push({...t._doc}) : items[t.itemId].rc.push({...t._doc});
-        });
-
-        for (let id in items) {
-            let dcs = items[id].dc, rcs = items[id].rc;
-            rcs.forEach(r => {
-                let qty = r.quantity;
-                dcs.forEach(d => {
-                    if (d.quantity > 0 && qty > 0) {
-                        let take = Math.min(d.quantity, qty);
-                        let days = Math.max(1, Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1);
-                        totalBilled += (take * d.rate * days);
-                        d.quantity -= take; qty -= take;
-                    }
-                });
-            });
-            dcs.forEach(d => {
-                if (d.quantity > 0) {
-                    let days = Math.max(1, Math.floor((new Date() - new Date(d.date)) / 86400000) + 1);
-                    totalBilled += (d.quantity * d.rate * days);
-                }
-            });
-        }
+        const res = await calculateSiteBill(site._id);
+        totalBilled += res.subtotal + res.service;
     }
     const totalPaid = payments.reduce((sum, p) => sum + p.amountPaid, 0);
     return { totalBilled, totalPaid, outstanding: totalBilled - totalPaid, payments };
 }
 
+async function calculateSiteBill(siteId) {
+    const txns = await Transaction.find({ siteId }).sort({ date: 1 });
+    let service = 0, bill = [], items = {};
+    txns.forEach(t => {
+        service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+        if (!items[t.itemId]) items[t.itemId] = { dc: [], rc: [] };
+        t.type === 'DC' ? items[t.itemId].dc.push({ ...t._doc }) : items[t.itemId].rc.push({ ...t._doc });
+    });
+    for (let id in items) {
+        const info = await Inventory.findById(id);
+        if(!info) continue;
+        let dcs = items[id].dc, rcs = items[id].rc;
+        rcs.forEach(r => {
+            let q = r.quantity;
+            dcs.forEach(d => {
+                if (d.quantity > 0 && q > 0) {
+                    let take = Math.min(d.quantity, q);
+                    let days = Math.max(1, Math.floor((new Date(r.date) - new Date(d.date)) / 86400000) + 1);
+                    bill.push({ name: info.itemName, cat: info.category, qty: take, days, rate: d.rate, total: take * d.rate * days, duration: `${new Date(d.date).toLocaleDateString()} to ${new Date(r.date).toLocaleDateString()}` });
+                    d.quantity -= take; q -= take;
+                }
+            });
+        });
+        dcs.forEach(d => {
+            if (d.quantity > 0) {
+                let days = Math.max(1, Math.floor((new Date() - new Date(d.date)) / 86400000) + 1);
+                bill.push({ name: info.itemName, cat: info.category, qty: d.quantity, days, rate: d.rate, total: d.quantity * d.rate * days, duration: `${new Date(d.date).toLocaleDateString()} to Still on Site` });
+            }
+        });
+    }
+    const subtotal = bill.reduce((s, i) => s + i.total, 0);
+    return { bill, service, subtotal };
+}
+
 // --- ROUTES ---
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
-app.get('/sites/:builderId', async (req, res) => res.json(await Site.find({builderId: req.params.builderId})));
+app.get('/sites/:builderId', async (req, res) => res.json(await Site.find({ builderId: req.params.builderId })));
 app.get('/inventory', async (req, res) => res.json(await Inventory.find()));
 
 app.post('/add-item', async (req, res) => {
     const { itemName, category, godown, totalStock } = req.body;
-    let item = await Inventory.findOne({ 
-        itemName: { $regex: new RegExp("^" + itemName.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-        category: { $regex: new RegExp("^" + category.trim().replace(/\s+/g, '\\s*') + "$", "i") },
-        godown 
-    });
+    let item = await Inventory.findOne({ itemName: itemName.trim(), category: category.trim(), godown });
     if (item) {
         item.totalStock += Number(totalStock); item.availableStock += Number(totalStock);
         await item.save();
@@ -76,29 +79,42 @@ app.post('/add-item', async (req, res) => {
     res.send("OK");
 });
 
+app.post('/transfer-stock', async (req, res) => {
+    try {
+        const { itemName, category, fromGodown, toGodown, quantity } = req.body;
+        const qty = Number(quantity);
+        let src = await Inventory.findOne({ itemName: itemName.trim(), category: category.trim(), godown: fromGodown });
+        if (!src || src.availableStock < qty) return res.status(400).json({ message: "Insufficient Stock" });
+        let dst = await Inventory.findOne({ itemName: itemName.trim(), category: category.trim(), godown: toGodown });
+        if (!dst) dst = new Inventory({ itemName: src.itemName, category: src.category, godown: toGodown, totalStock: 0, availableStock: 0 });
+        src.availableStock -= qty; src.totalStock -= qty;
+        dst.availableStock += qty; dst.totalStock += qty;
+        await src.save(); await dst.save();
+        res.json({ message: "Success" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/dispatch', async (req, res) => {
     const item = await Inventory.findById(req.body.itemId);
     if (!item || item.availableStock < req.body.quantity) return res.status(400).send("No Stock");
     item.availableStock -= req.body.quantity; await item.save();
-    const count = await Transaction.countDocuments({type:'DC'});
-    const challan = await new Transaction({...req.body, type:'DC', challanNo: `DC-${1001+count}`, godown: item.godown}).save();
+    const count = await Transaction.countDocuments({ type: 'DC' });
+    const challan = await new Transaction({ ...req.body, type: 'DC', challanNo: `DC-${1001 + count}`, godown: item.godown }).save();
     res.json(challan);
 });
 
 app.post('/return', async (req, res) => {
     const item = await Inventory.findById(req.body.itemId);
     item.availableStock += Number(req.body.quantity); await item.save();
-    const count = await Transaction.countDocuments({type:'RC'});
-    const challan = await new Transaction({...req.body, type:'RC', challanNo: `RC-${1001+count}`, godown: item.godown}).save();
+    const count = await Transaction.countDocuments({ type: 'RC' });
+    const challan = await new Transaction({ ...req.body, type: 'RC', challanNo: `RC-${1001 + count}`, godown: item.godown }).save();
     res.json(challan);
 });
 
 app.get('/site-balance/:siteId', async (req, res) => {
     const txns = await Transaction.find({ siteId: req.params.siteId });
     let bal = {};
-    for (let t of txns) {
-        bal[t.itemId] = (bal[t.itemId] || 0) + (t.type === 'DC' ? t.quantity : -t.quantity);
-    }
+    for (let t of txns) { bal[t.itemId] = (bal[t.itemId] || 0) + (t.type === 'DC' ? t.quantity : -t.quantity); }
     let out = [];
     for (let id in bal) {
         if (bal[id] > 0) {
@@ -110,34 +126,8 @@ app.get('/site-balance/:siteId', async (req, res) => {
 });
 
 app.get('/calculate-bill/:siteId', async (req, res) => {
-    const txns = await Transaction.find({ siteId: req.params.siteId }).sort({date:1});
-    let service = 0, bill = [], items = {};
-    txns.forEach(t => {
-        service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
-        if(!items[t.itemId]) items[t.itemId] = { dc:[], rc:[] };
-        t.type === 'DC' ? items[t.itemId].dc.push({...t._doc}) : items[t.itemId].rc.push({...t._doc});
-    });
-    for (let id in items) {
-        const info = await Inventory.findById(id);
-        items[id].rc.forEach(r => {
-            let q = r.quantity;
-            items[id].dc.forEach(d => {
-                if (d.quantity > 0 && q > 0) {
-                    let take = Math.min(d.quantity, q);
-                    let days = Math.max(1, Math.floor((new Date(r.date) - new Date(d.date))/86400000)+1);
-                    bill.push({ name: info.itemName, cat: info.category, qty: take, days, rate: d.rate, total: take*d.rate*days });
-                    d.quantity -= take; q -= take;
-                }
-            });
-        });
-        items[id].dc.forEach(d => {
-            if (d.quantity > 0) {
-                let days = Math.max(1, Math.floor((new Date() - new Date(d.date))/86400000)+1);
-                bill.push({ name: info.itemName, cat: info.category, qty: d.quantity, days, rate: d.rate, total: d.quantity*d.rate*days });
-            }
-        });
-    }
-    res.json({ bill, service });
+    try { res.json(await calculateSiteBill(req.params.siteId)); } 
+    catch (e) { res.status(500).send(e.message); }
 });
 
 app.get('/statement/:builderId', async (req, res) => res.json(await getBuilderStats(req.params.builderId)));
