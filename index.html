@@ -209,12 +209,25 @@
     }
 
     async function loadLedger() {
-        const bId = document.getElementById('pBuilder').value; if (!bId) return;
+        const bId = document.getElementById('pBuilder').value;
+        if (!bId) return;
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
-        let h = `<h4>History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
-        data.payments.forEach(p => h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`);
-        h += `</table><div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;"><p>Outstanding: ₹${data.outstanding.toLocaleString()}</p></div>`;
+        
+        let h = `<h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
+        data.payments.forEach(p => {
+            h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`;
+        });
+        h += `</table>`;
+        
+        // RESTORING ALL THREE VALUES: BILLED, RECEIVED (PAID), AND OUTSTANDING
+        h += `<div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;">
+              <p>Total Billed Amount: ₹${data.totalBilled.toLocaleString()}</p>
+              <p>Total Received Payment: ₹${data.totalPaid.toLocaleString()}</p>
+              <hr style="border:0.5px solid rgba(255,255,255,0.2)">
+              <h3 style="margin:0;">Total Outstanding: ₹${data.outstanding.toLocaleString()}</h3>
+              </div>`;
+              
         document.getElementById('ledgerDisplay').innerHTML = h;
     }
 
