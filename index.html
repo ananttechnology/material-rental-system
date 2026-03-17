@@ -12,8 +12,6 @@
             --light: #f4f7f6; --sidebar-width: 260px;
         }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--light); display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Sidebar */
         #sidebar { width: var(--sidebar-width); background: var(--primary); color: white; transition: 0.3s; display: flex; flex-direction: column; position: relative; z-index: 10; }
         #sidebar.collapsed { width: 70px; }
         .nav-header { padding: 25px; text-align: center; background: rgba(0,0,0,0.2); font-weight: bold; font-size: 1.2rem; }
@@ -23,39 +21,27 @@
         #sidebar.collapsed span { display: none; }
         #sidebar.collapsed .nav-item i { margin-right: 0; }
         #toggle-btn { position: absolute; bottom: 30px; right: -15px; background: var(--accent); color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; z-index: 20; }
-
-        /* Main Content */
         #main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .top-bar { background: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .content-area { padding: 30px 40px; }
-
-        /* Dashboard Cards */
         .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 40px; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-bottom: 4px solid var(--accent); cursor: pointer; transition: 0.3s; }
         .card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
         .card h3 { margin: 0; font-size: 0.85rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; }
         .card .value { font-size: 1.6rem; font-weight: bold; margin-top: 10px; color: var(--primary); display: flex; align-items: center; justify-content: space-between; }
-        .card i { color: var(--accent); opacity: 0.7; }
-
-        /* Sections */
         .section { background: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border-top: 5px solid #eee; }
         .dispatch-sec { border-top-color: var(--danger); }
         .return-sec { border-top-color: var(--accent); }
         .report-sec { border-top-color: var(--warning); }
         .pay-sec { border-top-color: #e83e8c; }
-        
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         input, select, textarea { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; }
         button { background: var(--success); color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
         button:hover { filter: brightness(1.1); }
-
-        /* Modal Popups */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
         .modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; position: relative; animation: slideIn 0.3s ease-out; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
         @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .close-btn { position: absolute; top: 20px; right: 25px; font-size: 28px; cursor: pointer; color: #999; transition: 0.2s; line-height: 1; }
-        .close-btn:hover { color: var(--danger); }
-        
+        .close-btn { position: absolute; top: 20px; right: 25px; font-size: 28px; cursor: pointer; color: #999; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #eee; padding: 15px; text-align: left; }
         th { background: #f8f9fa; font-weight: 600; }
@@ -86,129 +72,52 @@
     <div class="content-area">
         <div id="dashboard" class="page active">
             <div class="dash-grid">
-                <div class="card" onclick="openStockModal('Ankleshwar')">
-                    <h3>Ankleshwar Godown</h3>
-                    <div class="value"><span id="stat-ank">0</span> <i class="fas fa-warehouse"></i></div>
-                </div>
-                <div class="card" onclick="openStockModal('Dahej')">
-                    <h3>Dahej Godown</h3>
-                    <div class="value"><span id="stat-dah">0</span> <i class="fas fa-warehouse"></i></div>
-                </div>
-                <div class="card" onclick="openMonthlyModal('billed')">
-                    <h3>Month Billed</h3>
-                    <div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-alt"></i></div>
-                </div>
-                <div class="card" onclick="openMonthlyModal('out')">
-                    <h3>Total Outstanding</h3>
-                    <div class="value">₹<span id="dash-out">0</span> <i class="fas fa-money-bill-wave"></i></div>
-                </div>
+                <div class="card" onclick="openStockModal('Ankleshwar')"><h3>Ankleshwar Godown</h3><div class="value"><span id="stat-ank">0</span> <i class="fas fa-warehouse"></i></div></div>
+                <div class="card" onclick="openStockModal('Dahej')"><h3>Dahej Godown</h3><div class="value"><span id="stat-dah">0</span> <i class="fas fa-warehouse"></i></div></div>
+                <div class="card" onclick="openMonthlyModal('billed')"><h3>Month Billed</h3><div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-alt"></i></div></div>
+                <div class="card" onclick="openMonthlyModal('out')"><h3>Total Outstanding</h3><div class="value">₹<span id="dash-out">0</span> <i class="fas fa-money-bill-wave"></i></div></div>
             </div>
-
             <div class="section dispatch-sec">
                 <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
-                <div class="grid">
-                    <select id="dBuilder" onchange="loadSites('dBuilder','dSite')"></select>
-                    <select id="dSite"></select>
-                </div>
-                <div class="grid">
-                    <select id="dItem" onchange="showStock('dItem','stockStatus')"></select>
-                    <span id="stockStatus" style="font-weight: bold; color: var(--accent);">Available: 0</span>
-                </div>
-                <div class="grid">
-                    <input type="number" id="dQty" placeholder="Quantity">
-                    <input type="number" id="dRate" placeholder="Daily Rate (₹)">
-                </div>
-                <div class="grid">
-                    <input type="number" id="dLoading" placeholder="Loading Charges (₹)">
-                    <input type="date" id="dDate">
-                </div>
+                <div class="grid"><select id="dBuilder" onchange="loadSites('dBuilder','dSite')"></select><select id="dSite"></select></div>
+                <div class="grid"><select id="dItem" onchange="showStock('dItem','stockStatus')"></select><span id="stockStatus" style="font-weight: bold; color: var(--accent);">Available: 0</span></div>
+                <div class="grid"><input type="number" id="dQty" placeholder="Quantity"><input type="number" id="dRate" placeholder="Daily Rate (₹)"></div>
+                <div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="date" id="dDate"></div>
                 <button onclick="processTxn('dispatch')" style="background: var(--danger);">Confirm Dispatch</button>
                 <div id="msg4" class="msg-area"></div>
                 <button id="btnPrintDC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
             </div>
-
             <div class="section return-sec">
                 <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
-                <div class="grid">
-                    <select id="rBuilder" onchange="loadSites('rBuilder','rSite')"></select>
-                    <select id="rSite" onchange="loadReturnItems()"></select>
-                </div>
+                <div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"></select><select id="rSite" onchange="loadReturnItems()"></select></div>
                 <select id="rItem"></select>
-                <div class="grid">
-                    <input type="number" id="rQty" placeholder="Qty Returned">
-                    <input type="number" id="rUnloading" placeholder="Unloading Charges (₹)">
-                </div>
+                <div class="grid"><input type="number" id="rQty" placeholder="Qty Returned"><input type="number" id="rUnloading" placeholder="Unloading Charges (₹)"></div>
                 <input type="date" id="rDate">
                 <button onclick="processTxn('return')" style="background: var(--accent);">Confirm Return</button>
                 <div id="msg5" class="msg-area"></div>
                 <button id="btnPrintRC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('RC')">🖨️ Print Return Challan</button>
             </div>
-
             <div class="section report-sec">
                 <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
-                <div class="grid">
-                    <select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select>
-                    <select id="repSite"></select>
-                </div>
+                <div class="grid"><select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select><select id="repSite"></select></div>
                 <button onclick="openSiteReportModal()" style="background: var(--warning); color: #000;">🔍 Generate Holding List</button>
             </div>
-
             <div class="section pay-sec">
                 <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
                 <select id="pBuilder" onchange="loadLedger()"><option value="">-- Select Builder --</option></select>
-                <div class="grid">
-                    <input type="number" id="pAmount" placeholder="Amount Paid (₹)">
-                    <select id="pMode">
-                        <option value="Cash">Cash</option>
-                        <option value="Online">Online / G-Pay</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Bank">Bank Transfer</option>
-                    </select>
-                </div>
+                <div class="grid"><input type="number" id="pAmount" placeholder="Amount Paid (₹)"><select id="pMode"><option value="Cash">Cash</option><option value="Online">Online / G-Pay</option><option value="Cheque">Cheque</option><option value="Bank">Bank Transfer</option></select></div>
                 <div class="grid"><input type="text" id="pRef" placeholder="Ref No."><input type="date" id="pDate"></div>
                 <button onclick="recordPayment()" style="background: #e83e8c;">Confirm Payment Receipt</button>
                 <div id="msg8" class="msg-area"></div>
                 <div id="ledgerDisplay"></div>
             </div>
         </div>
-
-        <div id="builder" class="page"><div class="form-container section"><h2>New Builder Profile</h2><input type="text" id="compName" placeholder="Company Name *"><input type="text" id="bMobile" placeholder="Mobile"><input type="text" id="bGst" placeholder="GST Number"><textarea id="bAddr" placeholder="Address"></textarea><button onclick="saveBuilder()">Save Profile</button><div id="msg1" class="msg-area"></div></div></div>
-        <div id="site" class="page"><div class="form-container section"><h2>Link Site to Builder</h2><select id="builderSelect"></select><input type="text" id="sName" placeholder="Site Name"><textarea id="sAddr" placeholder="Site Address"></textarea><button onclick="saveSite()">Link Site</button><div id="msg2" class="msg-area"></div></div></div>
-        <div id="inventory" class="page"><div class="form-container section"><h2>Inventory Stock Entry</h2><select id="itemName" onchange="updateCategories('')"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Total Units to Add"><button onclick="saveItem()">Update Stock</button><div id="msg3" class="msg-area"></div></div></div>
-        
-        <div id="transfer" class="page">
-            <div class="form-container section">
-                <h2>Inter-Godown Stock Transfer</h2>
-                <select id="tItemName" onchange="updateCategories('t')"></select>
-                <select id="tCategory"><option value="">-- Select Type --</option></select>
-                <div class="grid">
-                    <select id="tFrom"><option value="">From Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select>
-                    <select id="tTo"><option value="">To Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select>
-                </div>
-                <input type="number" id="tQty" placeholder="Quantity to Move">
-                <button onclick="transferStock()" style="background: var(--primary);">Confirm Transfer</button>
-                <div id="msg9" class="msg-area"></div>
-            </div>
-        </div>
-
-        <div id="billing" class="page">
-            <div class="form-container section">
-                <h2>Master Billing Engine</h2>
-                <div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div>
-                <label><input type="checkbox" id="gstToggle"> Include GST 18%</label>
-                <button onclick="generateBill()" style="background: var(--success);">Calculate Final Bill</button>
-                <div id="billDisplay"></div>
-                <div id="msg7" class="msg-area"></div>
-            </div>
-        </div>
-
-        <div id="dataModal" class="modal">
-            <div class="modal-content">
-                <span class="close-btn" onclick="closeModal()">&times;</span>
-                <h2 id="modalTitle">Report View</h2>
-                <div id="modalBody"></div>
-            </div>
-        </div>
+        <div id="builder" class="page"><div class="form-container"><h2>New Builder</h2><input type="text" id="compName" placeholder="Name"><input type="text" id="bMobile" placeholder="Mobile"><input type="text" id="bGst" placeholder="GST"><textarea id="bAddr" placeholder="Address"></textarea><button onclick="saveBuilder()">Save Builder</button><div id="msg1"></div></div></div>
+        <div id="site" class="page"><div class="form-container"><h2>Link New Site</h2><select id="builderSelect"></select><input type="text" id="sName" placeholder="Site Name"><textarea id="sAddr" placeholder="Site Address"></textarea><button onclick="saveSite()">Link Site</button><div id="msg2"></div></div></div>
+        <div id="inventory" class="page"><div class="form-container"><h2>Inventory Addition</h2><select id="itemName" onchange="updateCategories('')"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Quantity"><button onclick="saveItem()">Add Stock</button><div id="msg3"></div></div></div>
+        <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateCategories('t')"></select><select id="tCategory"></select><select id="tFrom"><option value="">From Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="">To Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
+        <div id="billing" class="page"><div class="section"><h2>Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><label><input type="checkbox" id="gstToggle"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="billDisplay"></div></div></div>
+        <div id="dataModal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal()">&times;</span><h2 id="modalTitle">Report</h2><div id="modalBody"></div></div></div>
     </div>
 </div>
 
@@ -218,25 +127,14 @@
     let lastTxn = null;
 
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
-    function showPage(id) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1);
-    }
-    function openModal(title, content) { 
-        document.getElementById('modalTitle').innerText = title; 
-        document.getElementById('modalBody').innerHTML = content; 
-        document.getElementById('dataModal').style.display = 'block'; 
-    }
+    function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
+    function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; }
     function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
+    window.onclick = function(e) { if(e.target == document.getElementById('dataModal')) closeModal(); }
 
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
-        for (let key in fields) {
-            if (fields[key] === null || fields[key] === undefined || fields[key].toString().trim() === "") {
-                msg.style.color = "red"; msg.innerHTML = "⚠️ Error: Fill all boxes."; return false;
-            }
-        }
+        for (let key in fields) { if (fields[key] === null || fields[key] === undefined || fields[key].toString().trim() === "") { msg.style.color = "red"; msg.innerHTML = "⚠️ Error: Fill all boxes."; return false; } }
         msg.innerHTML = ""; return true;
     }
 
@@ -246,20 +144,12 @@
             const b = await res.json();
             ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
                 const s = document.getElementById(id);
-                if(s) {
-                    const cur = s.value;
-                    s.innerHTML = '<option value="">-- Select Builder --</option>';
-                    b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`);
-                    s.value = cur;
-                }
+                if(s) { const cur = s.value; s.innerHTML = '<option value="">-- Select Builder --</option>'; b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); s.value = cur; }
             });
             const invRes = await fetch(`${API_URL}/inventory`);
             fullInventory = await invRes.json();
             const dItem = document.getElementById('dItem');
-            if(dItem) {
-                dItem.innerHTML = '<option value="">-- Select Material --</option>';
-                fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`);
-            }
+            if(dItem) { dItem.innerHTML = '<option value="">-- Select Material --</option>'; fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`); }
             document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
             document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
             const statRes = await fetch(`${API_URL}/company-stats`);
@@ -298,11 +188,7 @@
         if (!validate(body, msgId)) return;
         const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
         const result = await res.json();
-        if(res.ok) {
-            lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] };
-            document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
-            document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; masterSync();
-        }
+        if(res.ok) { lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] }; document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block'; document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; masterSync(); }
     }
 
     function openStockModal(godown) {
@@ -316,24 +202,18 @@
         const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value };
         if (!validate(body, 'msg8')) return;
         await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg8').innerHTML = "✅ Recorded"; masterSync();
+        document.getElementById('msg8').innerHTML = "✅ Recorded"; loadLedger(); masterSync();
     }
 
     async function loadLedger() {
-    const bId = document.getElementById('pBuilder').value;
-    if (!bId) return;
-    const res = await fetch(${API_URL}/statement/${bId});
-    const data = await res.json();
-    
-    let h = <h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>;
-    data.payments.forEach(p => {
-        h += <tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>;
-    });
-    h += `</table><div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;">
-          <p>Total Billed: ₹${data.totalBilled.toLocaleString()}</p>
-          <p>Total Paid: ₹${data.totalPaid.toLocaleString()}</p>
-          <hr><h3>Outstanding: ₹${data.outstanding.toLocaleString()}</h3></div>`;
-    document.getElementById('ledgerDisplay').innerHTML = h;
+        const bId = document.getElementById('pBuilder').value;
+        if (!bId) return;
+        const res = await fetch(`${API_URL}/statement/${bId}`);
+        const data = await res.json();
+        let h = `<h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
+        data.payments.forEach(p => h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`);
+        h += `</table><div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;"><p>Total Billed: ₹${data.totalBilled.toLocaleString()}</p><p>Total Paid: ₹${data.totalPaid.toLocaleString()}</p><hr><h3>Outstanding: ₹${data.outstanding.toLocaleString()}</h3></div>`;
+        document.getElementById('ledgerDisplay').innerHTML = h;
     }
 
     async function loadSites(bId, sId) {
@@ -352,10 +232,17 @@
         data.forEach(i => r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
     }
 
-    function showStock(id, lab) {
-        const item = fullInventory.find(i => i._id === document.getElementById(id).value);
-        document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0';
+    async function openSiteReportModal() {
+        const siteId = document.getElementById('repSite').value;
+        if (!siteId) return alert("Select Site");
+        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+        const data = await res.json();
+        let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
+        data.forEach(i => h += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`);
+        openModal("Site Holdings", h + "</table>");
     }
+
+    function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
 
     function updateCategories(pref = '') {
         const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'] };
@@ -365,41 +252,25 @@
         (list[val] || ['N/A']).forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
     }
 
-    function printChallan(type) {
-        const win = window.open('', '', 'height=600,width=800');
-        win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>Challan No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`);
-        win.document.close(); win.print();
-    }
+    function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>Challan No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
+
     async function generateBill() {
-    const siteId = document.getElementById('billSite').value;
-    if (!siteId) return alert("Select Site");
-    const res = await fetch(${API_URL}/calculate-bill/${siteId});
-    const data = await res.json();
-    
-    let h = `<table style="width:100%; border-collapse:collapse;">
-             <tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
-    let sub = 0;
-    data.bill.forEach(i => {
-        h += <tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.total}</td></tr>;
-        sub += i.total;
-    });
-    const gst = document.getElementById('gstToggle').checked ? (sub + data.service) * 0.18 : 0;
-    h += `</table><div style="text-align:right; margin-top:15px;">
-          <p>Rent: ₹${sub}</p><p>Service: ₹${data.service}</p><p>GST: ₹${gst.toFixed(2)}</p>
-          <h3>Grand Total: ₹${(sub + data.service + gst).toFixed(2)}</h3></div>`;
-    document.getElementById('billDisplay').innerHTML = h;
+        const siteId = document.getElementById('billSite').value;
+        if (!siteId) return alert("Select Site");
+        const res = await fetch(`${API_URL}/calculate-bill/${siteId}`);
+        const data = await res.json();
+        let h = `<table style="width:100%; border-collapse:collapse;"><tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
+        let sub = 0;
+        data.bill.forEach(i => { h += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${i.days}</td><td>${i.rate}</td><td>₹${i.total}</td></tr>`; sub += i.total; });
+        const gst = document.getElementById('gstToggle').checked ? (sub + data.service) * 0.18 : 0;
+        h += `</table><div style="text-align:right; margin-top:15px;"><p>Rent: ₹${sub}</p><p>Service: ₹${data.service}</p><p>GST: ₹${gst.toFixed(2)}</p><h3>Grand Total: ₹${(sub + data.service + gst).toFixed(2)}</h3></div>`;
+        document.getElementById('billDisplay').innerHTML = h;
     }
 
     window.onload = () => {
         masterSync();
         const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
-        ['itemName', 'tItemName'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) {
-                el.innerHTML = '<option value="">-- Select Item --</option>';
-                items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`);
-            }
-        });
+        ['itemName', 'tItemName'].forEach(id => { const el = document.getElementById(id); if(el) { el.innerHTML = '<option value="">-- Select Item --</option>'; items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`); } });
     };
 </script>
 </body>
