@@ -4,11 +4,7 @@ const cors = require('cors');
 
 const app = express();
 // FINAL CORS FIX: Explicitly allow your GitHub domain
-app.use(cors({
-    origin: ["https://ananttechnology.github.io", "http://127.0.0.1:5500"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type"]
-}));
+app.use(cors());
 app.use(express.json());
 
 const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtenting.aczjrep.mongodb.net/?appName=materialtenting"; 
