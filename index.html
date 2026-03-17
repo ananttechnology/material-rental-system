@@ -148,7 +148,7 @@
             const invRes = await fetch(`${API_URL}/inventory`);
             fullInventory = await invRes.json();
             const dItem = document.getElementById('dItem');
-            if(dItem) { dItem.innerHTML = '<option value="">-- Select Material --</option>'; fullInventory.forEach(i => dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`); }
+            if(dItem) { dItem.innerHTML = '<option value="">-- Select Material --</option>'; fullInventory.filter(i => i.availableStock > 0).forEach(i => { dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`; });
             document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
             document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
             const statRes = await fetch(`${API_URL}/company-stats`);
