@@ -194,6 +194,47 @@
             document.getElementById('msg1').innerHTML = "❌ Connection Error: Cannot reach server.";
         }
     }
+    async function saveSite() {
+    const body = { 
+        builderId: document.getElementById('builderSelect').value, 
+        sName: document.getElementById('sName').value, 
+        sAddr: document.getElementById('sAddr').value 
+    };
+
+    // The backend expects 'siteName' and 'siteAddress' based on your Schema
+    // So we map the HTML values to the correct keys
+    const payload = {
+        builderId: body.builderId,
+        siteName: body.sName,
+        siteAddress: body.sAddr
+    };
+
+    if (!validate(payload, 'msg2')) return;
+
+    try {
+        const res = await fetch(`${API_URL}/add-site`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+
+        if (res.ok) {
+            document.getElementById('msg2').style.color = "green";
+            document.getElementById('msg2').innerHTML = "✅ Site Linked Successfully";
+            
+            // Clear the boxes
+            document.getElementById('sName').value = "";
+            document.getElementById('sAddr').value = "";
+            
+            masterSync(); // Refresh data
+        } else {
+            document.getElementById('msg2').style.color = "red";
+            document.getElementById('msg2').innerHTML = "❌ Server rejected site data";
+        }
+    } catch (e) {
+        document.getElementById('msg2').innerHTML = "❌ Connection Error";
+    }
+}
 
     async function saveItem() {
         const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, godown: document.getElementById('iGodown').value, totalStock: Number(document.getElementById('qty').value) };
