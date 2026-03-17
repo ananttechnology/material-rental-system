@@ -199,8 +199,41 @@ app.get('/site-balance/:siteId', async (req, res) => {
 });
 
 app.get('/calculate-bill/:siteId', async (req, res) => {
-    const { start, end } = req.query; // Get dates from URL
-    res.json(await calculateSiteBill(req.params.siteId, start, end));
+    const { siteId } = req.params;
+    const { start, end, builderId } = req.query; // Added builderId as a query param
+
+    try {
+        if (siteId === "ALL") {
+            // 1. Logic for Total (Consolidated) Billing
+            const sites = await Site.find({ builderId });
+            let consolidatedData = {
+                isConsolidated: true,
+                sites: [],
+                grandTotal: 0,
+                totalService: 0,
+                totalSubtotal: 0
+            };
+
+            for (let s of sites) {
+                const siteBill = await calculateSiteBill(s._id, start, end);
+                consolidatedData.sites.push({
+                    siteName: s.siteName,
+                    bill: siteBill.bill,
+                    subtotal: siteBill.subtotal,
+                    service: siteBill.service
+                });
+                consolidatedData.totalSubtotal += siteBill.subtotal;
+                consolidatedData.totalService += siteBill.service;
+            }
+            res.json(consolidatedData);
+        } else {
+            // 2. Logic for Single Site Billing (Existing Functionality)
+            const result = await calculateSiteBill(siteId, start, end);
+            res.json({ ...result, isConsolidated: false });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("OK"); });
 app.get('/statement/:builderId', async (req, res) => {
