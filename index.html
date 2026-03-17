@@ -138,25 +138,35 @@
     }
 
     async function masterSync() {
-        try {
-            const res = await fetch(`${API_URL}/builders`);
-            const b = await res.json();
-            ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
-                const s = document.getElementById(id);
-                if(s) { const cur = s.value; s.innerHTML = '<option value="">-- Select Builder --</option>'; b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); s.value = cur; }
+    try {
+        const res = await fetch(`${API_URL}/builders`);
+        const b = await res.json();
+        ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
+            const s = document.getElementById(id);
+            if(s) { const cur = s.value; s.innerHTML = '<option value="">-- Select Builder --</option>'; b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); s.value = cur; }
+        });
+
+        const invRes = await fetch(`${API_URL}/inventory`);
+        fullInventory = await invRes.json();
+        const dItem = document.getElementById('dItem');
+
+        if(dItem) { 
+            dItem.innerHTML = '<option value="">-- Select Material --</option>'; 
+            // FIXED: Added filter here to hide 0 stock items
+            fullInventory.filter(i => i.availableStock > 0).forEach(i => {
+                dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
             });
-            const invRes = await fetch(`${API_URL}/inventory`);
-            fullInventory = await invRes.json();
-            const dItem = document.getElementById('dItem');
-            if(dItem) { dItem.innerHTML = '<option value="">-- Select Material --</option>'; fullInventory.filter(i => i.availableStock > 0).forEach(i => { dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`; });
-            document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
-            document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
-            const statRes = await fetch(`${API_URL}/company-stats`);
-            const stats = await statRes.json();
-            document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
-            document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
-        } catch (e) { console.error(e); }
-    }
+        }
+
+        document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
+        document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
+        
+        const statRes = await fetch(`${API_URL}/company-stats`);
+        const stats = await statRes.json();
+        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
+        document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
+    } catch (e) { console.error(e); }
+}
 
     async function saveBuilder() {
         const body = { 
