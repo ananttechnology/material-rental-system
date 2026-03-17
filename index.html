@@ -101,6 +101,7 @@
                 <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
                 <div class="grid"><select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select><select id="repSite"></select></div>
                 <button onclick="openSiteReportModal()" style="background: var(--warning); color: #000;">🔍 Generate Holding List</button>
+                <button onclick="printHoldingReport()" style="background: #34495e; color: white; margin-top:10px;">🖨️ Print Holding Report</button>
             </div>
             <div class="section pay-sec">
                 <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
@@ -425,12 +426,20 @@
     }
 
     async function loadSites(bId, sId) {
-        const res = await fetch(`${API_URL}/sites/${document.getElementById(bId).value}`);
-        const data = await res.json();
-        const s = document.getElementById(sId);
-        s.innerHTML = '<option value="">-- Select Site --</option>';
-        data.forEach(x => s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`);
+    const builderId = document.getElementById(bId).value;
+    if(!builderId) return;
+    const res = await fetch(`${API_URL}/sites/${builderId}`);
+    const data = await res.json();
+    const s = document.getElementById(sId);
+    s.innerHTML = '<option value="">-- Select Site --</option>';
+    
+    // If we are in the Billing section, add the "ALL" option
+    if (sId === 'billSite') {
+        s.innerHTML += `<option value="ALL">-- ALL SITES (Total Bill) --</option>`;
     }
+    
+    data.forEach(x => s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`);
+}
 
     async function loadReturnItems() {
         const siteId = document.getElementById('rSite').value; if(!siteId) return;
@@ -463,32 +472,75 @@
     function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
 
     async function generateBill() {
+    const builderId = document.getElementById('billBuilder').value;
     const siteId = document.getElementById('billSite').value;
     const start = document.getElementById('billStart').value;
     const end = document.getElementById('billEnd').value;
 
-    if (!siteId) return alert("Select Site");
-    // Per your request: All boxes should be filled
-    if (!start || !end) return alert("Please select both Start and End dates for the bill.");
+    if (!siteId || !start || !end) return alert("Please fill Builder, Site/Total, and Date Range.");
 
-    const res = await fetch(`${API_URL}/calculate-bill/${siteId}?start=${start}&end=${end}`);
+    // We pass builderId in the URL for "ALL" logic
+    const res = await fetch(`${API_URL}/calculate-bill/${siteId}?start=${start}&end=${end}&builderId=${builderId}`);
     const data = await res.json();
     
-    let h = `<table style="width:100%; border-collapse:collapse;"><tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
-    data.bill.forEach(i => { h += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${i.duration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; });
-    
-    const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
-    
-    h += `</table><div style="text-align:right; margin-top:15px;">
-          <p>Rent Subtotal: ₹${data.subtotal.toLocaleString()}</p>
-          <p>Service Charges: ₹${data.service.toLocaleString()}</p>
-          <p>GST (18%): ₹${gst.toLocaleString()}</p>
-          <hr>
-          <h3>Grand Total: ₹${(data.subtotal + data.service + gst).toLocaleString()}</h3>
-          </div>`;
-          
+    let h = "";
+    if (data.isConsolidated) {
+        // Render Total Bill grouped by Site
+        data.sites.forEach(site => {
+            h += `<h3 style="background:#f4f4f4; padding:10px; border-left:5px solid var(--accent);">Site: ${site.siteName}</h3>`;
+            h += renderBillTable(site.bill);
+            h += `<p style="text-align:right;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p><hr>`;
+        });
+        const sub = data.totalSubtotal;
+        const ser = data.totalService;
+        const gst = document.getElementById('gstToggle').checked ? (sub + ser) * 0.18 : 0;
+        h += renderBillSummary(sub, ser, gst);
+    } else {
+        // Render Single Site Bill
+        h += renderBillTable(data.bill);
+        const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
+        h += renderBillSummary(data.subtotal, data.service, gst);
+    }
     document.getElementById('billDisplay').innerHTML = h;
-}
+    }
+
+    // Helper functions to keep code clean and undisturbed
+    function renderBillTable(billItems) {
+    let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
+    billItems.forEach(i => { t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${i.duration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; });
+    return t + `</table>`;
+    }
+
+    function renderBillSummary(sub, ser, gst) {
+    return `<div style="text-align:right; margin-top:15px; border-top:2px solid #333; padding-top:10px;">
+          <p>Rent: ₹${sub.toLocaleString()}</p><p>Service: ₹${ser.toLocaleString()}</p>
+          <p>GST: ₹${gst.toLocaleString()}</p><h3>Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
+    }
+    async function printHoldingReport() {
+    const siteId = document.getElementById('repSite').value;
+    const builderName = document.getElementById('repBuilder').selectedOptions[0].text;
+    const siteName = document.getElementById('repSite').selectedOptions[0].text;
+    
+    if (!siteId) return alert("Select a site first");
+    
+    const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+    const data = await res.json();
+    
+    const win = window.open('', '', 'height=700,width=900');
+    let content = `<html><head><title>Holding Report</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} th{background:#f2f2f2;}</style></head><body>`;
+    content += `<h1 style="text-align:center;">STOCK HOLDING REPORT</h1>`;
+    content += `<p><b>Builder:</b> ${builderName} | <b>Site:</b> ${siteName}</p>`;
+    content += `<p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p><table><tr><th>Item Description</th><th>Category</th><th>Godown Source</th><th>Current Holding Qty</th></tr>`;
+    
+    data.forEach(i => {
+        content += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
+    });
+    
+    content += `</table><p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`;
+    win.document.write(content);
+    win.document.close();
+    win.print();
+    }
 
     window.onload = () => {
         masterSync();
