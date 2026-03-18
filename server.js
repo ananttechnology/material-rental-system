@@ -285,53 +285,54 @@ app.put('/edit-transaction/:id', async (req, res) => {
     const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
 
     try {
-        // 1. Get the original state
-        const oldTxn = await Transaction.findById(id);
+        // 1. Convert IDs to ObjectId to match your database exactly
+        const objTxnId = new mongoose.Types.ObjectId(id);
+        const objItemId = new mongoose.Types.ObjectId(itemId);
+
+        const oldTxn = await Transaction.findById(objTxnId);
         if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
 
         // --- PHASE 1: UNDO OLD IMPACT ---
-        // Reverse Godown
+        // Restore Godown Stock
         await Inventory.findByIdAndUpdate(oldTxn.itemId, { 
-            $inc: { currentStock: oldTxn.type === 'DC' ? oldTxn.quantity : -oldTxn.quantity } 
+            $inc: { currentStock: oldTxn.type === 'DC' ? Number(oldTxn.quantity) : -Number(oldTxn.quantity) } 
         });
         
-        // Reverse Site (Target the specific item in the array)
+        // Restore Site Balance
         await Site.updateOne(
             { _id: oldTxn.siteId, "siteBalance.itemId": oldTxn.itemId },
-            { $inc: { "siteBalance.$.currentBalance": oldTxn.type === 'DC' ? -oldTxn.quantity : oldTxn.quantity } }
+            { $inc: { "siteBalance.$.currentBalance": oldTxn.type === 'DC' ? -Number(oldTxn.quantity) : Number(oldTxn.quantity) } }
         );
 
         // --- PHASE 2: APPLY NEW IMPACT ---
-        // Update Godown with new item/qty
-        await Inventory.findByIdAndUpdate(itemId, { 
-            $inc: { currentStock: type === 'DC' ? -quantity : quantity } 
+        // New Godown Stock (using Number() to ensure $inc works)
+        await Inventory.findByIdAndUpdate(objItemId, { 
+            $inc: { currentStock: type === 'DC' ? -Number(quantity) : Number(quantity) } 
         });
 
-        // Update Site: Check if NEW item already exists at site
-        const siteWithItem = await Site.findOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId });
+        // Update Site: Check if item exists in array
+        const siteMatch = await Site.findOne({ _id: oldTxn.siteId, "siteBalance.itemId": objItemId });
 
-        if (siteWithItem) {
-            // Item exists, update it
+        if (siteMatch) {
             await Site.updateOne(
-                { _id: oldTxn.siteId, "siteBalance.itemId": itemId },
-                { $inc: { "siteBalance.$.currentBalance": type === 'DC' ? quantity : -quantity } }
+                { _id: oldTxn.siteId, "siteBalance.itemId": objItemId },
+                { $inc: { "siteBalance.$.currentBalance": type === 'DC' ? Number(quantity) : -Number(quantity) } }
             );
         } else {
-            // Item doesn't exist at site (e.g. user changed sub-type), create NEW row
             await Site.findByIdAndUpdate(oldTxn.siteId, { 
-                $push: { siteBalance: { itemId: itemId, currentBalance: type === 'DC' ? quantity : -quantity } } 
+                $push: { siteBalance: { itemId: objItemId, currentBalance: type === 'DC' ? Number(quantity) : -Number(quantity) } } 
             });
         }
 
-        // --- PHASE 3: SAVE TRANSACTION ---
-        const updatedTxn = await Transaction.findByIdAndUpdate(id, {
+        // --- PHASE 3: SAVE TRANSACTION RECORD ---
+        const updatedTxn = await Transaction.findByIdAndUpdate(objTxnId, {
             date, 
-            itemId: itemId, // In case they changed the item
+            itemId: objItemId,
             quantity: Number(quantity), 
             rate: Number(rate), 
             loadingCharges: Number(loadingCharges) || 0, 
             unloadingCharges: Number(unloadingCharges) || 0,
-            remarks: `Updated ${new Date().toLocaleDateString()}`
+            remarks: `Edited: ${new Date().toLocaleString()}`
         }, { new: true });
 
         res.json({ message: "Success", updatedTxn });
