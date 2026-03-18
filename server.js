@@ -257,5 +257,28 @@ app.get('/company-stats', async (req, res) => {
     }
     res.json({ currentMonthBilled: billed, totalOutstanding: out });
 });
+app.get('/all-transactions', async (req, res) => {
+    try {
+        const txns = await Transaction.find().sort({ date: -1 }); // Newest first
+        const builders = await Builder.find();
+        const sites = await Site.find();
+        const items = await Inventory.find();
+
+        const history = txns.map(t => {
+            const b = builders.find(x => x._id.toString() === t.builderId.toString());
+            const s = sites.find(x => x._id.toString() === t.siteId.toString());
+            const i = items.find(x => x._id.toString() === t.itemId.toString());
+            return {
+                ...t._doc,
+                builderName: b ? b.companyName : 'N/A',
+                siteName: s ? s.siteName : 'N/A',
+                itemName: i ? i.itemName + " (" + i.category + ")" : 'N/A'
+            };
+        });
+        res.json(history);
+    } catch (e) {
+        res.status(500).send(e.message);
+    }
+});
 
 app.listen(5000);
