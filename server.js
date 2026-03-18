@@ -285,63 +285,60 @@ app.put('/edit-transaction/:id', async (req, res) => {
     const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
 
     try {
+        // 1. Get the original state
         const oldTxn = await Transaction.findById(id);
-        if (!oldTxn) return res.status(404).json({ error: "Transaction record not found." });
+        if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
 
-        // 1. REVERSE OLD IMPACT (Godown and Site)
-        const oldImpact = oldTxn.type === 'DC' ? oldTxn.quantity : -oldTxn.quantity;
-        await Inventory.findByIdAndUpdate(oldTxn.itemId, { $inc: { currentStock: oldImpact } });
+        // --- PHASE 1: UNDO OLD IMPACT ---
+        // Reverse Godown
+        await Inventory.findByIdAndUpdate(oldTxn.itemId, { 
+            $inc: { currentStock: oldTxn.type === 'DC' ? oldTxn.quantity : -oldTxn.quantity } 
+        });
         
-        // Safety check for Site update
+        // Reverse Site (Target the specific item in the array)
         await Site.updateOne(
             { _id: oldTxn.siteId, "siteBalance.itemId": oldTxn.itemId },
-            { $inc: { "siteBalance.$.currentBalance": -oldImpact } }
+            { $inc: { "siteBalance.$.currentBalance": oldTxn.type === 'DC' ? -oldTxn.quantity : oldTxn.quantity } }
         );
 
-        // 2. FETCH SITE WITH SAFETY CHECK
-        const site = await Site.findById(oldTxn.siteId);
-        if (!site) {
-            console.error("SITE NOT FOUND for ID:", oldTxn.siteId);
-            return res.status(404).json({ error: "Associated Site no longer exists. Cannot recalculate stock." });
-        }
+        // --- PHASE 2: APPLY NEW IMPACT ---
+        // Update Godown with new item/qty
+        await Inventory.findByIdAndUpdate(itemId, { 
+            $inc: { currentStock: type === 'DC' ? -quantity : quantity } 
+        });
 
-        // 3. APPLY NEW IMPACT
-        if (type === 'DC') {
-            await Inventory.findByIdAndUpdate(itemId, { $inc: { currentStock: -quantity } });
-            
-            // Check if item exists in siteBalance array
-            const exists = site.siteBalance && site.siteBalance.find(b => b.itemId && b.itemId.toString() === itemId.toString());
-            
-            if (exists) {
-                await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": quantity } });
-            } else {
-                await Site.findByIdAndUpdate(oldTxn.siteId, { $push: { siteBalance: { itemId, currentBalance: quantity } } });
-            }
+        // Update Site: Check if NEW item already exists at site
+        const siteWithItem = await Site.findOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId });
+
+        if (siteWithItem) {
+            // Item exists, update it
+            await Site.updateOne(
+                { _id: oldTxn.siteId, "siteBalance.itemId": itemId },
+                { $inc: { "siteBalance.$.currentBalance": type === 'DC' ? quantity : -quantity } }
+            );
         } else {
-            // RC Logic
-            await Inventory.findByIdAndUpdate(itemId, { $inc: { currentStock: quantity } });
-            
-            const exists = site.siteBalance && site.siteBalance.find(b => b.itemId && b.itemId.toString() === itemId.toString());
-            if (exists) {
-                await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": -quantity } });
-            } else {
-                await Site.findByIdAndUpdate(oldTxn.siteId, { $push: { siteBalance: { itemId, currentBalance: -quantity } } });
-            }
+            // Item doesn't exist at site (e.g. user changed sub-type), create NEW row
+            await Site.findByIdAndUpdate(oldTxn.siteId, { 
+                $push: { siteBalance: { itemId: itemId, currentBalance: type === 'DC' ? quantity : -quantity } } 
+            });
         }
 
-        // 4. FINAL SAVE
+        // --- PHASE 3: SAVE TRANSACTION ---
         const updatedTxn = await Transaction.findByIdAndUpdate(id, {
-            date, itemId, quantity, rate, 
-            loadingCharges: loadingCharges || 0, 
-            unloadingCharges: unloadingCharges || 0,
+            date, 
+            itemId: itemId, // In case they changed the item
+            quantity: Number(quantity), 
+            rate: Number(rate), 
+            loadingCharges: Number(loadingCharges) || 0, 
+            unloadingCharges: Number(unloadingCharges) || 0,
             remarks: `Updated ${new Date().toLocaleDateString()}`
         }, { new: true });
 
-        res.json({ message: "Update successful", updatedTxn });
+        res.json({ message: "Success", updatedTxn });
 
     } catch (e) {
-        console.error("EDIT ERROR:", e);
-        res.status(500).json({ error: "Internal Server Error: " + e.message });
+        console.error("CRITICAL EDIT ERROR:", e);
+        res.status(500).json({ error: "Update failed: " + e.message });
     }
 });
 
