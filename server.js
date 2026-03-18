@@ -281,76 +281,63 @@ app.get('/all-transactions', async (req, res) => {
     }
 });
 app.put('/edit-transaction/:id', async (req, res) => {
-    const { id } = req.params;
-    const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
-
     try {
-        // 1. Convert all IDs and Numbers strictly based on your DB screenshot
-        const objTxnId = new mongoose.Types.ObjectId(id);
-        const objItemId = new mongoose.Types.ObjectId(itemId);
-        
-        // Ensure numbers are Floats/Doubles for the DB
-        const newQty = parseFloat(quantity);
-        const newRate = parseFloat(rate);
-        const newLoad = parseFloat(loadingCharges) || 0;
-        const newUnload = parseFloat(unloadingCharges) || 0;
+        const { id } = req.params;
+        const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
 
-        const oldTxn = await Transaction.findById(objTxnId);
-        if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
+        // 1. Fetch the data
+        const oldTxn = await Transaction.findById(id);
+        if (!oldTxn) return res.status(404).json({ error: "Original Transaction not found" });
 
-        const oldQty = parseFloat(oldTxn.quantity);
+        const inventoryItem = await Inventory.findById(itemId);
+        if (!inventoryItem) return res.status(404).json({ error: "Item not found in Godown" });
 
-        // --- PHASE 1: REVERSE OLD IMPACT ---
-        // Restore Godown Stock (Reverse of the original action)
-        await Inventory.findByIdAndUpdate(oldTxn.itemId, { 
-            $inc: { currentStock: oldTxn.type === 'DC' ? oldQty : -oldQty } 
-        });
-        
-        // Restore Site Balance (Reverse of the original action)
-        await Site.updateOne(
-            { _id: oldTxn.siteId, "siteBalance.itemId": oldTxn.itemId },
-            { $inc: { "siteBalance.$.currentBalance": oldTxn.type === 'DC' ? -oldQty : oldQty } }
-        );
+        const site = await Site.findById(oldTxn.siteId);
+        if (!site) return res.status(404).json({ error: "Site not found" });
 
-        // --- PHASE 2: APPLY NEW IMPACT ---
-        // New Godown Stock Impact
-        const godownChange = type === 'DC' ? -newQty : newQty;
-        await Inventory.findByIdAndUpdate(objItemId, { 
-            $inc: { currentStock: godownChange } 
-        });
+        // 2. Strict Math (Convert everything to numbers immediately)
+        const oldQty = parseFloat(oldTxn.quantity) || 0;
+        const newQty = parseFloat(quantity) || 0;
+        const diff = newQty - oldQty;
 
-        // New Site Balance Impact
-        const siteQtyChange = type === 'DC' ? newQty : -newQty;
-        const siteMatch = await Site.findOne({ _id: oldTxn.siteId, "siteBalance.itemId": objItemId });
-
-        if (siteMatch) {
-            await Site.updateOne(
-                { _id: oldTxn.siteId, "siteBalance.itemId": objItemId },
-                { $inc: { "siteBalance.$.currentBalance": siteQtyChange } }
-            );
+        // 3. Update Inventory (Godown)
+        // If DC: If newQty is higher, we subtract more from Godown. If lower, we add back.
+        // If diff is positive (50 -> 60), we subtract diff. If negative (50 -> 30), we add diff.
+        if (type === 'DC') {
+            inventoryItem.currentStock -= diff; 
         } else {
-            // If item changed, push a new entry
-            await Site.findByIdAndUpdate(oldTxn.siteId, { 
-                $push: { siteBalance: { itemId: objItemId, currentBalance: siteQtyChange } } 
-            });
+            inventoryItem.currentStock += diff;
         }
 
-        // --- PHASE 3: SAVE FINAL TRANSACTION ---
-        const updatedTxn = await Transaction.findByIdAndUpdate(objTxnId, {
-            date, 
-            itemId: objItemId,
-            quantity: newQty, 
-            rate: newRate, 
-            loadingCharges: newLoad, 
-            unloadingCharges: newUnload,
-            remarks: `Edited: ${new Date().toLocaleString()}`
-        }, { new: true });
+        // 4. Update Site Balance
+        let balanceEntry = site.siteBalance.find(b => b.itemId.toString() === itemId.toString());
+        if (balanceEntry) {
+            if (type === 'DC') balanceEntry.currentBalance += diff;
+            else balanceEntry.currentBalance -= diff;
+        } else {
+            // If item was changed during edit
+            site.siteBalance.push({ itemId: itemId, currentBalance: type === 'DC' ? newQty : -newQty });
+        }
 
-        res.json({ message: "Success", updatedTxn });
+        // 5. Update Transaction
+        oldTxn.date = date;
+        oldTxn.itemId = itemId;
+        oldTxn.quantity = newQty;
+        oldTxn.rate = parseFloat(rate);
+        if (type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
+        else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
+        oldTxn.remarks = `Updated: ${new Date().toLocaleString()}`;
+
+        // 6. SAVE EVERYTHING AT ONCE (Atomic)
+        await inventoryItem.save();
+        await site.save();
+        await oldTxn.save();
+
+        res.json({ message: "Success" });
 
     } catch (e) {
-        console.error("EDIT ERROR:", e);
-        res.status(500).json({ error: "Update failed: " + e.message });
+        console.error("CRITICAL ERROR:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 app.listen(5000);
