@@ -284,7 +284,6 @@ app.put('/edit-transaction/:id', async (req, res) => {
     const { id } = req.params;
     const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
 
-    // 1. Strict Validation: All boxes must be filled
     if (!date || !itemId || !quantity || !rate) {
         return res.status(400).json({ error: "All fields must be filled to update." });
     }
@@ -293,7 +292,7 @@ app.put('/edit-transaction/:id', async (req, res) => {
         const oldTxn = await Transaction.findById(id);
         if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
 
-        // 2. REVERSE OLD STOCK IMPACT
+        // 1. REVERSE OLD STOCK IMPACT
         if (oldTxn.type === 'DC') {
             await Inventory.findByIdAndUpdate(oldTxn.itemId, { $inc: { currentStock: oldTxn.quantity } });
             await Site.updateOne(
@@ -308,15 +307,20 @@ app.put('/edit-transaction/:id', async (req, res) => {
             );
         }
 
+        // 2. FETCH SITE (Crash Prevention)
+        const site = await Site.findById(oldTxn.siteId);
+        if (!site) throw new Error("Associated Site not found in database.");
+
         // 3. APPLY NEW STOCK IMPACT
         if (type === 'DC') {
+            // Check Godown Stock
             const inv = await Inventory.findById(itemId);
-            if (inv.currentStock < quantity) throw new Error("Not enough stock in Godown for this edit!");
+            if (!inv || inv.currentStock < quantity) throw new Error("Not enough stock in Godown!");
             
             await Inventory.findByIdAndUpdate(itemId, { $inc: { currentStock: -quantity } });
-            // Update or push to site balance
-            const site = await Site.findById(oldTxn.siteId);
-            const exists = site.siteBalance.find(b => b.itemId.toString() === itemId);
+
+            // Handle Site Balance for DC
+            const exists = site.siteBalance.find(b => b.itemId && b.itemId.toString() === itemId);
             if (exists) {
                 await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": quantity } });
             } else {
@@ -325,11 +329,18 @@ app.put('/edit-transaction/:id', async (req, res) => {
         } else {
             // RC Logic: Add to Godown, Subtract from Site
             await Inventory.findByIdAndUpdate(itemId, { $inc: { currentStock: quantity } });
-            await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": -quantity } });
+            
+            const exists = site.siteBalance.find(b => b.itemId && b.itemId.toString() === itemId);
+            if (exists) {
+                await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": -quantity } });
+            } else {
+                // If returning an item not recorded at site, we create the entry with negative balance logic
+                await Site.findByIdAndUpdate(oldTxn.siteId, { $push: { siteBalance: { itemId, currentBalance: -quantity } } });
+            }
         }
 
         // 4. SAVE UPDATED TRANSACTION
-        const updatedRemarks = `Edited on ${new Date().toLocaleString()}. Original: ${oldTxn.quantity} qty of ${oldTxn.itemId}`;
+        const updatedRemarks = `Edited: ${new Date().toLocaleString()}. Was: ${oldTxn.quantity} qty`;
         const updatedTxn = await Transaction.findByIdAndUpdate(id, {
             date, itemId, quantity, rate, 
             loadingCharges: loadingCharges || 0, 
@@ -339,6 +350,7 @@ app.put('/edit-transaction/:id', async (req, res) => {
 
         res.json({ message: "Update successful", updatedTxn });
     } catch (e) {
+        console.error("Edit Error:", e.message);
         res.status(500).json({ error: e.message });
     }
 });
