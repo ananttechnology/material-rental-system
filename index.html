@@ -38,7 +38,7 @@
         input, select, textarea { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; }
         button { background: var(--success); color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
         button:hover { filter: brightness(1.1); }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); justfy-content: center; align-items: center }
         .modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; position: relative; animation: slideIn 0.3s ease-out; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
         @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .close-btn { position: absolute; top: 20px; right: 25px; font-size: 28px; cursor: pointer; color: #999; }
@@ -672,6 +672,96 @@
         const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
         ['itemName', 'tItemName'].forEach(id => { const el = document.getElementById(id); if(el) { el.innerHTML = '<option value="">-- Select Item --</option>'; items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`); } });
     };
+    // 1. Function to open the modal and fill it with EXISTING data
+async function openEditModal(txnId) {
+    try {
+        // Fetch all transactions to find the one we need
+        const res = await fetch(`${API_URL}/all-transactions`);
+        const data = await res.json();
+        const txn = data.find(t => t._id === txnId);
+
+        if (!txn) return alert("Transaction not found!");
+
+        // Fill the Hidden ID and visible inputs
+        document.getElementById('editId').value = txn._id;
+        document.getElementById('editDate').value = txn.date.split('T')[0]; // Format for <input type="date">
+        document.getElementById('editQty').value = txn.quantity;
+        document.getElementById('editRate').value = txn.rate;
+        document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
+
+        // Pre-fill the Item Dropdown (Reuse your existing inventory data)
+        const invRes = await fetch(`${API_URL}/inventory`);
+        const items = await invRes.json();
+        const itemSelect = document.getElementById('editItem');
+        itemSelect.innerHTML = items.map(i => 
+            `<option value="${i._id}" ${i._id === txn.itemId ? 'selected' : ''}>${i.itemName} (${i.category})</option>`
+        ).join('');
+
+        // Show the Modal
+        document.getElementById('editModal').style.display = 'flex';
+    } catch (e) {
+        console.error(e);
+        alert("Error loading transaction data.");
+    }
+}
+
+// 2. Function to SAVE the edited data
+async function saveEdit() {
+    const id = document.getElementById('editId').value;
+    const date = document.getElementById('editDate').value;
+    const itemId = document.getElementById('editItem').value;
+    const quantity = parseFloat(document.getElementById('editQty').value);
+    const rate = parseFloat(document.getElementById('editRate').value);
+    const charges = parseFloat(document.getElementById('editCharges').value);
+
+    // STRICT VALIDATION: No empty boxes allowed
+    if (!date || !itemId || isNaN(quantity) || isNaN(rate) || isNaN(charges)) {
+        return alert("⚠️ All fields must be filled correctly before saving.");
+    }
+
+    if (quantity <= 0) return alert("Quantity must be greater than 0.");
+
+    try {
+        // We need to know if this was a DC or RC to send the right charge type
+        const resCheck = await fetch(`${API_URL}/all-transactions`);
+        const allTxns = await resCheck.json();
+        const original = allTxns.find(t => t._id === id);
+
+        const updateData = {
+            date,
+            itemId,
+            quantity,
+            rate,
+            type: original.type, // Keep the same type (DC stays DC)
+            [original.type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: charges
+        };
+
+        const res = await fetch(`${API_URL}/edit-transaction/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        });
+
+        const result = await res.json();
+
+        if (res.ok) {
+            alert("✅ Transaction & Inventory Updated Successfully!");
+            document.getElementById('editModal').style.display = 'none';
+            loadHistory(); // Refresh the table
+            updateDashboard(); // Refresh stock numbers
+        } else {
+            alert("❌ Error: " + result.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Server error during update.");
+    }
+}
+
+// Helper to close modal
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
 </script>
     <div id="editModal" class="modal"><div class="modal-content"><h3>✏️ Edit Transaction</h3><input type="hidden" id="editId"><label>Date:</label><input type="date" id="editDate"><label>Item & Category:</label><select id="editItem"></select> <label>Quantity:</label><input type="number" id="editQty"><label>Rate:</label><input type="number" id="editRate"><label>Charges (Load/Unload):</label><input type="number" id="editCharges"><div style="display:flex; gap:10px; margin-top:20px;"><button onclick="saveEdit()" style="background:var(--success);">Save Changes</button><button onclick="closeModal('editModal')" style="background:var(--danger);">Cancel</button></div></div></div>
 </body>
