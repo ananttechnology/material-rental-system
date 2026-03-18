@@ -285,62 +285,72 @@ app.put('/edit-transaction/:id', async (req, res) => {
     const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
 
     try {
-        // 1. Convert IDs to ObjectId to match your database exactly
+        // 1. Convert all IDs and Numbers strictly based on your DB screenshot
         const objTxnId = new mongoose.Types.ObjectId(id);
         const objItemId = new mongoose.Types.ObjectId(itemId);
+        
+        // Ensure numbers are Floats/Doubles for the DB
+        const newQty = parseFloat(quantity);
+        const newRate = parseFloat(rate);
+        const newLoad = parseFloat(loadingCharges) || 0;
+        const newUnload = parseFloat(unloadingCharges) || 0;
 
         const oldTxn = await Transaction.findById(objTxnId);
         if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
 
-        // --- PHASE 1: UNDO OLD IMPACT ---
-        // Restore Godown Stock
+        const oldQty = parseFloat(oldTxn.quantity);
+
+        // --- PHASE 1: REVERSE OLD IMPACT ---
+        // Restore Godown Stock (Reverse of the original action)
         await Inventory.findByIdAndUpdate(oldTxn.itemId, { 
-            $inc: { currentStock: oldTxn.type === 'DC' ? Number(oldTxn.quantity) : -Number(oldTxn.quantity) } 
+            $inc: { currentStock: oldTxn.type === 'DC' ? oldQty : -oldQty } 
         });
         
-        // Restore Site Balance
+        // Restore Site Balance (Reverse of the original action)
         await Site.updateOne(
             { _id: oldTxn.siteId, "siteBalance.itemId": oldTxn.itemId },
-            { $inc: { "siteBalance.$.currentBalance": oldTxn.type === 'DC' ? -Number(oldTxn.quantity) : Number(oldTxn.quantity) } }
+            { $inc: { "siteBalance.$.currentBalance": oldTxn.type === 'DC' ? -oldQty : oldQty } }
         );
 
         // --- PHASE 2: APPLY NEW IMPACT ---
-        // New Godown Stock (using Number() to ensure $inc works)
+        // New Godown Stock Impact
+        const godownChange = type === 'DC' ? -newQty : newQty;
         await Inventory.findByIdAndUpdate(objItemId, { 
-            $inc: { currentStock: type === 'DC' ? -Number(quantity) : Number(quantity) } 
+            $inc: { currentStock: godownChange } 
         });
 
-        // Update Site: Check if item exists in array
+        // New Site Balance Impact
+        const siteQtyChange = type === 'DC' ? newQty : -newQty;
         const siteMatch = await Site.findOne({ _id: oldTxn.siteId, "siteBalance.itemId": objItemId });
 
         if (siteMatch) {
             await Site.updateOne(
                 { _id: oldTxn.siteId, "siteBalance.itemId": objItemId },
-                { $inc: { "siteBalance.$.currentBalance": type === 'DC' ? Number(quantity) : -Number(quantity) } }
+                { $inc: { "siteBalance.$.currentBalance": siteQtyChange } }
             );
         } else {
+            // If item changed, push a new entry
             await Site.findByIdAndUpdate(oldTxn.siteId, { 
-                $push: { siteBalance: { itemId: objItemId, currentBalance: type === 'DC' ? Number(quantity) : -Number(quantity) } } 
+                $push: { siteBalance: { itemId: objItemId, currentBalance: siteQtyChange } } 
             });
         }
 
-        // --- PHASE 3: SAVE TRANSACTION RECORD ---
+        // --- PHASE 3: SAVE FINAL TRANSACTION ---
         const updatedTxn = await Transaction.findByIdAndUpdate(objTxnId, {
             date, 
             itemId: objItemId,
-            quantity: Number(quantity), 
-            rate: Number(rate), 
-            loadingCharges: Number(loadingCharges) || 0, 
-            unloadingCharges: Number(unloadingCharges) || 0,
+            quantity: newQty, 
+            rate: newRate, 
+            loadingCharges: newLoad, 
+            unloadingCharges: newUnload,
             remarks: `Edited: ${new Date().toLocaleString()}`
         }, { new: true });
 
         res.json({ message: "Success", updatedTxn });
 
     } catch (e) {
-        console.error("CRITICAL EDIT ERROR:", e);
+        console.error("EDIT ERROR:", e);
         res.status(500).json({ error: "Update failed: " + e.message });
     }
 });
-
 app.listen(5000);
