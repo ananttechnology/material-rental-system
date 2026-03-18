@@ -642,6 +642,8 @@
                 <td>₹${t.rate || 0}</td>
                 <td>₹${charges}</td>
               </tr>`;
+        // Inside loadHistory() loop:
+        h += `<td><button onclick="openEditModal('${t._id}')" style="background:var(--accent); padding:5px;">✏️ Edit</button></td>`;
     });
     document.getElementById('historyDisplay').innerHTML = h + `</table>`;
     }
@@ -669,5 +671,21 @@
         ['itemName', 'tItemName'].forEach(id => { const el = document.getElementById(id); if(el) { el.innerHTML = '<option value="">-- Select Item --</option>'; items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`); } });
     };
 </script>
+    <div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ Edit Transaction</h3>
+        <input type="hidden" id="editId">
+        <label>Date:</label><input type="date" id="editDate">
+        <label>Item & Category:</label>
+        <select id="editItem"></select> 
+        <label>Quantity:</label><input type="number" id="editQty">
+        <label>Rate:</label><input type="number" id="editRate">
+        <label>Charges (Load/Unload):</label><input type="number" id="editCharges">
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button onclick="saveEdit()" style="background:var(--success);">Save Changes</button>
+            <button onclick="closeModal('editModal')" style="background:var(--danger);">Cancel</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
