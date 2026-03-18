@@ -280,5 +280,67 @@ app.get('/all-transactions', async (req, res) => {
         res.status(500).send(e.message);
     }
 });
+app.put('/edit-transaction/:id', async (req, res) => {
+    const { id } = req.params;
+    const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
+
+    // 1. Strict Validation: All boxes must be filled
+    if (!date || !itemId || !quantity || !rate) {
+        return res.status(400).json({ error: "All fields must be filled to update." });
+    }
+
+    try {
+        const oldTxn = await Transaction.findById(id);
+        if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
+
+        // 2. REVERSE OLD STOCK IMPACT
+        if (oldTxn.type === 'DC') {
+            await Inventory.findByIdAndUpdate(oldTxn.itemId, { $inc: { currentStock: oldTxn.quantity } });
+            await Site.updateOne(
+                { _id: oldTxn.siteId, "siteBalance.itemId": oldTxn.itemId },
+                { $inc: { "siteBalance.$.currentBalance": -oldTxn.quantity } }
+            );
+        } else {
+            await Inventory.findByIdAndUpdate(oldTxn.itemId, { $inc: { currentStock: -oldTxn.quantity } });
+            await Site.updateOne(
+                { _id: oldTxn.siteId, "siteBalance.itemId": oldTxn.itemId },
+                { $inc: { "siteBalance.$.currentBalance": oldTxn.quantity } }
+            );
+        }
+
+        // 3. APPLY NEW STOCK IMPACT
+        if (type === 'DC') {
+            const inv = await Inventory.findById(itemId);
+            if (inv.currentStock < quantity) throw new Error("Not enough stock in Godown for this edit!");
+            
+            await Inventory.findByIdAndUpdate(itemId, { $inc: { currentStock: -quantity } });
+            // Update or push to site balance
+            const site = await Site.findById(oldTxn.siteId);
+            const exists = site.siteBalance.find(b => b.itemId.toString() === itemId);
+            if (exists) {
+                await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": quantity } });
+            } else {
+                await Site.findByIdAndUpdate(oldTxn.siteId, { $push: { siteBalance: { itemId, currentBalance: quantity } } });
+            }
+        } else {
+            // RC Logic: Add to Godown, Subtract from Site
+            await Inventory.findByIdAndUpdate(itemId, { $inc: { currentStock: quantity } });
+            await Site.updateOne({ _id: oldTxn.siteId, "siteBalance.itemId": itemId }, { $inc: { "siteBalance.$.currentBalance": -quantity } });
+        }
+
+        // 4. SAVE UPDATED TRANSACTION
+        const updatedRemarks = `Edited on ${new Date().toLocaleString()}. Original: ${oldTxn.quantity} qty of ${oldTxn.itemId}`;
+        const updatedTxn = await Transaction.findByIdAndUpdate(id, {
+            date, itemId, quantity, rate, 
+            loadingCharges: loadingCharges || 0, 
+            unloadingCharges: unloadingCharges || 0,
+            remarks: updatedRemarks
+        }, { new: true });
+
+        res.json({ message: "Update successful", updatedTxn });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 app.listen(5000);
