@@ -61,6 +61,7 @@
     <div class="nav-item" onclick="showPage('inventory')"><i class="fas fa-box-open"></i><span>Inventory</span></div>
     <div class="nav-item" onclick="showPage('transfer')"><i class="fas fa-exchange-alt"></i><span>Stock Transfer</span></div>
     <div class="nav-item" onclick="showPage('billing')"><i class="fas fa-file-invoice"></i><span>Billing Engine</span></div>
+    <div class="nav-item" onclick="showPage('history'); loadHistory();"><i class="fas fa-history"></i><span>Txn History</span></div>
 </div>
 
 <div id="main">
@@ -118,6 +119,7 @@
         <div id="inventory" class="page"><div class="form-container"><h2>Inventory Addition</h2><select id="itemName" onchange="updateCategories('')"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Quantity"><button onclick="saveItem()">Add Stock</button><div id="msg3"></div></div></div>
         <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateCategories('t')"></select><select id="tCategory"></select><select id="tFrom"><option value="">From Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="">To Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
         <div id="billing" class="page"><div class="section"><h2>Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><div class="grid" style="margin-top:10px;"><input type="date" id="billStart" placeholder="From Date"><input type="date" id="billEnd" placeholder="To Date"></div><label style="display:block; margin: 15px 0;"><input type="checkbox" id="gstToggle"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="holdingDisplay" style="margin-top: 20px;"></div><div id="billDisplay" style="margin-top: 20px;"></div></div></div>
+        <div id="history" class="page"><div class="section"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2><i class="fas fa-list-ul"></i> Transaction History (DC/RC)</h2><button onclick="printHistory()" style="width:auto; padding:10px 20px; background:#2c3e50;">🖨️ Print Full Log</button></div><input type="text" id="histSearch" placeholder="🔍 Search by Builder, Site or Challan..." onkeyup="filterHistory()" style="margin-bottom:20px;"><div id="historyDisplay" style="overflow-x:auto;"></div></div></div>
         <div id="dataModal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal()">&times;</span><h2 id="modalTitle">Report</h2><div id="modalBody"></div></div></div>
     </div>
 </div>
@@ -623,6 +625,44 @@
     }, 500);
     }
 
+    async function loadHistory() {
+    const res = await fetch(`${API_URL}/all-transactions`);
+    const data = await res.json();
+    let h = `<table id="histTable"><tr><th>Date</th><th>Challan</th><th>Type</th><th>Builder / Site</th><th>Item</th><th>Qty</th><th>Rate</th><th>Charges</th></tr>`;
+    data.forEach(t => {
+        const charges = t.type === 'DC' ? (t.loadingCharges || 0) : (t.unloadingCharges || 0);
+        const color = t.type === 'DC' ? 'color:red;' : 'color:green;';
+        h += `<tr>
+                <td>${new Date(t.date).toLocaleDateString()}</td>
+                <td><b>${t.challanNo}</b></td>
+                <td style="${color} font-weight:bold;">${t.type}</td>
+                <td>${t.builderName}<br><small>${t.siteName}</small></td>
+                <td>${t.itemName}</td>
+                <td>${t.quantity}</td>
+                <td>₹${t.rate || 0}</td>
+                <td>₹${charges}</td>
+              </tr>`;
+    });
+    document.getElementById('historyDisplay').innerHTML = h + `</table>`;
+    }
+
+    function filterHistory() {
+    const val = document.getElementById('histSearch').value.toUpperCase();
+    const rows = document.querySelectorAll('#histTable tr:not(:first-child)');
+    rows.forEach(row => {
+        row.style.display = row.innerText.toUpperCase().includes(val) ? '' : 'none';
+    });
+    }
+
+    function printHistory() {
+    const content = document.getElementById('historyDisplay').innerHTML;
+    const win = window.open('', '', 'height=700,width=1000');
+    win.document.write(`<html><head><title>Txn History</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:8px;font-size:12px;}</style></head><body>`);
+    win.document.write(`<h2 style="text-align:center;">Transaction History Log</h2>${content}</body></html>`);
+    win.document.close();
+    win.print();
+    }
+    
     window.onload = () => {
         masterSync();
         const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
