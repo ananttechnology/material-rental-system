@@ -249,46 +249,51 @@ app.get('/company-stats', async (req, res) => {
     try {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-        // Fetch all Dispatch transactions (to calculate rental revenue)
+        
+        // 1. Get ALL Dispatch transactions
         const transactions = await Transaction.find({ type: 'DC' });
         
         let totalMonthlyBilled = 0;
         let builderMap = {};
 
+        // 2. Calculation Logic
         transactions.forEach(t => {
             const txnDate = new Date(t.date);
-            // Calculate rental only if it overlaps with current month
-            // Billing period for this month = from (txnDate or startOfMonth) to endOfToday
-            const billingStart = txnDate > startOfMonth ? txnDate : startOfMonth;
+            // Calculate from (Transaction Date OR Start of Month, whichever is later)
+            const calcStart = txnDate > startOfMonth ? txnDate : startOfMonth;
             
-            if (billingStart <= endOfToday) {
-                const diffTime = Math.abs(endOfToday - billingStart);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
+            if (calcStart <= now) {
+                const diffTime = Math.abs(now - calcStart);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
                 
-                const dayRate = t.rate || 0;
-                const dailyBill = t.quantity * dayRate * diffDays;
+                const rate = Number(t.rate) || 0;
+                const qty = Number(t.quantity) || 0;
+                const dailyAmount = qty * rate * diffDays;
 
-                totalMonthlyBilled += dailyBill;
+                totalMonthlyBilled += dailyAmount;
 
-                if (!builderMap[t.builderName]) builderMap[t.builderName] = 0;
-                builderMap[t.builderName] += dailyBill;
+                const bName = t.builderName || "Unknown Builder";
+                if (!builderMap[bName]) builderMap[bName] = 0;
+                builderMap[bName] += dailyAmount;
             }
         });
 
+        // 3. Prepare clean JSON response
         const breakdown = Object.keys(builderMap).map(name => ({
             name: name,
             amount: Math.round(builderMap[name])
         }));
 
-        res.json({
+        res.status(200).json({
             currentMonthBilled: Math.round(totalMonthlyBilled),
             monthName: now.toLocaleString('default', { month: 'Long' }),
             builderBreakdown: breakdown
         });
+
     } catch (e) {
-        res.status(500).send({ error: e.message });
+        console.error("Dashboard Stats Error:", e);
+        // Send a valid JSON even on error so the frontend doesn't crash
+        res.status(200).json({ currentMonthBilled: 0, monthName: "Error", builderBreakdown: [] });
     }
 });
 
