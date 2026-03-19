@@ -89,36 +89,6 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     }
     return { bill, service, subtotal: bill.reduce((s, i) => s + i.total, 0) };
 }
-async function openMonthlyModal() {
-    try {
-        const res = await fetch(`${API_URL}/company-stats`);
-        const stats = await res.json();
-        
-        if (!stats.builderBreakdown) throw new Error("No data received");
-
-        let h = `<h3 style="color:var(--accent);">${stats.monthName} ${new Date().getFullYear()} Report</h3>`;
-        h += `<table style="width:100%; border-collapse:collapse; margin-top:10px;">
-                <tr style="background:#f2f2f2;"><th>Builder</th><th style="text-align:right">Amount (₹)</th></tr>`;
-        
-        stats.builderBreakdown.forEach(b => {
-            // Check that b.amount exists before calling toLocaleString
-            const amt = (b.amount || 0).toLocaleString();
-            h += `<tr style="border-bottom:1px solid #eee;">
-                    <td style="padding:10px;">${b.name}</td>
-                    <td style="padding:10px; text-align:right;">₹${amt}</td>
-                  </tr>`;
-        });
-
-        h += `<tr style="background:#eee; font-weight:bold;">
-                <td style="padding:10px;">Total Monthly Billed</td>
-                <td style="padding:10px; text-align:right; color:var(--success);">₹${stats.currentMonthBilled.toLocaleString()}</td>
-              </tr></table>`;
-
-        openModal("Monthly Breakdown", h);
-    } catch (e) {
-        alert("Wait for the server to finish deploying... " + e.message);
-    }
-}
 
 // --- ROUTES ---
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
@@ -351,5 +321,52 @@ app.put('/edit-transaction/:id', async (req, res) => {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
-}); 
+});
+// --- MOVE THIS TO THE VERY BOTTOM OF SERVER.JS ---
+app.get('/company-stats', async (req, res) => {
+    try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+        // We fetch the collections directly to ensure we have data
+        const builders = await mongoose.model('Builder').find({});
+        let grandTotal = 0;
+        let breakdown = [];
+
+        for (let b of builders) {
+            const sites = await mongoose.model('Site').find({ builderId: b._id });
+            let builderSum = 0;
+
+            for (let s of sites) {
+                try {
+                    // Using 'global' check to find your function anywhere in the file
+                    const billingFn = typeof calculateSiteBill === 'function' ? calculateSiteBill : null;
+                    
+                    if (billingFn) {
+                        const result = await billingFn(s._id, startOfMonth, endOfToday);
+                        if (result && result.subtotal) {
+                            builderSum += result.subtotal;
+                        }
+                    }
+                } catch (err) {
+                    console.log("Skipping site due to data error");
+                }
+            }
+            if (builderSum > 0) {
+                grandTotal += builderSum;
+                breakdown.push({ name: b.companyName, amount: Math.round(builderSum) });
+            }
+        }
+
+        res.json({
+            currentMonthBilled: Math.round(grandTotal),
+            monthName: now.toLocaleString('default', { month: 'Long' }),
+            builderBreakdown: breakdown
+        });
+    } catch (e) {
+        console.error("DASHBOARD CRASH:", e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
 app.listen(5000);
