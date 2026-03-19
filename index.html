@@ -534,9 +534,16 @@ async function selectRepBuilder(id, name) {
     const res = await fetch(`${API_URL}/sites/${id}`);
     const sites = await res.json();
     const siteListDiv = document.getElementById('repSiteList');
-    siteListDiv.innerHTML = sites.map(s => 
+
+    // Manually add the "ALL SITES" option at the top of the list
+    let listHtml = `<div onclick="selectRepSite('ALL', '-- ALL SITES (Total Holding) --')" style="font-weight:bold; color:var(--accent);">-- ALL SITES (Total Holding) --</div>`;
+    
+    // Add the rest of the individual sites
+    listHtml += sites.map(s => 
         `<div onclick="selectRepSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
     ).join('');
+
+    siteListDiv.innerHTML = listHtml;
 }
 
 // 2. Select Site in Report Section
@@ -548,23 +555,58 @@ function selectRepSite(id, name) {
 
 // 3. Updated Report Modal Function with Auto-Reset
 async function openSiteReportModal() {
+    const builderId = document.getElementById('repBuilder').value;
     const siteId = document.getElementById('repSite').value; 
-    if (!siteId) return alert("Select Site");
-
-    const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-    const data = await res.json();
     
+    if (!builderId || !siteId) return alert("Please select both Builder and Site!");
+
     let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-    data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
-    
-    // Open the modal with data
-    openModal("Site Holdings", h + "</table>");
 
-    // RESET BOXES TO EMPTY as requested
-    document.getElementById('repBuilderSearch').value = "";
-    document.getElementById('repSiteSearch').value = "";
-    document.getElementById('repBuilder').value = "";
-    document.getElementById('repSite').value = "";
+    try {
+        if (siteId === "ALL") {
+            // Case 1: Consolidated Report for all sites of this builder
+            const resSites = await fetch(`${API_URL}/sites/${builderId}`);
+            const sites = await resSites.json();
+            
+            let totalBal = {}; // To merge stocks of same items from different sites
+
+            for (let s of sites) {
+                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
+                const bal = await resBal.json();
+                bal.forEach(i => {
+                    const key = i.itemId;
+                    if (!totalBal[key]) {
+                        totalBal[key] = { ...i };
+                    } else {
+                        totalBal[key].currentBalance += i.currentBalance;
+                    }
+                });
+            }
+
+            // Convert merged object back to rows
+            Object.values(totalBal).forEach(i => {
+                h += `<tr><td>${i.itemName} (${i.category})</td><td>Multiple</td><td>${i.currentBalance}</td></tr>`;
+            });
+
+        } else {
+            // Case 2: Standard Single Site Report
+            const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+            const data = await res.json();
+            data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
+        }
+
+        openModal(siteId === "ALL" ? "Consolidated Builder Holdings" : "Site Holdings", h + "</table>");
+
+        // RESET BOXES TO EMPTY
+        document.getElementById('repBuilderSearch').value = "";
+        document.getElementById('repSiteSearch').value = "";
+        document.getElementById('repBuilder').value = "";
+        document.getElementById('repSite').value = "";
+        
+    } catch (e) {
+        console.error(e);
+        alert("Error generating report");
+    }
 }
 
     function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
@@ -667,6 +709,7 @@ async function openSiteReportModal() {
     }
     
 async function printHoldingReport() {
+    const builderId = document.getElementById('repBuilder').value;
     const siteId = document.getElementById('repSite').value;
     // Get names from the search inputs instead of select options
     const builderName = document.getElementById('repBuilderSearch').value;
