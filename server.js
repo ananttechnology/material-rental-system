@@ -283,50 +283,44 @@ app.get('/all-transactions', async (req, res) => {
 app.put('/edit-transaction/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { date, itemId, quantity, rate, loadingCharges, unloadingCharges, type } = req.body;
+        const { date, itemId, quantity, rate, loadingCharges, unloadingCharges } = req.body;
 
-        // 1. Fetch the original transaction
         const oldTxn = await Transaction.findById(id);
-        if (!oldTxn) return res.status(404).json({ error: "Original Transaction not found" });
+        if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
 
-        // 2. Fetch the Item from Inventory (matches your Schema)
-        const inventoryItem = await Inventory.findById(itemId);
-        if (!inventoryItem) return res.status(404).json({ error: "Item not found in Godown" });
-
-        // 3. Strict Math for Stock Update
         const oldQty = parseFloat(oldTxn.quantity) || 0;
         const newQty = parseFloat(quantity) || 0;
-        const diff = newQty - oldQty;
+        const oldItemId = oldTxn.itemId.toString();
+        const newItemId = itemId;
 
-        // FIXED: Using 'availableStock' as per your Schema
-        // If Dispatch (DC): If quantity increased (diff > 0), we subtract more from stock.
-        // If Return (RC): If quantity increased (diff > 0), we add more to stock.
-        if (oldTxn.type === 'DC') {
-            inventoryItem.availableStock -= diff; 
-        } else {
-            inventoryItem.availableStock += diff;
+        // STEP A: UNDO OLD STOCK IMPACT
+        const oldInvItem = await Inventory.findById(oldItemId);
+        if (oldInvItem) {
+            // If it was a Dispatch, give stock back. If Return, take stock away.
+            if (oldTxn.type === 'DC') oldInvItem.availableStock += oldQty;
+            else oldInvItem.availableStock -= oldQty;
+            await oldInvItem.save();
         }
 
-        // 4. Update the Transaction Record
+        // STEP B: APPLY NEW STOCK IMPACT
+        const newInvItem = await Inventory.findById(newItemId);
+        if (!newInvItem) return res.status(404).json({ error: "New item not found in Godown" });
+
+        if (oldTxn.type === 'DC') newInvItem.availableStock -= newQty;
+        else newInvItem.availableStock += newQty;
+        await newInvItem.save();
+
+        // STEP C: UPDATE TRANSACTION RECORD
         oldTxn.date = date;
-        oldTxn.itemId = itemId;
+        oldTxn.itemId = newItemId;
         oldTxn.quantity = newQty;
         oldTxn.rate = parseFloat(rate) || 0;
+        if (oldTxn.type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
+        else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
 
-        if (oldTxn.type === 'DC') {
-            oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
-        } else {
-            oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
-        }
-
-        // 5. Save everything
-        await inventoryItem.save();
         await oldTxn.save();
-
         res.json({ message: "Success" });
-
     } catch (e) {
-        console.error("SERVER EDIT ERROR:", e);
         res.status(500).json({ error: e.message });
     }
 });
