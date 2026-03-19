@@ -120,12 +120,9 @@
             </div>
             <div class="section pay-sec">
                 <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
-                <select id="pBuilder" onchange="loadLedger()"><option value="">-- Select Builder --</option></select>
+                <div class="search-wrapper" style="margin-bottom: 20px;"><input type="text" id="pBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Ledger/Payment..." onclick="toggleDrop('pBuilderList')" onkeyup="filterDrop('pBuilderSearch', 'pBuilderList')"><div id="pBuilderList" class="search-results"></div><input type="hidden" id="pBuilder"></div>
                 <div class="grid"><input type="number" id="pAmount" placeholder="Amount Paid (₹)"><select id="pMode"><option value="Cash">Cash</option><option value="Online">Online / G-Pay</option><option value="Cheque">Cheque</option><option value="Bank">Bank Transfer</option></select></div>
-                <div class="grid"><input type="text" id="pRef" placeholder="Ref No."><input type="date" id="pDate"></div>
-                <button onclick="recordPayment()" style="background: #e83e8c;">Confirm Payment Receipt</button>
-                <div id="msg8" class="msg-area"></div>
-                <div id="ledgerDisplay"></div>
+                <div class="grid"><input type="text" id="pRef" placeholder="Ref No."><input type="date" id="pDate"></div><button onclick="recordPayment()" style="background: #e83e8c;">Confirm Payment Receipt</button><div id="msg8" class="msg-area"></div><div id="ledgerDisplay"></div>
             </div>
         </div>
         <div id="builder" class="page"><div class="form-container"><h2>New Builder</h2><input type="text" id="compName" placeholder="Name"><input type="text" id="bMobile" placeholder="Mobile"><input type="text" id="bGst" placeholder="GST"><textarea id="bAddr" placeholder="Address"></textarea><button onclick="saveBuilder()">Save Builder</button><div id="msg1"></div></div></div>
@@ -189,6 +186,12 @@
         if (billBuilderList) {
             billBuilderList.innerHTML = builders.map(b => 
                 `<div onclick="selectBillBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+        const pBuilderList = document.getElementById('pBuilderList');
+        if (pBuilderList) {
+            pBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectPayBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
             ).join('');
         }
 
@@ -481,7 +484,10 @@
 
     async function loadLedger() {
         const bId = document.getElementById('pBuilder').value;
-        if (!bId) return;
+        if (!bId) {
+        document.getElementById('ledgerDisplay').innerHTML = ""; // Clear if no builder
+        return;
+        }
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
         
@@ -1143,6 +1149,54 @@ function selectBillSite(id, name) {
     document.getElementById('billSite').value = id;
     document.getElementById('billSiteSearch').value = name;
     document.getElementById('billSiteList').style.display = 'none';
+}
+    // 1. Select Builder in Payment Section
+function selectPayBuilder(id, name) {
+    document.getElementById('pBuilder').value = id;
+    document.getElementById('pBuilderSearch').value = name;
+    document.getElementById('pBuilderList').style.display = 'none';
+    
+    // Automatically load the history/ledger when selected
+    loadLedger(); 
+}
+
+// 2. Updated recordPayment with Auto-Reset
+async function recordPayment() {
+    const body = { 
+        builderId: document.getElementById('pBuilder').value, 
+        amountPaid: Number(document.getElementById('pAmount').value), 
+        paymentMode: document.getElementById('pMode').value, 
+        referenceNo: document.getElementById('pRef').value, 
+        date: document.getElementById('pDate').value 
+    };
+
+    if (!validate(body, 'msg8')) return;
+
+    try {
+        const res = await fetch(`${API_URL}/add-payment`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(body) 
+        });
+
+        if (res.ok) {
+            document.getElementById('msg8').style.color = "green";
+            document.getElementById('msg8').innerHTML = "✅ Payment Recorded Successfully";
+            
+            // --- AUTO-RESET BOXES ---
+            document.getElementById('pAmount').value = "";
+            document.getElementById('pRef').value = "";
+            document.getElementById('pDate').value = "";
+            document.getElementById('pBuilderSearch').value = "";
+            document.getElementById('pBuilder').value = "";
+            document.getElementById('pMode').selectedIndex = 0; // Reset to Cash
+
+            loadLedger(); // Refresh the table below
+            masterSync(); // Update dashboard stats
+        }
+    } catch (e) {
+        document.getElementById('msg8').innerHTML = "❌ Connection Error";
+    }
 }
 
 
