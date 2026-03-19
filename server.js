@@ -248,43 +248,61 @@ app.get('/statement/:builderId', async (req, res) => {
 app.get('/company-stats', async (req, res) => {
     try {
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        
-        // 1. Get ALL Dispatch transactions
+        const year = now.getFullYear();
+        const month = now.getMonth();
+
+        // 1. Create start of the current month and today at the very end
+        const startOfMonth = new Date(year, month, 1, 0, 0, 0);
+        const endOfToday = new Date(year, month, now.getDate(), 23, 59, 59);
+
+        // 2. Get ALL Dispatch transactions (mongo will return real Date objects)
         const transactions = await Transaction.find({ type: 'DC' });
         
         let totalMonthlyBilled = 0;
         let builderMap = {};
 
-        // 2. Calculation Logic
         transactions.forEach(t => {
-            const txnDate = new Date(t.date);
-            // Calculate from (Transaction Date OR Start of Month, whichever is later)
-            const calcStart = txnDate > startOfMonth ? txnDate : startOfMonth;
+            // Mongo should already give us a Date object, but just in case, 
+            // t.date is the database date you showed me.
+            const txnDate = t.date; 
+
+            // SAFETY CHECK: Make sure t.date exists and is a date
+            if (!(txnDate instanceof Date)) return; 
             
-            if (calcStart <= now) {
-                const diffTime = Math.abs(now - calcStart);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+            // 3. Billing period logic for this month:
+            // The rental starts at (Transaction Date OR Start of Month, whichever is LATER)
+            let billingStart;
+            if (txnDate > startOfMonth) {
+                billingStart = txnDate; // The dispatch happened this month
+            } else {
+                billingStart = startOfMonth; // The dispatch happened before, but is still on-site
+            }
+            
+            // 4. Calculate if there's any overlap with today
+            if (billingStart <= endOfToday) {
+                // Calculate difference in days. Using 86400000 ms per day.
+                const diffTime = Math.abs(endOfToday - billingStart);
+                const diffDays = Math.floor(diffTime / 86400000) + 1; // Count full days
                 
                 const rate = Number(t.rate) || 0;
                 const qty = Number(t.quantity) || 0;
-                const dailyAmount = qty * rate * diffDays;
+                const dailyBill = qty * rate * diffDays;
 
-                totalMonthlyBilled += dailyAmount;
+                totalMonthlyBilled += dailyBill;
 
                 const bName = t.builderName || "Unknown Builder";
                 if (!builderMap[bName]) builderMap[bName] = 0;
-                builderMap[bName] += dailyAmount;
+                builderMap[bName] += dailyBill;
             }
         });
 
-        // 3. Prepare clean JSON response
+        // 5. Prepare clean JSON response
         const breakdown = Object.keys(builderMap).map(name => ({
             name: name,
             amount: Math.round(builderMap[name])
         }));
 
-        res.status(200).json({
+        res.json({
             currentMonthBilled: Math.round(totalMonthlyBilled),
             monthName: now.toLocaleString('default', { month: 'Long' }),
             builderBreakdown: breakdown
@@ -293,7 +311,7 @@ app.get('/company-stats', async (req, res) => {
     } catch (e) {
         console.error("Dashboard Stats Error:", e);
         // Send a valid JSON even on error so the frontend doesn't crash
-        res.status(200).json({ currentMonthBilled: 0, monthName: "Error", builderBreakdown: [] });
+        res.json({ currentMonthBilled: 0, monthName: "Error", builderBreakdown: [] });
     }
 });
 
