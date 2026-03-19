@@ -246,17 +246,37 @@ app.get('/statement/:builderId', async (req, res) => {
 });
 
 app.get('/company-stats', async (req, res) => {
-    const builders = await Builder.find();
-    let billed = 0, out = 0;
-    for (let b of builders) {
-        const sites = await Site.find({ builderId: b._id });
-        const payments = await Payment.find({ builderId: b._id });
-        let bBilled = 0;
-        for (let s of sites) { const res = await calculateSiteBill(s._id); bBilled += (res.subtotal + res.service); }
-        billed += bBilled; out += (bBilled - payments.reduce((sum, p) => sum + p.amountPaid, 0));
-    }
-    res.json({ currentMonthBilled: billed, totalOutstanding: out });
+    try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0,0,0,0);
+
+        // Fetch all transactions for this month
+        const txns = await Transaction.find({ date: { $gte: startOfMonth }, type: 'DC' });
+        
+        // Calculate Total and Breakdown
+        let total = 0;
+        let breakdownMap = {};
+
+        txns.forEach(t => {
+            const amt = (t.quantity * t.rate); // Simplistic rental calc for dashboard
+            total += amt;
+            if(!breakdownMap[t.builderName]) breakdownMap[t.builderName] = 0;
+            breakdownMap[t.builderName] += amt;
+        });
+
+        const breakdown = Object.keys(breakdownMap).map(name => ({
+            name: name,
+            amount: breakdownMap[name]
+        }));
+
+        res.json({
+            currentMonthBilled: total,
+            builderBreakdown: breakdown
+        });
+    } catch (e) { res.status(500).send(e); }
 });
+
 app.get('/all-transactions', async (req, res) => {
     try {
         const txns = await Transaction.find().sort({ date: -1 }); // Newest first
