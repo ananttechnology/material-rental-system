@@ -247,34 +247,49 @@ app.get('/statement/:builderId', async (req, res) => {
 
 app.get('/company-stats', async (req, res) => {
     try {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0,0,0,0);
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-        // Fetch all transactions for this month
-        const txns = await Transaction.find({ date: { $gte: startOfMonth }, type: 'DC' });
+        // Fetch all Dispatch transactions (to calculate rental revenue)
+        const transactions = await Transaction.find({ type: 'DC' });
         
-        // Calculate Total and Breakdown
-        let total = 0;
-        let breakdownMap = {};
+        let totalMonthlyBilled = 0;
+        let builderMap = {};
 
-        txns.forEach(t => {
-            const amt = (t.quantity * t.rate); // Simplistic rental calc for dashboard
-            total += amt;
-            if(!breakdownMap[t.builderName]) breakdownMap[t.builderName] = 0;
-            breakdownMap[t.builderName] += amt;
+        transactions.forEach(t => {
+            const txnDate = new Date(t.date);
+            // Calculate rental only if it overlaps with current month
+            // Billing period for this month = from (txnDate or startOfMonth) to endOfToday
+            const billingStart = txnDate > startOfMonth ? txnDate : startOfMonth;
+            
+            if (billingStart <= endOfToday) {
+                const diffTime = Math.abs(endOfToday - billingStart);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
+                
+                const dayRate = t.rate || 0;
+                const dailyBill = t.quantity * dayRate * diffDays;
+
+                totalMonthlyBilled += dailyBill;
+
+                if (!builderMap[t.builderName]) builderMap[t.builderName] = 0;
+                builderMap[t.builderName] += dailyBill;
+            }
         });
 
-        const breakdown = Object.keys(breakdownMap).map(name => ({
+        const breakdown = Object.keys(builderMap).map(name => ({
             name: name,
-            amount: breakdownMap[name]
+            amount: Math.round(builderMap[name])
         }));
 
         res.json({
-            currentMonthBilled: total,
+            currentMonthBilled: Math.round(totalMonthlyBilled),
+            monthName: now.toLocaleString('default', { month: 'Long' }),
             builderBreakdown: breakdown
         });
-    } catch (e) { res.status(500).send(e); }
+    } catch (e) {
+        res.status(500).send({ error: e.message });
+    }
 });
 
 app.get('/all-transactions', async (req, res) => {
