@@ -1235,28 +1235,41 @@ async function openMonthlyModal() {
         if (!res.ok) throw new Error("Server Response Error");
         
         const stats = await res.json();
+        const currentYear = new Date().getFullYear();
         
-        let h = `<h3 style="color:var(--accent); margin-bottom:10px;">${stats.monthName} ${new Date().getFullYear()} Report</h3>`;
-        h += `<table style="width:100%; margin-top:10px;">
-                <tr style="background:#f2f2f2;"><th>Builder</th><th style="text-align:right">Current Month (₹)</th></tr>`;
+        // Dynamic Title with Month and Year
+        let h = `<div style="text-align:center; margin-bottom:20px; border-bottom:2px solid var(--accent); padding-bottom:10px;">
+                    <h2 style="color:var(--primary); margin:0;">${stats.monthName} ${currentYear}</h2>
+                    <p style="margin:5px 0; color:#666; font-size:0.9rem;">Builder-wise billing summary for the current month</p>
+                 </div>`;
+
+        h += `<table style="width:100%; border-collapse:collapse;">
+                <tr style="background:var(--primary); color:white;">
+                    <th style="padding:12px; text-align:left;">Builder Name</th>
+                    <th style="padding:12px; text-align:right;">Monthly Total (₹)</th>
+                </tr>`;
         
         if (stats.builderBreakdown && stats.builderBreakdown.length > 0) {
             stats.builderBreakdown.forEach(b => {
-                h += `<tr><td>${b.name}</td><td style="text-align:right">₹${b.amount.toLocaleString()}</td></tr>`;
+                h += `<tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:12px;">${b.name}</td>
+                        <td style="padding:12px; text-align:right; font-weight:bold;">₹${b.amount.toLocaleString()}</td>
+                      </tr>`;
             });
         } else {
-            h += `<tr><td colspan="2" style="text-align:center; padding:15px;">No billing found for this month.</td></tr>`;
+            h += `<tr><td colspan="2" style="text-align:center; padding:30px; color:#999;">No billing records found for ${stats.monthName}.</td></tr>`;
         }
 
-        h += `<tr style="background:#eee; font-weight:bold;">
-                <td>Total Monthly Billed</td>
-                <td style="text-align:right; color:green;">₹${stats.currentMonthBilled.toLocaleString()}</td>
+        // Grand Total Row
+        h += `<tr style="background:#f8f9fa; font-size:1.2rem; border-top:2px solid var(--primary);">
+                <td style="padding:15px; font-weight:bold;">Grand Total</td>
+                <td style="padding:15px; text-align:right; color:var(--success); font-weight:bold;">₹${stats.currentMonthBilled.toLocaleString()}</td>
               </tr></table>`;
 
-        openModal("Monthly Breakdown", h);
+        openModal(`Current Month Billing`, h);
     } catch (e) {
         console.error(e);
-        alert("Could not load billing data. Check server console.");
+        alert("Could not load billing data. Check server connection.");
     }
 }
 
