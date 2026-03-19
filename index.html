@@ -38,8 +38,8 @@
         input, select, textarea { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; }
         button { background: var(--success); color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
         button:hover { filter: brightness(1.1); }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-        .modal-content { background: white; margin: 5% auto; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; position: relative; animation: slideIn 0.3s ease-out; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); overflow-y: auto; padding:20px 0; }
+        .modal-content { background: white; margin: 2% auto; padding: 30px; border-radius: 15px; width: 90%; max-width: 900px; position: relative; animation: slideIn 0.3s ease-out; box-shadow: 0 20px 50px rgba(0,0,0,0.2); height: auto; max-heigght: none; }
         @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .close-btn { position: absolute; top: 20px; right: 25px; font-size: 28px; cursor: pointer; color: #999; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -134,8 +134,8 @@
         <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateCategories('t')"></select><select id="tCategory"></select><select id="tFrom"><option value="">From Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="">To Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
         <div id="billing" class="page"><div class="section"><h2>Billing Engine</h2><div class="grid"><select id="billBuilder" onchange="loadSites('billBuilder','billSite')"></select><select id="billSite"></select></div><div class="grid" style="margin-top:10px;"><input type="date" id="billStart" placeholder="From Date"><input type="date" id="billEnd" placeholder="To Date"></div><label style="display:block; margin: 15px 0;"><input type="checkbox" id="gstToggle"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="holdingDisplay" style="margin-top: 20px;"></div><div id="billDisplay" style="margin-top: 20px;"></div></div></div>
         <div id="history" class="page"><div class="section"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2><i class="fas fa-list-ul"></i> Transaction History (DC/RC)</h2><button onclick="printHistory()" style="width:auto; padding:10px 20px; background:#2c3e50;">🖨️ Print Full Log</button></div><input type="text" id="histSearch" placeholder="🔍 Search by Builder, Site or Challan..." onkeyup="filterHistory()" style="margin-bottom:20px;"><div id="historyDisplay" style="overflow-x:auto;"></div></div></div>
-        <div id="dataModal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal()">&times;</span><h2 id="modalTitle">Report</h2><div id="modalBody"></div></div></div>
-        
+        <div id="dataModal" class="modal"><div class="modal-content"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:20px; padding-bottom:10px;"><h2 id="modalTitle" style="margin:0; color:var(--primary);">Report</h2><span class="close-btn" onclick="closeModal()" style="position:static; line-height:1;">&times;</span></div><div id="modalBody"></div></div></div>
+    
     </div>
 </div>
 
@@ -150,8 +150,8 @@
 
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
     function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
-    function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; }
-    function closeModal() { document.getElementById('dataModal').style.display = 'none'; }
+    function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
+    function closeModal() { document.getElementById('dataModal').style.display = 'none'; documnet.body.style.overflow = 'auto'; }
 
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
