@@ -114,8 +114,8 @@
             </div>
             <div class="section report-sec">
                 <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
-                <div class="grid"><select id="repBuilder" onchange="loadSites('repBuilder','repSite')"></select><select id="repSite"></select></div>
-                <button onclick="openSiteReportModal()" style="background: var(--warning); color: #000;">🔍 Generate Holding List</button>
+                <div class="grid"><div class="search-wrapper"><input type="text" id="repBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Report..." onclick="toggleDrop('repBuilderList')" onkeyup="filterDrop('repBuilderSearch', 'repBuilderList')"><div id="repBuilderList" class="search-results"></div><input type="hidden" id="repBuilder"></div><div class="search-wrapper"><input type="text" id="repSiteSearch" autocomplete="off" placeholder="🔍 Search Site for Report..." onclick="toggleDrop('repSiteList')" onkeyup="filterDrop('repSiteSearch', 'repSiteList')"><div id="repSiteList" class="search-results"></div><input type="hidden" id="repSite"></div></div>
+                <button onclick="openSiteReportModal()" style="background: var(--warning); color: #000; margin-top:20px;">🔍 Generate Holding List</button>
                 <button onclick="printHoldingReport()" style="background: #34495e; color: white; margin-top:10px;">🖨️ Print Holding Report</button>
             </div>
             <div class="section pay-sec">
@@ -177,6 +177,12 @@
         if (rBuilderList) {
             rBuilderList.innerHTML = builders.map(b => 
                 `<div onclick="selectReturnBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+        const repBuilderList = document.getElementById('repBuilderList');
+        if (repBuilderList) {
+            repBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectRepBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
             ).join('');
         }
 
@@ -515,14 +521,51 @@
         data.forEach(i => r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
     }
 
-    async function openSiteReportModal() {
-        const siteId = document.getElementById('repSite').value; if (!siteId) return alert("Select Site");
-        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-        const data = await res.json();
-        let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-        data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
-        openModal("Site Holdings", h + "</table>");
-    }
+    // 1. Select Builder in Report Section
+async function selectRepBuilder(id, name) {
+    document.getElementById('repBuilder').value = id;
+    document.getElementById('repBuilderSearch').value = name;
+    document.getElementById('repBuilderList').style.display = 'none';
+    
+    // Reset Site boxes
+    document.getElementById('repSite').value = "";
+    document.getElementById('repSiteSearch').value = "";
+
+    const res = await fetch(`${API_URL}/sites/${id}`);
+    const sites = await res.json();
+    const siteListDiv = document.getElementById('repSiteList');
+    siteListDiv.innerHTML = sites.map(s => 
+        `<div onclick="selectRepSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
+    ).join('');
+}
+
+// 2. Select Site in Report Section
+function selectRepSite(id, name) {
+    document.getElementById('repSite').value = id;
+    document.getElementById('repSiteSearch').value = name;
+    document.getElementById('repSiteList').style.display = 'none';
+}
+
+// 3. Updated Report Modal Function with Auto-Reset
+async function openSiteReportModal() {
+    const siteId = document.getElementById('repSite').value; 
+    if (!siteId) return alert("Select Site");
+
+    const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+    const data = await res.json();
+    
+    let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
+    data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
+    
+    // Open the modal with data
+    openModal("Site Holdings", h + "</table>");
+
+    // RESET BOXES TO EMPTY as requested
+    document.getElementById('repBuilderSearch').value = "";
+    document.getElementById('repSiteSearch').value = "";
+    document.getElementById('repBuilder').value = "";
+    document.getElementById('repSite').value = "";
+}
 
     function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
 
@@ -623,12 +666,13 @@
           <h3 style="color:var(--danger);">Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
     }
     
-    async function printHoldingReport() {
+async function printHoldingReport() {
     const siteId = document.getElementById('repSite').value;
-    const builderName = document.getElementById('repBuilder').selectedOptions[0].text;
-    const siteName = document.getElementById('repSite').selectedOptions[0].text;
+    // Get names from the search inputs instead of select options
+    const builderName = document.getElementById('repBuilderSearch').value;
+    const siteName = document.getElementById('repSiteSearch').value;
     
-    if (!siteId) return alert("Select a site first");
+    if (!siteId) return alert("Select a site and generate the list first (before the boxes reset)");
     
     const res = await fetch(`${API_URL}/site-balance/${siteId}`);
     const data = await res.json();
@@ -647,7 +691,7 @@
     win.document.write(content);
     win.document.close();
     win.print();
-    }
+}
 
     function printInvoice() {
     // 1. Get the data currently visible on your screen
