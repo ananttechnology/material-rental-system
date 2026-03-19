@@ -381,24 +381,45 @@
         const result = await res.json();
 
         if(res.ok) {
-            lastTxn = { ...body, challanNo: result.challanNo, builder: document.getElementById(`${p}Builder`).selectedOptions[0].text, site: document.getElementById(`${p}Site`).selectedOptions[0].text, item: document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0] };
+            // Updated logic to get names from our new search inputs
+            const builderName = type === 'dispatch' ? 
+                document.getElementById(`dBuilderSearch`).value : 
+                document.getElementById(`${p}Builder`).selectedOptions[0].text;
+
+            const siteName = type === 'dispatch' ? 
+                document.getElementById(`dSiteSearch`).value : 
+                document.getElementById(`${p}Site`).selectedOptions[0].text;
+
+            const itemName = document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0];
+
+            lastTxn = { 
+                ...body, 
+                challanNo: result.challanNo, 
+                builder: builderName, 
+                site: siteName, 
+                item: itemName 
+            };
             
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
             document.getElementById(msgId).style.color = "green";
             document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; 
             
-            // 3. ACTUAL RESET: Manual reset to ensure it works
+            // Clear inputs
             document.getElementById(`${p}Qty`).value = "";
             document.getElementById(`${p}Date`).value = "";
             if(type === 'dispatch') {
                 document.getElementById(`dRate`).value = "";
                 document.getElementById(`dLoading`).value = "";
+                document.getElementById(`dBuilderSearch`).value = "";
+                document.getElementById(`dSiteSearch`).value = "";
+                document.getElementById(`dBuilder`).value = "";
+                document.getElementById(`dSite`).value = "";
             } else {
                 document.getElementById(`rUnloading`).value = "";
                 document.getElementById('rItem').innerHTML = '<option value="">-- Items on Site --</option>';
             }
             
-            masterSync(); // Refresh dashboard and stocks
+            await masterSync(); // This will now run correctly and update stocks!
         } else {
             document.getElementById(msgId).style.color = "red";
             document.getElementById(msgId).innerHTML = "❌ " + (result.message || "Error occurred");
