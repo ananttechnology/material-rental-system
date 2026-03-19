@@ -746,8 +746,8 @@ async function saveEdit() {
             closeModal('editModal'); // Use your standard close function
             
             // Refresh UI
-            if (typeof loadHistory === 'function') loadHistory();
-            if (typeof updateDashboard === 'function') updateDashboard();
+            await loadHistory();
+            await masterSync();
         } else {
             alert("❌ Database Error: " + result.error);
         }
