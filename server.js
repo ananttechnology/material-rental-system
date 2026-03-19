@@ -248,47 +248,40 @@ app.get('/statement/:builderId', async (req, res) => {
 app.get('/company-stats', async (req, res) => {
     try {
         const now = new Date();
+        // Set range: 1st of current month to Today
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
         const builders = await Builder.find({});
         let totalMonthlyBilled = 0;
-        let builderMap = {};
+        let builderBreakdown = [];
 
         for (let b of builders) {
             const sites = await Site.find({ builderId: b._id });
-            let builderTotal = 0;
+            let builderSum = 0;
 
             for (let s of sites) {
-                // We use your existing Billing Engine function here!
-                // It handles the Return items (1500) and Holding items (1900) automatically.
+                // We call your EXISTING function that you said works perfectly
                 const result = await calculateSiteBill(s._id, startOfMonth, endOfToday);
-                builderTotal += result.subtotal;
+                builderSum += result.subtotal;
             }
 
-            if (builderTotal > 0) {
-                totalMonthlyBilled += builderTotal;
-                builderMap[b.companyName] = builderTotal;
+            if (builderSum > 0) {
+                totalMonthlyBilled += builderSum;
+                builderBreakdown.push({ name: b.companyName, amount: Math.round(builderSum) });
             }
         }
-
-        const breakdown = Object.keys(builderMap).map(name => ({
-            name: name,
-            amount: Math.round(builderMap[name])
-        }));
 
         res.json({
             currentMonthBilled: Math.round(totalMonthlyBilled),
             monthName: now.toLocaleString('default', { month: 'Long' }),
-            builderBreakdown: breakdown
+            builderBreakdown: builderBreakdown
         });
-
     } catch (e) {
-        console.error("Dashboard Stats Error:", e);
-        res.status(500).json({ currentMonthBilled: 0, monthName: "Error", builderBreakdown: [] });
+        console.error("Dashboard Error:", e);
+        res.status(500).json({ error: e.message });
     }
 });
-
 app.get('/all-transactions', async (req, res) => {
     try {
         const txns = await Transaction.find().sort({ date: -1 }); // Newest first
