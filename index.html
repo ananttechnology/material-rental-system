@@ -727,6 +727,7 @@ async function saveEdit() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateData)
         });
+        const result = await res.json();
 
         if (res.ok) {
             // Show message at top of popup
@@ -743,7 +744,12 @@ async function saveEdit() {
                 await loadHistory();
                 await masterSync();
             }, 1200);
-        }
+        } else {
+        // This will now show "Insufficient Stock! MS Plate 3x24 only has 25 available."
+        const msgDiv = document.getElementById('editMsg');
+        msgDiv.style.color = "red";
+        msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
+    }
     } catch (e) { alert("Server Error"); }
 }
     //To Close Editing Popup
