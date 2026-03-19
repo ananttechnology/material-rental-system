@@ -239,8 +239,16 @@
         }
 
         // 3. UPDATE DASHBOARD STATS
-        document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
-        document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
+        // Check if the element exists before trying to set innerText
+        const ankEl = document.getElementById('stat-ank');
+        if (ankEl) {
+        ankEl.innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
+        }
+
+        const dahEl = document.getElementById('stat-dah');
+        if (dahEl) {
+        dahEl.innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
+        }
         
         // Inside masterSync try block:
         const statRes = await fetch(`${API_URL}/company-stats`);
