@@ -293,35 +293,45 @@ app.put('/edit-transaction/:id', async (req, res) => {
         const oldItemId = oldTxn.itemId.toString();
         const newItemId = itemId;
 
-        // STEP A: UNDO OLD STOCK IMPACT
+        // STEP 1: UNDO OLD STOCK (Temporary)
         const oldInvItem = await Inventory.findById(oldItemId);
         if (oldInvItem) {
-            // If it was a Dispatch, give stock back. If Return, take stock away.
             if (oldTxn.type === 'DC') oldInvItem.availableStock += oldQty;
             else oldInvItem.availableStock -= oldQty;
-            await oldInvItem.save();
+            // We don't save yet, just update the object in memory
         }
 
-        // STEP B: APPLY NEW STOCK IMPACT
-        const newInvItem = await Inventory.findById(newItemId);
-        if (!newInvItem) return res.status(404).json({ error: "New item not found in Godown" });
+        // STEP 2: SAFETY CHECK FOR NEW ITEM
+        const newInvItem = (oldItemId === newItemId) ? oldInvItem : await Inventory.findById(newItemId);
+        if (!newInvItem) return res.status(404).json({ error: "New item not found" });
 
+        // If it's a Dispatch (DC), check if we have enough
+        if (oldTxn.type === 'DC' && newInvItem.availableStock < newQty) {
+            return res.status(400).json({ 
+                error: `Insufficient Stock! ${newInvItem.itemName} only has ${newInvItem.availableStock} available.` 
+            });
+        }
+
+        // STEP 3: APPLY NEW STOCK
         if (oldTxn.type === 'DC') newInvItem.availableStock -= newQty;
         else newInvItem.availableStock += newQty;
+
+        // STEP 4: SAVE EVERYTHING (Atomic-like)
+        if (oldInvItem && oldItemId !== newItemId) await oldInvItem.save();
         await newInvItem.save();
 
-        // STEP C: UPDATE TRANSACTION RECORD
         oldTxn.date = date;
         oldTxn.itemId = newItemId;
         oldTxn.quantity = newQty;
         oldTxn.rate = parseFloat(rate) || 0;
         if (oldTxn.type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
         else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
-
+        
         await oldTxn.save();
         res.json({ message: "Success" });
+
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
-});
+}); 
 app.listen(5000);
