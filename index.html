@@ -105,8 +105,7 @@
             </div>
             <div class="section return-sec">
                 <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
-                <div class="grid"><select id="rBuilder" onchange="loadSites('rBuilder','rSite')"></select><select id="rSite" onchange="loadReturnItems()"></select></div>
-                <select id="rItem"></select>
+                <div class="grid"><div class="search-wrapper"><input type="text" id="rBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder..." onclick="toggleDrop('rBuilderList')" onkeyup="filterDrop('rBuilderSearch', 'rBuilderList')"><div id="rBuilderList" class="search-results"></div><input type="hidden" id="rBuilder"></div><div class="search-wrapper"><input type="text" id="rSiteSearch" autocomplete="off" placeholder="🔍 Search Site..." onclick="toggleDrop('rSiteList')" onkeyup="filterDrop('rSiteSearch', 'rSiteList')"><div id="rSiteList" class="search-results"></div><input type="hidden" id="rSite"></div></div><div class="search-wrapper" style="margin-top:20px;"><input type="text" id="rItemSearch" autocomplete="off" placeholder="🔍 Search Items on Site..." onclick="toggleDrop('rItemList')" onkeyup="filterDrop('rItemSearch', 'rItemList')"><div id="rItemList" class="search-results"></div><input type="hidden" id="rItem"></div>
                 <div class="grid"><input type="number" id="rQty" placeholder="Qty Returned"><input type="number" id="rUnloading" placeholder="Unloading Charges (₹)"></div>
                 <input type="date" id="rDate">
                 <button onclick="processTxn('return')" style="background: var(--accent);">Confirm Return</button>
@@ -172,6 +171,12 @@
         if (dBuilderList) {
             dBuilderList.innerHTML = builders.map(b => 
                 `<div onclick="selectBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+        const rBuilderList = document.getElementById('rBuilderList');
+        if (rBuilderList) {
+            rBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectReturnBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
             ).join('');
         }
 
@@ -383,19 +388,18 @@
         const result = await res.json();
 
         if(res.ok) {
-            // Updated logic to get names from our new search inputs
+            // 1. Get names for the receipt (Handles Searchable vs Standard)
             const builderName = type === 'dispatch' ? 
                 document.getElementById(`dBuilderSearch`).value : 
-                document.getElementById(`${p}Builder`).selectedOptions[0].text;
+                document.getElementById(`rBuilderSearch`).value; // Updated for RC Search
 
             const siteName = type === 'dispatch' ? 
                 document.getElementById(`dSiteSearch`).value : 
-                document.getElementById(`${p}Site`).selectedOptions[0].text;
+                document.getElementById(`rSiteSearch`).value; // Updated for RC Search
 
-            // New logic to handle searchable item name
             const itemName = type === 'dispatch' ? 
                 document.getElementById(`dItemSearch`).value.split('-')[0] : 
-                document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0];
+                document.getElementById(`rItemSearch`).value.split('-')[0]; // Updated for RC Search
 
             lastTxn = { 
                 ...body, 
@@ -409,22 +413,33 @@
             document.getElementById(msgId).style.color = "green";
             document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; 
             
-            // Clear inputs
+            // 2. Clear common fields
             document.getElementById(`${p}Qty`).value = "";
             document.getElementById(`${p}Date`).value = "";
+
+            // 3. Clear Specific Section Fields
             if(type === 'dispatch') {
                 document.getElementById(`dRate`).value = "";
                 document.getElementById(`dLoading`).value = "";
                 document.getElementById(`dBuilderSearch`).value = "";
                 document.getElementById(`dSiteSearch`).value = "";
+                document.getElementById(`dItemSearch`).value = ""; // Added
                 document.getElementById(`dBuilder`).value = "";
                 document.getElementById(`dSite`).value = "";
+                document.getElementById(`dItem`).value = ""; // Added
             } else {
+                // THIS IS THE ELSE BLOCK FOR RETURNS (RC)
                 document.getElementById(`rUnloading`).value = "";
-                document.getElementById('rItem').innerHTML = '<option value="">-- Items on Site --</option>';
+                document.getElementById(`rBuilderSearch`).value = "";
+                document.getElementById(`rSiteSearch`).value = "";
+                document.getElementById(`rItemSearch`).value = "";
+                document.getElementById(`rBuilder`).value = "";
+                document.getElementById(`rSite`).value = "";
+                document.getElementById(`rItem`).value = "";
+                document.getElementById(`rItemList`).innerHTML = ""; // Clear the results list
             }
             
-            await masterSync(); // This will now run correctly and update stocks!
+            await masterSync(); 
         } else {
             document.getElementById(msgId).style.color = "red";
             document.getElementById(msgId).innerHTML = "❌ " + (result.message || "Error occurred");
@@ -940,6 +955,49 @@ function selectItem(id, label, stock) {
     // Update the "Available: X" label if you still use it
     const stockStatus = document.getElementById('stockStatus');
     if(stockStatus) stockStatus.innerText = `Available: ${stock}`;
+}
+// 1. Select Builder in Return Section
+async function selectReturnBuilder(id, name) {
+    document.getElementById('rBuilder').value = id;
+    document.getElementById('rBuilderSearch').value = name;
+    document.getElementById('rBuilderList').style.display = 'none';
+    
+    // Reset Site and Item boxes
+    document.getElementById('rSite').value = "";
+    document.getElementById('rSiteSearch').value = "";
+    document.getElementById('rItem').value = "";
+    document.getElementById('rItemSearch').value = "";
+
+    const res = await fetch(`${API_URL}/sites/${id}`);
+    const sites = await res.json();
+    const siteListDiv = document.getElementById('rSiteList');
+    siteListDiv.innerHTML = sites.map(s => 
+        `<div onclick="selectReturnSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
+    ).join('');
+}
+
+// 2. Select Site and Load ONLY its holdings
+async function selectReturnSite(id, name) {
+    document.getElementById('rSite').value = id;
+    document.getElementById('rSiteSearch').value = name;
+    document.getElementById('rSiteList').style.display = 'none';
+
+    // Fetch site balance (Holdings)
+    const res = await fetch(`${API_URL}/site-balance/${id}`);
+    const data = await res.json();
+    
+    const rItemList = document.getElementById('rItemList');
+    rItemList.innerHTML = data.map(i => {
+        const label = `${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]`;
+        return `<div onclick="selectReturnItem('${i.itemId}', '${label}')">${label}</div>`;
+    }).join('');
+}
+
+// 3. Select the Item to return
+function selectReturnItem(id, label) {
+    document.getElementById('rItem').value = id;
+    document.getElementById('rItemSearch').value = label;
+    document.getElementById('rItemList').style.display = 'none';
 }
 
 
