@@ -679,57 +679,46 @@ async function openEditModal(txnId) {
         const res = await fetch(`${API_URL}/all-transactions`);
         const data = await res.json();
         const txn = data.find(t => t._id === txnId);
+        if (!txn) return alert("Not found");
 
-        if (!txn) return alert("Transaction not found!");
+        // Clear previous success messages
+        const msgDiv = document.getElementById('editMsg');
+        if(msgDiv) msgDiv.innerText = "";
 
-        // Fill data
         document.getElementById('editId').value = txn._id;
         document.getElementById('editDate').value = txn.date.split('T')[0];
         document.getElementById('editQty').value = txn.quantity;
         document.getElementById('editRate').value = txn.rate;
-        
-        // Store the TYPE in a custom attribute on the save button or a hidden field
-        // This prevents needing an extra fetch later
         document.getElementById('saveEditBtn').setAttribute('data-type', txn.type);
+        document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
 
-        document.getElementById('editCharges').value = txn.type === 'DC' ? 
-            (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
-
+        // Fetch latest inventory for the dropdown
         const invRes = await fetch(`${API_URL}/inventory`);
         const items = await invRes.json();
         const itemSelect = document.getElementById('editItem');
+        
+        // REFRESH DROPDOWN: Clear duplicates and show current stock
         itemSelect.innerHTML = items.map(i => 
-            `<option value="${i._id}" ${i._id === txn.itemId ? 'selected' : ''}>${i.itemName} (${i.category})</option>`
+            `<option value="${i._id}" ${i._id === txn.itemId ? 'selected' : ''}>
+                ${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]
+            </option>`
         ).join('');
 
         document.getElementById('editModal').style.display = 'flex';
-    } catch (e) {
-        console.error(e);
-        alert("Error loading transaction data.");
-    }
+    } catch (e) { alert("Error loading data"); }
 }
 
 // 2. Function to SAVE the edited data
 async function saveEdit() {
     const id = document.getElementById('editId').value;
     const type = document.getElementById('saveEditBtn').getAttribute('data-type');
-    const date = document.getElementById('editDate').value;
-    const itemId = document.getElementById('editItem').value;
-    const quantity = parseFloat(document.getElementById('editQty').value);
-    const rate = parseFloat(document.getElementById('editRate').value);
-    const charges = parseFloat(document.getElementById('editCharges').value);
-
-    if (!date || isNaN(quantity) || isNaN(rate)) {
-        return alert("⚠️ Please fill all required fields correctly.");
-    }
-
+    
     const updateData = {
-        date,
-        itemId,
-        quantity,
-        rate,
-        type, // Sending the type directly
-        [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: charges
+        date: document.getElementById('editDate').value,
+        itemId: document.getElementById('editItem').value,
+        quantity: parseFloat(document.getElementById('editQty').value),
+        rate: parseFloat(document.getElementById('editRate').value),
+        [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: parseFloat(document.getElementById('editCharges').value)
     };
 
     try {
@@ -739,22 +728,23 @@ async function saveEdit() {
             body: JSON.stringify(updateData)
         });
 
-        const result = await res.json();
-
         if (res.ok) {
-            alert("✅ Inventory & Records Updated Successfully!");
-            closeModal('editModal'); // Use your standard close function
-            
-            // Refresh UI
-            await loadHistory();
-            await masterSync();
-        } else {
-            alert("❌ Database Error: " + result.error);
+            // Show message at top of popup
+            const msgDiv = document.getElementById('editMsg');
+            msgDiv.style.color = "green";
+            msgDiv.innerText = "✅ Saved Successfully!";
+
+            // Reset Boxes after 1 second and refresh
+            setTimeout(async () => {
+                document.getElementById('editQty').value = "";
+                document.getElementById('editRate').value = "";
+                document.getElementById('editCharges').value = "";
+                closeEditModal();
+                await loadHistory();
+                await masterSync();
+            }, 1200);
         }
-    } catch (e) {
-        console.error(e);
-        alert("❌ Connection Error. Check if server is running.");
-    }
+    } catch (e) { alert("Server Error"); }
 }
     //To Close Editing Popup
     function closeEditModal() {
@@ -765,6 +755,7 @@ async function saveEdit() {
     <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>✏️ Edit Transaction</h3>
+        <div id="editMsg" style="text-align:center; font-weight:bold; height:20px; margin-bottom:10px;"></div>
         <input type="hidden" id="editId">
         <label>Date:</label><input type="date" id="editDate">
         <label>Item & Category:</label>
