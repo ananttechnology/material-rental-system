@@ -48,6 +48,14 @@
         .msg-area { margin-top: 15px; font-weight: bold; }
         .page { display: none; }
         .active { display: block; }
+        /* Professional Edit Modal Styling */
+        .edit-grid { display: grid; grid-template-columns: 1fr 1fr; /* Two equal columns */ gap: 15px; margin-top: 10px; }
+        .full-width { grid-column: span 2; } /* Item dropdown takes full width */.edit-field { display: flex; flex-direction: column; gap: 5px; }
+        .edit-field label { font-size: 0.8rem; font-weight: bold; color: var(--secondary); text-transform: uppercase; }
+        .edit-field input, 
+        .edit-field select { padding: 10px; border: 1.5px solid #eee; border-radius: 6px; }
+        .edit-field input:focus { border-color: var(--accent); outline: none; }
+        #editMsg { border-radius: 6px; font-size: 0.9rem; padding: 0; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
@@ -747,7 +755,9 @@ async function saveEdit() {
         } else {
         // This will now show "Insufficient Stock! MS Plate 3x24 only has 25 available."
         const msgDiv = document.getElementById('editMsg');
-        msgDiv.style.color = "red";
+        msgDiv.style.background = "#fff3f3";
+        msgDiv.style.border = "1px solid var(--danger)";
+        msgDiv.style.color = "var(--danger)";
         msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
     }
     } catch (e) { alert("Server Error"); }
@@ -759,21 +769,42 @@ async function saveEdit() {
 
 </script>
     <div id="editModal" class="modal">
-    <div class="modal-content">
-        <h3>✏️ Edit Transaction</h3>
-        <div id="editMsg" style="text-align:center; font-weight:bold; height:20px; margin-bottom:10px;"></div>
-        <input type="hidden" id="editId">
-        <label>Date:</label><input type="date" id="editDate">
-        <label>Item & Category:</label>
-        <select id="editItem"></select> 
-        <label>Quantity:</label><input type="number" id="editQty">
-        <label>Rate:</label><input type="number" id="editRate">
-        <label>Charges (Load/Unload):</label><input type="number" id="editCharges">
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success);">Save Changes</button>
-            <button onclick="closeEditModal('editModal')" style="background:var(--danger);">Cancel</button>
+    <div class="modal-content" style="max-width: 600px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;">
+            <h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3>
+            <span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span>
         </div>
-    </div>
+
+        <div id="editMsg" style="height:35px; margin-bottom:15px;"></div>
+
+        <input type="hidden" id="editId">
+        
+        <div class="edit-grid">
+            <div class="edit-field full-width">
+                <label>Material & Category (Godown Source)</label>
+                <select id="editItem"></select>
+            </div>
+
+            <div class="edit-field">
+                <label>Transaction Date</label>
+                <input type="date" id="editDate">
+            </div>
+            <div class="edit-field">
+                <label>Quantity</label>
+                <input type="number" id="editQty">
+            </div>
+
+            <div class="edit-field">
+                <label>Daily Rate (₹)</label>
+                <input type="number" id="editRate">
+            </div>
+            <div class="edit-field">
+                <label>Service Charges (Load/Unload)</label>
+                <input type="number" id="editCharges">
+            </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
 </div>
 </body>
 </html>
