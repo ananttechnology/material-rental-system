@@ -146,8 +146,26 @@
 
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
     function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
-    function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
-    function closeModal() { document.getElementById('dataModal').style.display = 'none'; documnet.body.style.overflow = 'auto'; }
+    function openModal(title, content) {
+    const modal = document.getElementById('dataModal');
+    const titleEl = document.getElementById('modalTitle');
+    const bodyEl = document.getElementById('modalBody');
+
+    if (modal && titleEl && bodyEl) {
+        titleEl.innerText = title;
+        bodyEl.innerHTML = content;
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden'; 
+    }
+}
+    function closeModal() {
+    const modal = document.getElementById('dataModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    // Restore scrolling safely
+    document.body.style.overflow = 'auto';
+}
 
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
@@ -224,10 +242,13 @@
         document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
         document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
         
+        // Inside masterSync try block:
         const statRes = await fetch(`${API_URL}/company-stats`);
         const stats = await statRes.json();
-        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
-        document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
+        const billEl = document.getElementById('dash-billed');
+        if (billEl) {
+        billEl.innerText = stats.currentMonthBilled.toLocaleString();
+        }
         
     } catch (e) { console.error("Sync Error:", e); }
 }
@@ -1210,36 +1231,32 @@ async function updateDashboardStats() {
 // 2. New Modal for Builder-wise Monthly Billing
 async function openMonthlyModal() {
     try {
-        // We fetch the breakdown from the server
-        // Note: Ensure your backend has an endpoint for this, or we use a filtered builder list
-        const res = await fetch(`${API_URL}/builders`);
-        const builders = await res.json();
+        const res = await fetch(`${API_URL}/company-stats`);
+        const stats = await res.json();
         
-        let h = `<p style="margin-bottom:15px; color:var(--secondary);">Showing total billing for the <b>current calendar month</b> only.</p>`;
-        h += `<table><tr><th>Builder Name</th><th>Month Bill (₹)</th></tr>`;
+        let h = `<h3 style="color:var(--accent); margin-bottom:10px;">Data for: ${stats.monthName} ${new Date().getFullYear()}</h3>`;
+        h += `<p style="font-size:0.9rem; color:#666; margin-bottom:15px;">Calculated from 1st ${stats.monthName} to Today (Rental Basis)</p>`;
+        h += `<table style="width:100%"><tr><th>Builder Name</th><th style="text-align:right">Current Bill (₹)</th></tr>`;
         
-        let grandTotal = 0;
-
-        // Note: For high accuracy, your server.js needs a specific "monthly-breakdown" route.
-        // If not, we fetch company stats which usually holds this.
-        const statRes = await fetch(`${API_URL}/company-stats`);
-        const stats = await statRes.json();
-        
-        // If your server provides 'builderBreakdown', we loop it here:
-        if(stats.builderBreakdown) {
+        if (stats.builderBreakdown && stats.builderBreakdown.length > 0) {
             stats.builderBreakdown.forEach(b => {
-                h += `<tr><td>${b.name}</td><td><b>₹${b.amount.toLocaleString()}</b></td></tr>`;
-                grandTotal += b.amount;
+                h += `<tr><td>${b.name}</td><td style="text-align:right"><b>₹${b.amount.toLocaleString()}</b></td></tr>`;
             });
         } else {
-            h += `<tr><td colspan="2" style="text-align:center;">Breakdown data loading...</td></tr>`;
+            h += `<tr><td colspan="2" style="text-align:center; padding:20px;">No active dispatches found for this month.</td></tr>`;
         }
 
-        h += `<tr style="background:#eee; font-weight:bold;"><td>Total Running Bill</td><td>₹${stats.currentMonthBilled.toLocaleString()}</td></tr>`;
-        openModal("Current Month Billing Breakdown", h + "</table>");
-    } catch (e) { alert("Error loading monthly details"); }
+        h += `<tr style="background:#f8f9fa; font-weight:bold; font-size:1.1rem;">
+                <td>Grand Total</td>
+                <td style="text-align:right; color:var(--success);">₹${stats.currentMonthBilled.toLocaleString()}</td>
+              </tr>`;
+        
+        openModal(`Monthly Billing Breakdown`, h + "</table>");
+    } catch (e) { 
+        console.error(e);
+        alert("Error loading monthly billing data."); 
+    }
 }
-
 
 </script>
     <div id="editModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3><span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span></div><div id="editMsg" style="height:35px; margin-bottom:15px;"></div><input type="hidden" id="editId"><div class="edit-grid"><div class="edit-field full-width"><label>Material & Category (Godown Source)</label><select id="editItem"></select></div><div class="edit-field"><label>Transaction Date</label><input type="date" id="editDate"></div><div class="edit-field"><label>Quantity</label><input type="number" id="editQty"></div><div class="edit-field"><label>Daily Rate (₹)</label><input type="number" id="editRate"></div><div class="edit-field"><label>Service Charges (Load/Unload)</label><input type="number" id="editCharges"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
