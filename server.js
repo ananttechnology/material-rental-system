@@ -261,25 +261,21 @@ app.get('/company-stats', async (req, res) => {
 
             for (let s of sites) {
                 try {
-                    // Call your working billing function
+                    // Use your working function
                     const result = await calculateSiteBill(s._id, startOfMonth, endOfToday);
-                    
                     if (result && typeof result.subtotal === 'number') {
                         builderSum += result.subtotal;
                     }
-                } catch (siteErr) {
-                    // If one site has an issue, log it and move to the next 
-                    // This prevents the 500 Internal Server Error
-                    console.error("Error calculating site:", s._id, siteErr.message);
+                } catch (innerErr) {
+                    // If one site fails, log it and move to next site
+                    console.error(`Error on site ${s._id}:`, innerErr.message);
+                    continue; 
                 }
             }
 
             if (builderSum > 0) {
                 grandTotal += builderSum;
-                breakdown.push({ 
-                    name: b.companyName, 
-                    amount: Math.round(builderSum) 
-                });
+                breakdown.push({ name: b.companyName, amount: Math.round(builderSum) });
             }
         }
 
@@ -288,10 +284,9 @@ app.get('/company-stats', async (req, res) => {
             monthName: now.toLocaleString('default', { month: 'Long' }),
             builderBreakdown: breakdown
         });
-
     } catch (e) {
-        console.error("Dashboard Stats Global Error:", e);
-        res.status(500).json({ error: e.message });
+        console.error("Global Stats Error:", e);
+        res.status(500).json({ error: "Dashboard calculation failed" });
     }
 });
 app.get('/all-transactions', async (req, res) => {
