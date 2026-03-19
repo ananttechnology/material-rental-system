@@ -596,15 +596,8 @@ async function openSiteReportModal() {
         }
 
         openModal(siteId === "ALL" ? "Consolidated Builder Holdings" : "Site Holdings", h + "</table>");
-
-        // RESET BOXES TO EMPTY
-        document.getElementById('repBuilderSearch').value = "";
-        document.getElementById('repSiteSearch').value = "";
-        document.getElementById('repBuilder').value = "";
-        document.getElementById('repSite').value = "";
         
     } catch (e) {
-        console.error(e);
         alert("Error generating report");
     }
 }
@@ -711,29 +704,54 @@ async function openSiteReportModal() {
 async function printHoldingReport() {
     const builderId = document.getElementById('repBuilder').value;
     const siteId = document.getElementById('repSite').value;
-    // Get names from the search inputs instead of select options
     const builderName = document.getElementById('repBuilderSearch').value;
     const siteName = document.getElementById('repSiteSearch').value;
     
-    if (!siteId) return alert("Select a site and generate the list first (before the boxes reset)");
-    
-    const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-    const data = await res.json();
-    
-    const win = window.open('', '', 'height=700,width=900');
-    let content = `<html><head><title>Holding Report</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} th{background:#f2f2f2;}</style></head><body>`;
-    content += `<h1 style="text-align:center;">STOCK HOLDING REPORT</h1>`;
-    content += `<p><b>Builder:</b> ${builderName} | <b>Site:</b> ${siteName}</p>`;
-    content += `<p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p><table><tr><th>Item Description</th><th>Category</th><th>Godown Source</th><th>Current Holding Qty</th></tr>`;
-    
-    data.forEach(i => {
-        content += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
-    });
-    
-    content += `</table><p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`;
-    win.document.write(content);
-    win.document.close();
-    win.print();
+    if (!builderId || !siteId) return alert("Please select Builder and Site before printing!");
+
+    try {
+        let rows = "";
+        if (siteId === "ALL") {
+            const resSites = await fetch(`${API_URL}/sites/${builderId}`);
+            const sites = await resSites.json();
+            let totalBal = {};
+            for (let s of sites) {
+                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
+                const bal = await resBal.json();
+                bal.forEach(i => {
+                    const key = i.itemId;
+                    if (!totalBal[key]) totalBal[key] = { ...i };
+                    else totalBal[key].currentBalance += i.currentBalance;
+                });
+            }
+            Object.values(totalBal).forEach(i => {
+                rows += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>Multiple</td><td>${i.currentBalance}</td></tr>`;
+            });
+        } else {
+            const res = await fetch(`${API_URL}/site-balance/${siteId}`);
+            const data = await res.json();
+            data.forEach(i => {
+                rows += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
+            });
+        }
+
+        const win = window.open('', '', 'height=700,width=900');
+        win.document.write(`<html><head><title>Holding Report</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} th{background:#f2f2f2;}</style></head><body>
+            <h1 style="text-align:center;">STOCK HOLDING REPORT</h1>
+            <p><b>Builder:</b> ${builderName} | <b>Site:</b> ${siteName}</p>
+            <p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p>
+            <table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Holding Qty</th></tr>${rows}</table>
+            <p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`);
+        win.document.close();
+        win.print();
+
+        // RESET BOXES AFTER PRINTING
+        document.getElementById('repBuilderSearch').value = "";
+        document.getElementById('repSiteSearch').value = "";
+        document.getElementById('repBuilder').value = "";
+        document.getElementById('repSite').value = "";
+
+    } catch (e) { alert("Print Error: " + e.message); }
 }
 
     function printInvoice() {
