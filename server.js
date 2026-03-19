@@ -252,41 +252,40 @@ app.get('/company-stats', async (req, res) => {
         const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
         const builders = await Builder.find({});
-        let totalMonthlyBilled = 0;
-        let builderBreakdown = [];
+        let grandTotal = 0;
+        let breakdown = [];
 
         for (let b of builders) {
             const sites = await Site.find({ builderId: b._id });
             let builderSum = 0;
 
             for (let s of sites) {
-                // Calling your working logic
+                // Using your EXISTING function that works for your invoices
                 const result = await calculateSiteBill(s._id, startOfMonth, endOfToday);
-                
-                // Ensure result.subtotal exists and is a number
-                if (result && typeof result.subtotal === 'number') {
+                if (result && result.subtotal) {
                     builderSum += result.subtotal;
                 }
             }
 
             if (builderSum > 0) {
-                totalMonthlyBilled += builderSum;
-                builderBreakdown.push({ 
+                grandTotal += builderSum;
+                breakdown.push({ 
                     name: b.companyName, 
                     amount: Math.round(builderSum) 
                 });
             }
         }
 
+        // Send clean JSON so line 254 in index.html doesn't error out
         res.json({
-            currentMonthBilled: Math.round(totalMonthlyBilled),
+            currentMonthBilled: Math.round(grandTotal),
             monthName: now.toLocaleString('default', { month: 'Long' }),
-            builderBreakdown: builderBreakdown // This list is used by openMonthlyModal()
+            builderBreakdown: breakdown
         });
 
     } catch (e) {
         console.error("Dashboard Stats Error:", e);
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: "Server side calculation error" });
     }
 });
 app.get('/all-transactions', async (req, res) => {
