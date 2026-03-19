@@ -57,12 +57,14 @@
         .edit-field input:focus { border-color: var(--accent); outline: none; }
         #editMsg { border-radius: 6px; font-size: 0.9rem; padding: 0; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
         /* SEARCHABLE DROPDOWN STYLING */
-.search-wrapper { position: relative; width: 100%; }
-.search-results { position: absolute; top: 100%; left: 0; width: 100%; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #ccc; border-radius: 0 0 8px 8px; z-index: 9999; display: none; /* Hidden by default */ box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-.search-results div { padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
-.search-results div:hover { background-color: var(--light); color: var(--accent); }
-.search-results div.add-new { background: #eef9f3; color: var(--success); font-weight: bold; position: sticky; top: 0; }
-    </style>
+        .search-wrapper { position: relative; width: 100%; }
+        .search-results { position: absolute; top: 100%; left: 0; width: 100%; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #ccc; border-radius: 0 0 8px 8px; z-index: 9999; display: none; /* Hidden by default */ box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .search-results div { padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .search-results div:hover { background-color: var(--light); color: var(--accent); }
+        .search-results div.add-new { background: #eef9f3; color: var(--success); font-weight: bold; position: sticky; top: 0; }
+        /* Add this to your <style> if not already present */
+        #quickSiteModal { display: none; /* Hidden by default */align-items: center; justify-content: center; }
+</style>
 </head>
 <body>
 
@@ -807,23 +809,20 @@ function filterDrop(inputId, listId) {
     const input = document.getElementById(inputId).value.toUpperCase();
     const div = document.getElementById(listId);
     const items = div.getElementsByTagName('div');
+    const selectedBuilder = document.getElementById('dBuilder').value;
     
     div.style.display = 'block';
-    let visibleCount = 0;
 
     for (let i = 0; i < items.length; i++) {
         const txtValue = items[i].textContent || items[i].innerText;
-        if (txtValue.toUpperCase().indexOf(input) > -1) {
-            items[i].style.display = "";
-            visibleCount++;
-        } else {
-            items[i].style.display = "none";
-        }
+        items[i].style.display = (txtValue.toUpperCase().indexOf(input) > -1) ? "" : "none";
     }
     
-    // Show 'Quick Add' button if it's the Site list and no results found
+    // Show + button if searching in Sites AND a Builder is already selected
     if(listId === 'dSiteList') {
-        document.getElementById('quickAddSiteBtn').style.display = (input.length > 0) ? 'block' : 'none';
+        const plusBtn = document.getElementById('quickAddSiteBtn');
+        // Show button if builder is selected, even if input is empty
+        plusBtn.style.display = (selectedBuilder) ? 'block' : 'none';
     }
 }
 
@@ -835,15 +834,16 @@ window.onclick = function(event) {
 }
 // Function to handle Builder Selection
 async function selectBuilder(id, name) {
-    document.getElementById('dBuilder').value = id;         // Store ID for DB
-    document.getElementById('dBuilderSearch').value = name; // Show Name in box
-    document.getElementById('dBuilderList').style.display = 'none'; // Hide list
+    document.getElementById('dBuilder').value = id;
+    document.getElementById('dBuilderSearch').value = name;
+    document.getElementById('dBuilderList').style.display = 'none';
     
-    // Reset Site box when builder changes
     document.getElementById('dSite').value = "";
     document.getElementById('dSiteSearch').value = "";
     
-    // Load sites for THIS builder
+    // Show the + button now that a builder is selected
+    document.getElementById('quickAddSiteBtn').style.display = 'block';
+
     const res = await fetch(`${API_URL}/sites/${id}`);
     const sites = await res.json();
     allSites = sites;
@@ -892,6 +892,19 @@ async function saveQuickSite() {
             alert("✅ Site Added and Selected!");
         }
     } catch (e) { alert("Error saving site"); }
+}
+function openQuickSiteModal() {
+    const builderId = document.getElementById('dBuilder').value;
+    const builderName = document.getElementById('dBuilderSearch').value;
+
+    if (!builderId) {
+        alert("⚠️ Stop! Please select a Builder first before adding a site.");
+        return;
+    }
+
+    // Set the label in the modal so user knows which builder they are adding to
+    document.getElementById('labelForBuilder').innerText = "Adding Site for: " + builderName;
+    document.getElementById('quickSiteModal').style.display = 'flex';
 }
 
 
