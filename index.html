@@ -560,46 +560,39 @@ async function openSiteReportModal() {
     
     if (!builderId || !siteId) return alert("Please select both Builder and Site!");
 
-    let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
+    let h = ""; // Start empty to build sections
 
     try {
         if (siteId === "ALL") {
-            // Case 1: Consolidated Report for all sites of this builder
             const resSites = await fetch(`${API_URL}/sites/${builderId}`);
             const sites = await resSites.json();
             
-            let totalBal = {}; // To merge stocks of same items from different sites
-
             for (let s of sites) {
                 const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
                 const bal = await resBal.json();
-                bal.forEach(i => {
-                    const key = i.itemId;
-                    if (!totalBal[key]) {
-                        totalBal[key] = { ...i };
-                    } else {
-                        totalBal[key].currentBalance += i.currentBalance;
-                    }
-                });
+                
+                // Add a Header for each site
+                h += `<h3 style="background:#f4f7f6; padding:10px; border-left:4px solid var(--accent); margin-top:20px;">📍 Site: ${s.siteName}</h3>`;
+                
+                if (bal.length === 0) {
+                    h += `<p style="padding-left:15px; color:gray; font-style:italic;">No items currently held at this site.</p>`;
+                } else {
+                    h += `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
+                    bal.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
+                    h += `</table>`;
+                }
             }
-
-            // Convert merged object back to rows
-            Object.values(totalBal).forEach(i => {
-                h += `<tr><td>${i.itemName} (${i.category})</td><td>Multiple</td><td>${i.currentBalance}</td></tr>`;
-            });
-
         } else {
-            // Case 2: Standard Single Site Report
+            // Standard Single Site Report
             const res = await fetch(`${API_URL}/site-balance/${siteId}`);
             const data = await res.json();
+            h += `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
             data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
+            h += `</table>`;
         }
 
-        openModal(siteId === "ALL" ? "Consolidated Builder Holdings" : "Site Holdings", h + "</table>");
-        
-    } catch (e) {
-        alert("Error generating report");
-    }
+        openModal(siteId === "ALL" ? "Consolidated Site-wise Report" : "Site Holdings", h);
+    } catch (e) { alert("Error generating report"); }
 }
 
     function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
@@ -710,42 +703,54 @@ async function printHoldingReport() {
     if (!builderId || !siteId) return alert("Please select Builder and Site before printing!");
 
     try {
-        let rows = "";
+        let contentHtml = "";
         if (siteId === "ALL") {
             const resSites = await fetch(`${API_URL}/sites/${builderId}`);
             const sites = await resSites.json();
-            let totalBal = {};
             for (let s of sites) {
                 const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
                 const bal = await resBal.json();
-                bal.forEach(i => {
-                    const key = i.itemId;
-                    if (!totalBal[key]) totalBal[key] = { ...i };
-                    else totalBal[key].currentBalance += i.currentBalance;
-                });
+                
+                contentHtml += `<h3 style="margin-top:25px; border-bottom:1px solid #333;">Site: ${s.siteName}</h3>`;
+                if (bal.length === 0) {
+                    contentHtml += `<p>No items held.</p>`;
+                } else {
+                    contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Qty</th></tr>`;
+                    bal.forEach(i => {
+                        contentHtml += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
+                    });
+                    contentHtml += `</table>`;
+                }
             }
-            Object.values(totalBal).forEach(i => {
-                rows += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>Multiple</td><td>${i.currentBalance}</td></tr>`;
-            });
         } else {
             const res = await fetch(`${API_URL}/site-balance/${siteId}`);
             const data = await res.json();
+            contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Qty</th></tr>`;
             data.forEach(i => {
-                rows += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
+                contentHtml += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
             });
+            contentHtml += `</table>`;
         }
 
         const win = window.open('', '', 'height=700,width=900');
-        win.document.write(`<html><head><title>Holding Report</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:12px;text-align:left;} th{background:#f2f2f2;}</style></head><body>
-            <h1 style="text-align:center;">STOCK HOLDING REPORT</h1>
-            <p><b>Builder:</b> ${builderName} | <b>Site:</b> ${siteName}</p>
+        win.document.write(`<html><head><title>Holding Report</title>
+            <style>
+                body{font-family:sans-serif; padding:20px;}
+                table{width:100%; border-collapse:collapse; margin-bottom:10px;}
+                th,td{border:1px solid #000; padding:8px; text-align:left; font-size:13px;}
+                th{background:#f2f2f2;}
+                h1{text-align:center; font-size:22px;}
+                h3{color:#2c3e50;}
+            </style></head><body>
+            <h1>STOCK HOLDING REPORT (SITE-WISE)</h1>
+            <p><b>Builder:</b> ${builderName}</p>
             <p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p>
-            <table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Holding Qty</th></tr>${rows}</table>
+            ${contentHtml}
             <p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`);
         win.document.close();
         win.print();
 
-        // RESET BOXES AFTER PRINTING
+        // RESET BOXES
         document.getElementById('repBuilderSearch').value = "";
         document.getElementById('repSiteSearch').value = "";
         document.getElementById('repBuilder').value = "";
