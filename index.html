@@ -56,6 +56,12 @@
         .edit-field select { padding: 10px; border: 1.5px solid #eee; border-radius: 6px; }
         .edit-field input:focus { border-color: var(--accent); outline: none; }
         #editMsg { border-radius: 6px; font-size: 0.9rem; padding: 0; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
+        /* SEARCHABLE DROPDOWN STYLING */
+.search-wrapper { position: relative; width: 100%; }
+.search-results { position: absolute; top: 100%; left: 0; width: 100%; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #ccc; border-radius: 0 0 8px 8px; z-index: 9999; display: none; /* Hidden by default */ box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+.search-results div { padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+.search-results div:hover { background-color: var(--light); color: var(--accent); }
+.search-results div.add-new { background: #eef9f3; color: var(--success); font-weight: bold; position: sticky; top: 0; }
     </style>
 </head>
 <body>
@@ -65,7 +71,6 @@
     <div id="toggle-btn" onclick="toggleSidebar()"><i class="fas fa-chevron-left"></i></div>
     <div class="nav-item" onclick="showPage('dashboard')"><i class="fas fa-th-large"></i><span>Dashboard</span></div>
     <div class="nav-item" onclick="showPage('builder')"><i class="fas fa-user-plus"></i><span>Builders</span></div>
-    <div class="nav-item" onclick="showPage('site')"><i class="fas fa-map-marked-alt"></i><span>Sites</span></div>
     <div class="nav-item" onclick="showPage('inventory')"><i class="fas fa-box-open"></i><span>Inventory</span></div>
     <div class="nav-item" onclick="showPage('transfer')"><i class="fas fa-exchange-alt"></i><span>Stock Transfer</span></div>
     <div class="nav-item" onclick="showPage('billing')"><i class="fas fa-file-invoice"></i><span>Billing Engine</span></div>
@@ -88,7 +93,7 @@
             </div>
             <div class="section dispatch-sec">
                 <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
-                <div class="grid"><select id="dBuilder" onchange="loadSites('dBuilder','dSite')"></select><select id="dSite"></select></div>
+                <div class="grid"><div class="search-wrapper"><input type="text" id="dBuilderSearch" autocomplete="off" placeholder="🔍 Select or Search Builder..." onclick="toggleDrop('dBuilderList')" onkeyup="filterDrop('dBuilderSearch', 'dBuilderList')"><div id="dBuilderList" class="search-results"></div><input type="hidden" id="dBuilder"> </div><div class="search-wrapper"><div style="display:flex; gap:5px;"><input type="text" id="dSiteSearch" autocomplete="off" placeholder="🔍 Select or Search Site..." onclick="toggleDrop('dSiteList')" onkeyup="filterDrop('dSiteSearch', 'dSiteList')"><button onclick="openQuickSiteModal()" id="quickAddSiteBtn" style="width:45px; padding:0; background:var(--success); display:none;"><i class="fas fa-plus"></i></button></div><div id="dSiteList" class="search-results"></div><input type="hidden" id="dSite"></div></div>
                 <div class="grid"><select id="dItem" onchange="showStock('dItem','stockStatus')"></select><span id="stockStatus" style="font-weight: bold; color: var(--accent);">Available: 0</span></div>
                 <div class="grid"><input type="number" id="dQty" placeholder="Quantity"><input type="number" id="dRate" placeholder="Daily Rate (₹)"></div>
                 <div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="date" id="dDate"></div>
@@ -136,6 +141,9 @@
 
 <script>
     const API_URL = 'https://material-backend-trial.onrender.com';
+    // Global arrays to hold data for searching
+    let allBuilders = [];
+    let allSites = [];
     let fullInventory = [];
     let lastTxn = null;
 
@@ -152,25 +160,44 @@
 
     async function masterSync() {
     try {
+        // 1. FETCH BUILDERS
         const res = await fetch(`${API_URL}/builders`);
-        const b = await res.json();
-        ['builderSelect', 'dBuilder', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
+        const builders = await res.json();
+        allBuilders = builders; // Save to global variable for searching
+
+        // Populate the New Searchable DC Builder List
+        const dBuilderList = document.getElementById('dBuilderList');
+        if (dBuilderList) {
+            dBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+
+        // Keep standard dropdowns working for other sections (Billing, Payments, etc.)
+        ['builderSelect', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
             const s = document.getElementById(id);
-            if(s) { const cur = s.value; s.innerHTML = '<option value="">-- Select Builder --</option>'; b.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); s.value = cur; }
+            if(s) { 
+                const cur = s.value; 
+                s.innerHTML = '<option value="">-- Select Builder --</option>'; 
+                builders.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); 
+                s.value = cur; 
+            }
         });
 
+        // 2. FETCH INVENTORY
         const invRes = await fetch(`${API_URL}/inventory`);
         fullInventory = await invRes.json();
+        
+        // Populate DC Item List (Searchable or Standard)
         const dItem = document.getElementById('dItem');
-
         if(dItem) { 
             dItem.innerHTML = '<option value="">-- Select Material --</option>'; 
-            // FIXED: Added filter here to hide 0 stock items
             fullInventory.filter(i => i.availableStock > 0).forEach(i => {
                 dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
             });
         }
 
+        // 3. UPDATE DASHBOARD STATS
         document.getElementById('stat-ank').innerText = fullInventory.reduce((acc, i) => i.godown === "Ankleshwar" ? acc + i.availableStock : acc, 0);
         document.getElementById('stat-dah').innerText = fullInventory.reduce((acc, i) => i.godown === "Dahej" ? acc + i.availableStock : acc, 0);
         
@@ -178,9 +205,9 @@
         const stats = await statRes.json();
         document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
         document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
-    } catch (e) { console.error(e); }
+        
+    } catch (e) { console.error("Sync Error:", e); }
 }
-
     async function saveBuilder() {
         const body = { 
             companyName: document.getElementById('compName').value, 
@@ -761,50 +788,129 @@ async function saveEdit() {
         msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
     }
     } catch (e) { alert("Server Error"); }
-}
+    }
     //To Close Editing Popup
     function closeEditModal() {
     document.getElementById('editModal').style.display = 'none';
+    }
+    
+
+// 1. Show/Hide dropdown
+function toggleDrop(id) {
+    // Hide all other dropdowns first
+    document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none');
+    document.getElementById(id).style.display = 'block';
 }
 
+// 2. Filter list as user types (Case Insensitive)
+function filterDrop(inputId, listId) {
+    const input = document.getElementById(inputId).value.toUpperCase();
+    const div = document.getElementById(listId);
+    const items = div.getElementsByTagName('div');
+    
+    div.style.display = 'block';
+    let visibleCount = 0;
+
+    for (let i = 0; i < items.length; i++) {
+        const txtValue = items[i].textContent || items[i].innerText;
+        if (txtValue.toUpperCase().indexOf(input) > -1) {
+            items[i].style.display = "";
+            visibleCount++;
+        } else {
+            items[i].style.display = "none";
+        }
+    }
+    
+    // Show 'Quick Add' button if it's the Site list and no results found
+    if(listId === 'dSiteList') {
+        document.getElementById('quickAddSiteBtn').style.display = (input.length > 0) ? 'block' : 'none';
+    }
+}
+
+// 3. Close dropdowns if user clicks outside
+window.onclick = function(event) {
+    if (!event.target.matches('input')) {
+        document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none');
+    }
+}
+// Function to handle Builder Selection
+async function selectBuilder(id, name) {
+    document.getElementById('dBuilder').value = id;         // Store ID for DB
+    document.getElementById('dBuilderSearch').value = name; // Show Name in box
+    document.getElementById('dBuilderList').style.display = 'none'; // Hide list
+    
+    // Reset Site box when builder changes
+    document.getElementById('dSite').value = "";
+    document.getElementById('dSiteSearch').value = "";
+    
+    // Load sites for THIS builder
+    const res = await fetch(`${API_URL}/sites/${id}`);
+    const sites = await res.json();
+    allSites = sites;
+
+    const siteListDiv = document.getElementById('dSiteList');
+    siteListDiv.innerHTML = sites.map(s => 
+        `<div onclick="selectSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
+    ).join('');
+}
+
+// Function to handle Site Selection
+function selectSite(id, name) {
+    document.getElementById('dSite').value = id;
+    document.getElementById('dSiteSearch').value = name;
+    document.getElementById('dSiteList').style.display = 'none';
+    document.getElementById('quickAddSiteBtn').style.display = 'none';
+}
+async function saveQuickSite() {
+    const builderId = document.getElementById('dBuilder').value;
+    const siteName = document.getElementById('newQuickSiteName').value;
+
+    if (!builderId) return alert("Please select a Builder first!");
+    if (!siteName) return alert("Please enter a site name!");
+
+    const payload = { builderId, siteName, siteAddress: "Quick Added" };
+
+    try {
+        const res = await fetch(`${API_URL}/add-site`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(payload) 
+        });
+
+        if (res.ok) {
+            // Re-fetch sites to get the new ID from server
+            const siteRes = await fetch(`${API_URL}/sites/${builderId}`);
+            const sites = await siteRes.json();
+            const newSite = sites.find(s => s.siteName === siteName);
+
+            if (newSite) {
+                selectSite(newSite._id, newSite.siteName); // Auto-select the new site
+            }
+            
+            document.getElementById('quickSiteModal').style.display = 'none';
+            document.getElementById('newQuickSiteName').value = "";
+            alert("✅ Site Added and Selected!");
+        }
+    } catch (e) { alert("Error saving site"); }
+}
+
+
 </script>
-    <div id="editModal" class="modal">
-    <div class="modal-content" style="max-width: 600px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;">
-            <h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3>
-            <span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span>
+    <div id="editModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3><span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span></div><div id="editMsg" style="height:35px; margin-bottom:15px;"></div><input type="hidden" id="editId"><div class="edit-grid"><div class="edit-field full-width"><label>Material & Category (Godown Source)</label><select id="editItem"></select></div><div class="edit-field"><label>Transaction Date</label><input type="date" id="editDate"></div><div class="edit-field"><label>Quantity</label><input type="number" id="editQty"></div><div class="edit-field"><label>Daily Rate (₹)</label><input type="number" id="editRate"></div><div class="edit-field"><label>Service Charges (Load/Unload)</label><input type="number" id="editCharges"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
+    <div id="quickSiteModal" class="modal">
+    <div class="modal-content" style="max-width: 400px; margin-top: 10%;">
+        <h3 style="color:var(--primary)">➕ Quick Add New Site</h3>
+        <p id="labelForBuilder" style="font-weight:bold; color:var(--accent);"></p>
+        <div class="edit-field">
+            <label>Site Name</label>
+            <input type="text" id="newQuickSiteName" placeholder="Enter Site Name Only">
         </div>
-
-        <div id="editMsg" style="height:35px; margin-bottom:15px;"></div>
-
-        <input type="hidden" id="editId">
-        
-        <div class="edit-grid">
-            <div class="edit-field full-width">
-                <label>Material & Category (Godown Source)</label>
-                <select id="editItem"></select>
-            </div>
-
-            <div class="edit-field">
-                <label>Transaction Date</label>
-                <input type="date" id="editDate">
-            </div>
-            <div class="edit-field">
-                <label>Quantity</label>
-                <input type="number" id="editQty">
-            </div>
-
-            <div class="edit-field">
-                <label>Daily Rate (₹)</label>
-                <input type="number" id="editRate">
-            </div>
-            <div class="edit-field">
-                <label>Service Charges (Load/Unload)</label>
-                <input type="number" id="editCharges">
-            </div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button onclick="saveQuickSite()" style="background:var(--success);">Save Site</button>
+            <button onclick="document.getElementById('quickSiteModal').style.display='none'" style="background:var(--secondary);">Cancel</button>
         </div>
-
-        <div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
+    </div>
+</div>
 </div>
 </body>
 </html>
