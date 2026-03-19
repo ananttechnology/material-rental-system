@@ -248,7 +248,6 @@ app.get('/statement/:builderId', async (req, res) => {
 app.get('/company-stats', async (req, res) => {
     try {
         const now = new Date();
-        // Set range: 1st of current month to Today
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
@@ -261,24 +260,32 @@ app.get('/company-stats', async (req, res) => {
             let builderSum = 0;
 
             for (let s of sites) {
-                // We call your EXISTING function that you said works perfectly
+                // Calling your working logic
                 const result = await calculateSiteBill(s._id, startOfMonth, endOfToday);
-                builderSum += result.subtotal;
+                
+                // Ensure result.subtotal exists and is a number
+                if (result && typeof result.subtotal === 'number') {
+                    builderSum += result.subtotal;
+                }
             }
 
             if (builderSum > 0) {
                 totalMonthlyBilled += builderSum;
-                builderBreakdown.push({ name: b.companyName, amount: Math.round(builderSum) });
+                builderBreakdown.push({ 
+                    name: b.companyName, 
+                    amount: Math.round(builderSum) 
+                });
             }
         }
 
         res.json({
             currentMonthBilled: Math.round(totalMonthlyBilled),
             monthName: now.toLocaleString('default', { month: 'Long' }),
-            builderBreakdown: builderBreakdown
+            builderBreakdown: builderBreakdown // This list is used by openMonthlyModal()
         });
+
     } catch (e) {
-        console.error("Dashboard Error:", e);
+        console.error("Dashboard Stats Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
