@@ -260,10 +260,17 @@ app.get('/company-stats', async (req, res) => {
             let builderSum = 0;
 
             for (let s of sites) {
-                // Using your EXISTING function that works for your invoices
-                const result = await calculateSiteBill(s._id, startOfMonth, endOfToday);
-                if (result && result.subtotal) {
-                    builderSum += result.subtotal;
+                try {
+                    // Call your working billing function
+                    const result = await calculateSiteBill(s._id, startOfMonth, endOfToday);
+                    
+                    if (result && typeof result.subtotal === 'number') {
+                        builderSum += result.subtotal;
+                    }
+                } catch (siteErr) {
+                    // If one site has an issue, log it and move to the next 
+                    // This prevents the 500 Internal Server Error
+                    console.error("Error calculating site:", s._id, siteErr.message);
                 }
             }
 
@@ -276,7 +283,6 @@ app.get('/company-stats', async (req, res) => {
             }
         }
 
-        // Send clean JSON so line 254 in index.html doesn't error out
         res.json({
             currentMonthBilled: Math.round(grandTotal),
             monthName: now.toLocaleString('default', { month: 'Long' }),
@@ -284,8 +290,8 @@ app.get('/company-stats', async (req, res) => {
         });
 
     } catch (e) {
-        console.error("Dashboard Stats Error:", e);
-        res.status(500).json({ error: "Server side calculation error" });
+        console.error("Dashboard Stats Global Error:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 app.get('/all-transactions', async (req, res) => {
