@@ -88,10 +88,9 @@
     <div class="content-area">
         <div id="dashboard" class="page active">
             <div class="dash-grid">
-                <div class="card" onclick="openStockModal('Ankleshwar')"><h3>Ankleshwar Godown</h3><div class="value"><span id="stat-ank">0</span> <i class="fas fa-warehouse"></i></div></div>
-                <div class="card" onclick="openStockModal('Dahej')"><h3>Dahej Godown</h3><div class="value"><span id="stat-dah">0</span> <i class="fas fa-warehouse"></i></div></div>
-                <div class="card" onclick="openMonthlyModal('billed')"><h3>Month Billed</h3><div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-alt"></i></div></div>
-                <div class="card" onclick="openMonthlyModal('out')"><h3>Total Outstanding</h3><div class="value">₹<span id="dash-out">0</span> <i class="fas fa-money-bill-wave"></i></div></div>
+                <div class="card" onclick="openStockModal('Ankleshwar')"><h3>Ankleshwar Godown</h3><div class="value"><span>View Inventory</span> <i class="fas fa-warehouse"></i></div></div>
+                <div class="card" onclick="openStockModal('Dahej')"><h3>Dahej Godown</h3><div class="value"><span>View Inventory</span> <i class="fas fa-warehouse"></i></div></div>
+                <div class="card" onclick="openMonthlyModal()"><h3>Current Month Billed</h3><div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-check"></i></div></div>
             </div>
             <div class="section dispatch-sec">
                 <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
@@ -1197,6 +1196,48 @@ async function recordPayment() {
     } catch (e) {
         document.getElementById('msg8').innerHTML = "❌ Connection Error";
     }
+}
+    // 1. Update MasterSync to stop updating the deleted cards
+async function updateDashboardStats() {
+    try {
+        const res = await fetch(`${API_URL}/company-stats`);
+        const stats = await res.json();
+        // Only update the billed amount for the current month
+        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
+    } catch (e) { console.error("Stat Update Error", e); }
+}
+
+// 2. New Modal for Builder-wise Monthly Billing
+async function openMonthlyModal() {
+    try {
+        // We fetch the breakdown from the server
+        // Note: Ensure your backend has an endpoint for this, or we use a filtered builder list
+        const res = await fetch(`${API_URL}/builders`);
+        const builders = await res.json();
+        
+        let h = `<p style="margin-bottom:15px; color:var(--secondary);">Showing total billing for the <b>current calendar month</b> only.</p>`;
+        h += `<table><tr><th>Builder Name</th><th>Month Bill (₹)</th></tr>`;
+        
+        let grandTotal = 0;
+
+        // Note: For high accuracy, your server.js needs a specific "monthly-breakdown" route.
+        // If not, we fetch company stats which usually holds this.
+        const statRes = await fetch(`${API_URL}/company-stats`);
+        const stats = await statRes.json();
+        
+        // If your server provides 'builderBreakdown', we loop it here:
+        if(stats.builderBreakdown) {
+            stats.builderBreakdown.forEach(b => {
+                h += `<tr><td>${b.name}</td><td><b>₹${b.amount.toLocaleString()}</b></td></tr>`;
+                grandTotal += b.amount;
+            });
+        } else {
+            h += `<tr><td colspan="2" style="text-align:center;">Breakdown data loading...</td></tr>`;
+        }
+
+        h += `<tr style="background:#eee; font-weight:bold;"><td>Total Running Bill</td><td>₹${stats.currentMonthBilled.toLocaleString()}</td></tr>`;
+        openModal("Current Month Billing Breakdown", h + "</table>");
+    } catch (e) { alert("Error loading monthly details"); }
 }
 
 
