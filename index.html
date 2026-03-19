@@ -96,7 +96,7 @@
             <div class="section dispatch-sec">
                 <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
                 <div class="grid"><div class="search-wrapper"><input type="text" id="dBuilderSearch" autocomplete="off" placeholder="🔍 Select or Search Builder..." onclick="toggleDrop('dBuilderList')" onkeyup="filterDrop('dBuilderSearch', 'dBuilderList')"><div id="dBuilderList" class="search-results"></div><input type="hidden" id="dBuilder"> </div><div class="search-wrapper"><div style="display:flex; gap:5px;"><input type="text" id="dSiteSearch" autocomplete="off" placeholder="🔍 Select or Search Site..." onclick="toggleDrop('dSiteList')" onkeyup="filterDrop('dSiteSearch', 'dSiteList')"><button onclick="openQuickSiteModal()" id="quickAddSiteBtn" style="width:45px; padding:0; background:var(--success); display:none;"><i class="fas fa-plus"></i></button></div><div id="dSiteList" class="search-results"></div><input type="hidden" id="dSite"></div></div>
-                <div class="grid"><select id="dItem" onchange="showStock('dItem','stockStatus')"></select><span id="stockStatus" style="font-weight: bold; color: var(--accent);">Available: 0</span></div>
+                <div class="grid"><div class="search-wrapper"><input type="text" id="dItemSearch" autocomplete="off" placeholder="🔍 Search Material (e.g. Plate)..." onclick="toggleDrop('dItemList')" onkeyup="filterDrop('dItemSearch', 'dItemList')"><div id="dItemList" class="search-results"></div><input type="hidden" id="dItem"></div></div>
                 <div class="grid"><input type="number" id="dQty" placeholder="Quantity"><input type="number" id="dRate" placeholder="Daily Rate (₹)"></div>
                 <div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="date" id="dDate"></div>
                 <button onclick="processTxn('dispatch')" style="background: var(--danger);">Confirm Dispatch</button>
@@ -190,13 +190,15 @@
         const invRes = await fetch(`${API_URL}/inventory`);
         fullInventory = await invRes.json();
         
-        // Populate DC Item List (Searchable or Standard)
-        const dItem = document.getElementById('dItem');
-        if(dItem) { 
-            dItem.innerHTML = '<option value="">-- Select Material --</option>'; 
-            fullInventory.filter(i => i.availableStock > 0).forEach(i => {
-                dItem.innerHTML += `<option value="${i._id}">${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]</option>`;
-            });
+        const dItemList = document.getElementById('dItemList');
+        if(dItemList) { 
+            // Filter only items with stock > 0 and create the search list
+            dItemList.innerHTML = fullInventory
+                .filter(i => i.availableStock > 0)
+                .map(i => {
+                    const label = `${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]`;
+                    return `<div onclick="selectItem('${i._id}', '${label}', ${i.availableStock})">${label}</div>`;
+                }).join('');
         }
 
         // 3. UPDATE DASHBOARD STATS
@@ -390,7 +392,10 @@
                 document.getElementById(`dSiteSearch`).value : 
                 document.getElementById(`${p}Site`).selectedOptions[0].text;
 
-            const itemName = document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0];
+            // New logic to handle searchable item name
+            const itemName = type === 'dispatch' ? 
+                document.getElementById(`dItemSearch`).value.split('-')[0] : 
+                document.getElementById(`${p}Item`).selectedOptions[0].text.split('-')[0];
 
             lastTxn = { 
                 ...body, 
@@ -926,6 +931,15 @@ function openQuickSiteModal() {
     // Set the label in the modal so user knows which builder they are adding to
     document.getElementById('labelForBuilder').innerText = "Adding Site for: " + builderName;
     document.getElementById('quickSiteModal').style.display = 'flex';
+}
+function selectItem(id, label, stock) {
+    document.getElementById('dItem').value = id;         // Set hidden ID for DB
+    document.getElementById('dItemSearch').value = label; // Show text in box
+    document.getElementById('dItemList').style.display = 'none'; // Hide list
+    
+    // Update the "Available: X" label if you still use it
+    const stockStatus = document.getElementById('stockStatus');
+    if(stockStatus) stockStatus.innerText = `Available: ${stock}`;
 }
 
 
