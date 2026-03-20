@@ -97,7 +97,7 @@
                 <div class="grid"><div class="search-wrapper"><input type="text" id="dBuilderSearch" autocomplete="off" placeholder="🔍 Select or Search Builder..." onclick="toggleDrop('dBuilderList')" onkeyup="filterDrop('dBuilderSearch', 'dBuilderList')"><div id="dBuilderList" class="search-results"></div><input type="hidden" id="dBuilder"> </div><div class="search-wrapper"><div style="display:flex; gap:5px;"><input type="text" id="dSiteSearch" autocomplete="off" placeholder="🔍 Select or Search Site..." onclick="toggleDrop('dSiteList')" onkeyup="filterDrop('dSiteSearch', 'dSiteList')"><button onclick="openQuickSiteModal()" id="quickAddSiteBtn" style="width:45px; padding:0; background:var(--success); display:none;"><i class="fas fa-plus"></i></button></div><div id="dSiteList" class="search-results"></div><input type="hidden" id="dSite"></div></div>
                 <div class="grid"><div class="search-wrapper"><input type="text" id="dItemSearch" autocomplete="off" placeholder="🔍 Search Material (e.g. Plate)..." onclick="toggleDrop('dItemList')" onkeyup="filterDrop('dItemSearch', 'dItemList')"><div id="dItemList" class="search-results"></div><input type="hidden" id="dItem"></div></div>
                 <div class="grid"><input type="number" id="dQty" placeholder="Quantity"><input type="number" id="dRate" placeholder="Daily Rate (₹)"></div>
-                <div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="date" id="dDate"></div>
+                <div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="number" id="dDeposit" placeholder="Deposit (Advance ₹)" style="border: 1px solid var(--success);"></div><div class="grid"><input type="date" id="dDate"></div>
                 <button onclick="processTxn('dispatch')" style="background: var(--danger);">Confirm Dispatch</button>
                 <div id="msg4" class="msg-area"></div>
                 <button id="btnPrintDC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
@@ -121,7 +121,7 @@
                 <h2><i class="fas fa-cash-register"></i> Payment Tracking</h2>
                 <div class="search-wrapper" style="margin-bottom: 20px;"><input type="text" id="pBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Ledger/Payment..." onclick="toggleDrop('pBuilderList')" onkeyup="filterDrop('pBuilderSearch', 'pBuilderList')"><div id="pBuilderList" class="search-results"></div><input type="hidden" id="pBuilder"></div>
                 <div class="grid"><input type="number" id="pAmount" placeholder="Amount Paid (₹)"><select id="pMode"><option value="Cash">Cash</option><option value="Online">Online / G-Pay</option><option value="Cheque">Cheque</option><option value="Bank">Bank Transfer</option></select></div>
-                <div class="grid"><input type="text" id="pRef" placeholder="Ref No."><input type="date" id="pDate"></div><button onclick="recordPayment()" style="background: #e83e8c;">Confirm Payment Receipt</button><div id="msg8" class="msg-area"></div><div id="ledgerDisplay"></div>
+                <div class="grid"><input type="text" id="pRef" placeholder="Ref No."><input type="date" id="pDate"></div><button onclick="recordPayment()" style="background: #e83e8c;">Confirm Payment Receipt</button><button onclick="settleAll()" style="background: var(--primary); margin-top: 10px; border: 2px solid #e83e8c;"><i class="fas fa-handshake"></i> Settle All Outstanding</button><div id="msg8" class="msg-area"></div><div id="ledgerDisplay"></div>
             </div>
         </div>
         <div id="builder" class="page"><div class="form-container"><h2>New Builder</h2><div class="search-wrapper" style="margin-bottom: 15px;"><input type="text" id="compName" autocomplete="off" placeholder="Type Builder Name..." onclick="toggleDrop('bNameList')" onkeyup="filterDrop('compName', 'bNameList')"><div id="bNameList" class="search-results"></div></div><input type="text" id="bMobile" placeholder="Mobile"><input type="text" id="bGst" placeholder="GST"><textarea id="bAddr" placeholder="Address"></textarea><button onclick="saveBuilder()">Save Builder</button><div id="msg1"></div></div></div>
@@ -375,7 +375,7 @@
 }
 
     async function processTxn(type) {
-    const btn = event.target; // Gets the button you clicked
+    const btn = event.target; 
     const p = type === 'dispatch' ? 'd' : 'r';
     const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
     
@@ -387,13 +387,13 @@
         date: document.getElementById(`${p}Date`).value, 
         rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, 
         loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
-        unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 
+        unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0,
+        // NEW: Deposit only for dispatch
+        deposit: type === 'dispatch' ? Number(document.getElementById(`dDeposit`).value) : 0 
     };
 
-    // 1. Check if fields are empty BEFORE sending
     if (!validate(body, msgId)) return;
 
-    // 2. Disable button to prevent multiple clicks
     btn.disabled = true;
     btn.innerHTML = "Processing...";
 
@@ -407,18 +407,17 @@
         const result = await res.json();
 
         if(res.ok) {
-            // 1. Get names for the receipt (Handles Searchable vs Standard)
             const builderName = type === 'dispatch' ? 
                 document.getElementById(`dBuilderSearch`).value : 
-                document.getElementById(`rBuilderSearch`).value; // Updated for RC Search
+                document.getElementById(`rBuilderSearch`).value;
 
             const siteName = type === 'dispatch' ? 
                 document.getElementById(`dSiteSearch`).value : 
-                document.getElementById(`rSiteSearch`).value; // Updated for RC Search
+                document.getElementById(`rSiteSearch`).value;
 
             const itemName = type === 'dispatch' ? 
                 document.getElementById(`dItemSearch`).value.split('-')[0] : 
-                document.getElementById(`rItemSearch`).value.split('-')[0]; // Updated for RC Search
+                document.getElementById(`rItemSearch`).value.split('-')[0];
 
             lastTxn = { 
                 ...body, 
@@ -432,22 +431,20 @@
             document.getElementById(msgId).style.color = "green";
             document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; 
             
-            // 2. Clear common fields
             document.getElementById(`${p}Qty`).value = "";
             document.getElementById(`${p}Date`).value = "";
 
-            // 3. Clear Specific Section Fields
             if(type === 'dispatch') {
                 document.getElementById(`dRate`).value = "";
                 document.getElementById(`dLoading`).value = "";
+                document.getElementById(`dDeposit`).value = ""; // NEW: Clear deposit
                 document.getElementById(`dBuilderSearch`).value = "";
                 document.getElementById(`dSiteSearch`).value = "";
-                document.getElementById(`dItemSearch`).value = ""; // Added
+                document.getElementById(`dItemSearch`).value = "";
                 document.getElementById(`dBuilder`).value = "";
                 document.getElementById(`dSite`).value = "";
-                document.getElementById(`dItem`).value = ""; // Added
+                document.getElementById(`dItem`).value = "";
             } else {
-                // THIS IS THE ELSE BLOCK FOR RETURNS (RC)
                 document.getElementById(`rUnloading`).value = "";
                 document.getElementById(`rBuilderSearch`).value = "";
                 document.getElementById(`rSiteSearch`).value = "";
@@ -455,7 +452,7 @@
                 document.getElementById(`rBuilder`).value = "";
                 document.getElementById(`rSite`).value = "";
                 document.getElementById(`rItem`).value = "";
-                document.getElementById(`rItemList`).innerHTML = ""; // Clear the results list
+                document.getElementById(`rItemList`).innerHTML = "";
             }
             
             await masterSync(); 
@@ -466,12 +463,11 @@
     } catch (e) {
         document.getElementById(msgId).innerHTML = "❌ Connection Error";
     } finally {
-        // Re-enable button
         btn.disabled = false;
         btn.innerHTML = type === 'dispatch' ? "Confirm Dispatch" : "Confirm Return";
     }
 }
-
+    
     function openStockModal(godown) {
         const items = fullInventory.filter(i => i.godown === godown && i.availableStock > 0);
         let h = `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
@@ -487,30 +483,81 @@
     }
 
     async function loadLedger() {
-        const bId = document.getElementById('pBuilder').value;
-        if (!bId) {
-        document.getElementById('ledgerDisplay').innerHTML = ""; // Clear if no builder
+    const bId = document.getElementById('pBuilder').value;
+    if (!bId) {
+        document.getElementById('ledgerDisplay').innerHTML = ""; 
         return;
-        }
-        const res = await fetch(`${API_URL}/statement/${bId}`);
-        const data = await res.json();
-        
-        let h = `<h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
-        data.payments.forEach(p => {
-            h += `<tr><td>${formatDate(p.date)}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`;
-        });
-        h += `</table>`;
-        
-        // RESTORING ALL THREE VALUES: BILLED, RECEIVED (PAID), AND OUTSTANDING
-        h += `<div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;">
-              <p>Total Billed Amount: ₹${data.totalBilled.toLocaleString()}</p>
-              <p>Total Received Payment: ₹${data.totalPaid.toLocaleString()}</p>
-              <hr style="border:0.5px solid rgba(255,255,255,0.2)">
-              <h3 style="margin:0;">Total Outstanding: ₹${data.outstanding.toLocaleString()}</h3>
-              </div>`;
-              
-        document.getElementById('ledgerDisplay').innerHTML = h;
     }
+    const res = await fetch(`${API_URL}/statement/${bId}`);
+    const data = await res.json();
+    
+    // NEW: Month-wise Billing Table
+    let h = `<h4 style="margin-top:20px; color:var(--primary);">Monthly Billing (Rental)</h4>`;
+    h += `<table style="width:100%; margin-bottom:20px;">
+            <tr style="background:#f2f2f2;"><th>Month</th><th>Billed Amount</th></tr>`;
+    data.monthlyBilled.forEach(m => {
+        h += `<tr><td>${m.month}</td><td>₹${m.amount.toLocaleString()}</td></tr>`;
+    });
+    h += `</table>`;
+
+    // UPDATED: Payment History with Reference Column
+    h += `<h4>Payment History</h4><table style="width:100%">
+            <tr><th>Date</th><th>Mode</th><th>Ref No.</th><th>Amount</th></tr>`;
+    data.payments.forEach(p => {
+        h += `<tr>
+                <td>${formatDate(p.date)}</td>
+                <td>${p.paymentMode}</td>
+                <td>${p.referenceNo || '-'}</td>
+                <td>₹${p.amountPaid.toLocaleString()}</td>
+              </tr>`;
+    });
+    h += `</table>`;
+    
+    h += `<div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;">
+          <p>Total Billed Amount: ₹${data.totalBilled.toLocaleString()}</p>
+          <p>Total Received Payment: ₹${data.totalPaid.toLocaleString()}</p>
+          <hr style="border:0.5px solid rgba(255,255,255,0.2)">
+          <h3 style="margin:0;">Total Outstanding: ₹${data.outstanding.toLocaleString()}</h3>
+          </div>`;
+          
+    document.getElementById('ledgerDisplay').innerHTML = h;
+    // Save current balance for the Settle All function
+    window.currentOutstanding = data.outstanding; 
+}
+    async function settleAll() {
+    const bId = document.getElementById('pBuilder').value;
+    if (!bId || !window.currentOutstanding || window.currentOutstanding <= 0) {
+        alert("No outstanding balance to settle.");
+        return;
+    }
+
+    // Ask for Payment Mode
+    const isCash = confirm(`Total Outstanding: ₹${window.currentOutstanding}\n\nClick [OK] for CASH Payment\nClick [CANCEL] for BANK Transfer`);
+    const mode = isCash ? "Cash" : "Bank";
+
+    if (confirm(`Confirm Settle All for ₹${window.currentOutstanding} via ${mode}?`)) {
+        const body = { 
+            builderId: bId, 
+            amountPaid: window.currentOutstanding, 
+            paymentMode: mode, 
+            referenceNo: "Full Settlement", 
+            date: new Date().toISOString().split('T')[0] 
+        };
+
+        try {
+            const res = await fetch(`${API_URL}/add-payment`, { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(body) 
+            });
+            if (res.ok) {
+                alert("✅ Ledger Settled Successfully");
+                loadLedger();
+                masterSync();
+            }
+        } catch (e) { alert("Error during settlement"); }
+    }
+}
 
     async function loadSites(bId, sId) {
     const builderId = document.getElementById(bId).value;
