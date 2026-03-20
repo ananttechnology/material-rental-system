@@ -89,52 +89,6 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     }
     return { bill, service, subtotal: bill.reduce((s, i) => s + i.total, 0) };
 }
-app.get('/company-stats', async (req, res) => {
-    try {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-        // We fetch the collections directly to ensure we have data
-        const builders = await mongoose.model('Builder').find({});
-        let grandTotal = 0;
-        let breakdown = [];
-
-        for (let b of builders) {
-            const sites = await mongoose.model('Site').find({ builderId: b._id });
-            let builderSum = 0;
-
-            for (let s of sites) {
-                try {
-                    // Using 'global' check to find your function anywhere in the file
-                    const billingFn = typeof calculateSiteBill === 'function' ? calculateSiteBill : null;
-                    
-                    if (billingFn) {
-                        const result = await billingFn(s._id, startOfMonth, endOfToday);
-                        if (result && result.subtotal) {
-                            builderSum += result.subtotal;
-                        }
-                    }
-                } catch (err) {
-                    console.log("Skipping site due to data error");
-                }
-            }
-            if (builderSum > 0) {
-                grandTotal += builderSum;
-                breakdown.push({ name: b.companyName, amount: Math.round(builderSum) });
-            }
-        }
-
-        res.json({
-            currentMonthBilled: Math.round(grandTotal),
-            monthName: now.toLocaleString('default', { month: 'Long' }),
-            builderBreakdown: breakdown
-        });
-    } catch (e) {
-        console.error("DASHBOARD CRASH:", e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
 
 // --- ROUTES ---
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
@@ -291,6 +245,18 @@ app.get('/statement/:builderId', async (req, res) => {
     res.json({ totalBilled, totalPaid, outstanding: totalBilled - totalPaid, payments });
 });
 
+app.get('/company-stats', async (req, res) => {
+    const builders = await Builder.find();
+    let billed = 0, out = 0;
+    for (let b of builders) {
+        const sites = await Site.find({ builderId: b._id });
+        const payments = await Payment.find({ builderId: b._id });
+        let bBilled = 0;
+        for (let s of sites) { const res = await calculateSiteBill(s._id); bBilled += (res.subtotal + res.service); }
+        billed += bBilled; out += (bBilled - payments.reduce((sum, p) => sum + p.amountPaid, 0));
+    }
+    res.json({ currentMonthBilled: billed, totalOutstanding: out });
+});
 app.get('/all-transactions', async (req, res) => {
     try {
         const txns = await Transaction.find().sort({ date: -1 }); // Newest first
@@ -367,7 +333,5 @@ app.put('/edit-transaction/:id', async (req, res) => {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
-});
-// --- MOVE THIS TO THE VERY BOTTOM OF SERVER.JS ---
-
+}); 
 app.listen(5000);
