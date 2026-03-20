@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-
 const app = express();
 // FINAL CORS FIX: Explicitly allow your GitHub domain
 app.use(cors({
@@ -20,7 +19,7 @@ const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: Str
 const Site = mongoose.model('Site', new mongoose.Schema({ builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' }, siteName: String, siteAddress: String }));
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({ itemName: String, category: String, godown: String, totalStock: Number, availableStock: Number }));
 const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, itemId: mongoose.Schema.Types.ObjectId, godown: String, quantity: Number, rate: { type: Number, default: 0 }, loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
-const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: String, date: { type: Date, default: Date.now } }));
+const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: { type: String, default: "" }, date: { type: Date, default: Date.now } }));
 
 // --- BILLING ENGINE LOGIC ---
 async function calculateSiteBill(siteId, startDate = null, endDate = null) {
@@ -116,13 +115,28 @@ app.post('/transfer-stock', async (req, res) => {
     await src.save(); await dst.save(); res.json({ message: "Success" });
 });
 
+// 1. Modified Dispatch to handle Deposit
 app.post('/dispatch', async (req, res) => {
     const item = await Inventory.findById(req.body.itemId);
     if (!item || item.availableStock < req.body.quantity) return res.status(400).json({message: "No Stock"});
-    item.availableStock -= Number(req.body.quantity); await item.save();
+    
+    item.availableStock -= Number(req.body.quantity); 
+    await item.save();
+    
     const count = await Transaction.countDocuments({ type: 'DC' });
-    const challan = await new Transaction({ ...req.body, type: 'DC', challanNo: `DC-${1001 + count}`, godown: item.godown }).save();
-    res.json(challan);
+    const challan = await new Transaction({ ...req.body, type: 'DC', challanNo: DC-${1001 + count}, godown: item.godown }).save();
+
+    // AUTO-DEPOSIT LOGIC
+        if (req.body.deposit && Number(req.body.deposit) > 0) {
+            await new Payment({
+                builderId: req.body.builderId,
+                amountPaid: Number(req.body.deposit),
+                paymentMode: 'Cash',
+                referenceNo: 'Deposit',
+                date: req.body.date || new Date()
+                }).save();
+        }
+        res.json(challan);
 });
 
 app.post('/return', async (req, res) => {
@@ -236,13 +250,51 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
     }
 });
 app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(); res.send("OK"); });
+// 2. Modified Statement for Month-wise calculation
 app.get('/statement/:builderId', async (req, res) => {
-    const sites = await Site.find({ builderId: req.params.builderId });
-    const payments = await Payment.find({ builderId: req.params.builderId });
+    const bId = req.params.builderId;
+    const sites = await Site.find({ builderId: bId });
+    const payments = await Payment.find({ builderId: bId }).sort({ date: 1 });
+    
+    // Find the first ever dispatch date for this builder
+    const firstTxn = await Transaction.findOne({ builderId: bId }).sort({ date: 1 });
+    
+    let monthlyBilled = [];
     let totalBilled = 0;
-    for (let s of sites) { const res = await calculateSiteBill(s._id); totalBilled += (res.subtotal + res.service); }
+
+    if (firstTxn) {
+        let current = new Date(firstTxn.date);
+        current.setDate(1); // Start of the first month
+        const today = new Date();
+
+        while (current <= today) {
+            const mStart = new Date(current.getFullYear(), current.getMonth(), 1);
+            const mEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+            const calcEnd = mEnd > today ? today : mEnd;
+
+            let monthTotal = 0;
+            for (let s of sites) {
+                const result = await calculateSiteBill(s._id, mStart, calcEnd);
+                monthTotal += (result.subtotal + result.service);
+            }
+
+            monthlyBilled.push({
+                month: current.toLocaleString('default', { month: 'long', year: 'numeric' }),
+                amount: monthTotal
+            });
+            totalBilled += monthTotal;
+            current.setMonth(current.getMonth() + 1);
+        }
+    }
+
     const totalPaid = payments.reduce((sum, p) => sum + p.amountPaid, 0);
-    res.json({ totalBilled, totalPaid, outstanding: totalBilled - totalPaid, payments });
+    res.json({ 
+        monthlyBilled, 
+        totalBilled, 
+        totalPaid, 
+        outstanding: totalBilled - totalPaid, 
+        payments 
+    });
 });
 
 app.get('/company-stats', async (req, res) => {
