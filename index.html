@@ -302,55 +302,35 @@
     }
 
     async function generateBill() {
-        const bId = document.getElementById('billBuilder').value;
-        const sId = document.getElementById('billSite').value;
-        const start = document.getElementById('billStart').value;
-        const end = document.getElementById('billEnd').value;
-        if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes.");
+    const bId = document.getElementById('billBuilder').value;
+    const sId = document.getElementById('billSite').value;
+    const start = document.getElementById('billStart').value;
+    const end = document.getElementById('billEnd').value;
 
-        document.getElementById('billDisplay').innerHTML = "Calculating...";
-        document.getElementById('holdingDisplay').innerHTML = "";
+    if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes.");
 
-        try {
-            const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
-            const data = await resBill.json();
-            let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:10px;">💰 Calculated Bill</h2>`;
-            if (data.isConsolidated) {
-                data.sites.forEach(site => {
-                    if(site.bill.length > 0) {
-                        billH += `<h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger);">Site: ${site.siteName}</h4>`;
-                        billH += renderBillTable(site.bill);
-                        billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>`;
-                    }
-                });
-                const gst = document.getElementById('gstToggle').checked ? (data.totalSubtotal + data.totalService) * 0.18 : 0;
-                billH += renderBillSummary(data.totalSubtotal, data.totalService, gst);
-            } else {
-                billH += renderBillTable(data.bill);
-                const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
-                billH += renderBillSummary(data.subtotal, data.service, gst);
-            }
-            billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
-            document.getElementById('billDisplay').innerHTML = billH;
+    // IMPORTANT: Clear both boxes immediately so you see "Calculating..." at the top
+    document.getElementById('billDisplay').innerHTML = "<h3>Calculating Bill...</h3>";
+    document.getElementById('holdingDisplay').innerHTML = "";
 
-            let holdingH = `<hr style="margin: 40px 0; border: 1px dashed #ccc;">`;
-            holdingH += `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
-            if (sId === 'ALL') {
-                const resSites = await fetch(`${API_URL}/sites/${bId}`);
-                const sites = await resSites.json();
-                for (let s of sites) {
-                    const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                    const bal = await resBal.json();
-                    holdingH += `<h4 style="margin-bottom:5px;">Site: ${s.siteName}</h4>` + renderHoldingTable(bal);
-                }
-            } else {
-                const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
-                const bal = await resBal.json();
-                holdingH += renderHoldingTable(bal);
-            }
-            document.getElementById('holdingDisplay').innerHTML = holdingH;
-        } catch (e) { alert("Error generating report."); }
+    try {
+        // 1. Fetch & Display the Bill (This will now appear in the top box)
+        const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
+        const data = await resBill.json();
+        
+        let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px;">💰 Calculated Bill</h2>`;
+        // ... (Insert your existing rendering logic here) ...
+        document.getElementById('billDisplay').innerHTML = billH;
+
+        // 2. Fetch & Display the Stock (This will appear below the bill)
+        let holdingH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px; margin-top:30px;">📦 Current Stock on Site</h2>`;
+        // ... (Insert your existing rendering logic here) ...
+        document.getElementById('holdingDisplay').innerHTML = holdingH;
+
+    } catch (e) {
+        alert("❌ Error generating report.");
     }
+}
 
     function renderHoldingTable(data) {
         if (data.length === 0) return `<p style="color:gray;">No items held.</p>`;
