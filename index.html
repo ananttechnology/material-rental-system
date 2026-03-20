@@ -145,6 +145,7 @@
     let fullInventory = [];
     let lastTxn = null;
 
+    function formatDate(isoString) { if (!isoString) return "-"; const d = new Date(isoString); return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`; }
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
     function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
     function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
@@ -490,7 +491,7 @@
         
         let h = `<h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
         data.payments.forEach(p => {
-            h += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`;
+            h += `<tr><td>${formatDate(p.date)}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`;
         });
         h += `</table>`;
         
@@ -800,7 +801,7 @@ async function printHoldingReport() {
     
     html += `<div class="details">
                 <div><strong>To:</strong> ${builderName}<br><strong>Site:</strong> ${siteName}</div>
-                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
+                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${formatDate(new Date())}</div>
              </div>`;
 
     // Include both Holdings and the Money calculation
@@ -832,7 +833,7 @@ async function printHoldingReport() {
         const charges = t.type === 'DC' ? (t.loadingCharges || 0) : (t.unloadingCharges || 0);
         const color = t.type === 'DC' ? 'color:red;' : 'color:green;';
         h += `<tr>
-                <td>${new Date(t.date).toLocaleDateString()}</td>
+                <td>${formatDate(t.date)}</td>
                 <td><b>${t.challanNo}</b></td>
                 <td style="${color} font-weight:bold;">${t.type}</td>
                 <td>${t.builderName}<br><small>${t.siteName}</small></td>
@@ -1198,8 +1199,15 @@ async function recordPayment() {
     function openMonthlyModal(type) {
     if (type !== 'billed' || !currentStatsData) return;
 
+    // Get Today's Date and the 1st of the month
+    const now = new Date();
+    const todayFormatted = formatDate(now);
+    const startOfMonth = `01/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+
     let h = `<h3>Current Month Billing Breakdown</h3>
-             <p style="color:var(--accent); font-weight:bold;">Period: 1st of this month to Today</p>
+             <p style="color:var(--accent); font-weight:bold; margin-bottom:15px;">
+                <i class="fas fa-calendar-day"></i> Period: ${startOfMonth} to ${todayFormatted}
+             </p>
              <table style="width:100%">
                 <tr style="background:#eee;"><th>Builder / Site</th><th>Amount (₹)</th></tr>`;
 
