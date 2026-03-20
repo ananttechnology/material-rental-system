@@ -148,7 +148,7 @@
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
     function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
     function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
-    function closeModal() { document.getElementById('dataModal').style.display = 'none'; documnet.body.style.overflow = 'auto'; }
+    function closeModal() { document.getElementById('dataModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
 
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
