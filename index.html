@@ -139,6 +139,7 @@
 <script>
     const API_URL = 'https://material-backend-trial.onrender.com';
     // Global arrays to hold data for searching
+    let currentStatsData = null;
     let allBuilders = [];
     let allSites = [];
     let fullInventory = [];
@@ -223,6 +224,7 @@
         // 3. UPDATE DASHBOARD STATS
         const statRes = await fetch(`${API_URL}/company-stats`);
         const stats = await statRes.json();
+        currentStatsData = stats; // Store it for the modal click
         document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
         
     } catch (e) { console.error("Sync Error:", e); }
@@ -1192,6 +1194,40 @@ async function recordPayment() {
     } catch (e) {
         document.getElementById('msg8').innerHTML = "❌ Connection Error";
     }
+}
+    function openMonthlyModal(type) {
+    if (type !== 'billed' || !currentStatsData) return;
+
+    let h = `<h3>Current Month Billing Breakdown</h3>
+             <p style="color:var(--accent); font-weight:bold;">Period: 1st of this month to Today</p>
+             <table style="width:100%">
+                <tr style="background:#eee;"><th>Builder / Site</th><th>Amount (₹)</th></tr>`;
+
+    currentStatsData.breakdown.forEach(b => {
+        // Only show builders that actually have billing this month
+        if (b.builderTotal > 0) {
+            h += `<tr style="background:#f9f9f9; font-weight:bold;">
+                    <td>🏢 ${b.builderName}</td>
+                    <td>₹${b.builderTotal.toLocaleString()}</td>
+                  </tr>`;
+            
+            b.sites.forEach(s => {
+                if (s.amount > 0) {
+                    h += `<tr>
+                            <td style="padding-left:30px; font-size:0.85rem;">📍 ${s.siteName}</td>
+                            <td style="font-size:0.85rem;">₹${s.amount.toLocaleString()}</td>
+                          </tr>`;
+                }
+            });
+        }
+    });
+
+    h += `<tr style="background:var(--primary); color:white; font-weight:bold;">
+            <td>GRAND TOTAL</td>
+            <td>₹${currentStatsData.currentMonthBilled.toLocaleString()}</td>
+          </tr></table>`;
+
+    openModal("Current Month Billing", h);
 }
 
 
