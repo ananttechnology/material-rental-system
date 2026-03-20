@@ -91,7 +91,6 @@
                 <div class="card" onclick="openStockModal('Ankleshwar')"><h3>Ankleshwar Godown</h3><div class="value"><i class="fas fa-warehouse"></i></div></div>
                 <div class="card" onclick="openStockModal('Dahej')"><h3>Dahej Godown</h3><div class="value"><i class="fas fa-warehouse"></i></div></div>
                 <div class="card" onclick="openMonthlyModal('billed')"><h3>Month Billed</h3><div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-alt"></i></div></div>
-                <div class="card" onclick="openMonthlyModal('out')"><h3>Total Outstanding</h3><div class="value">₹<span id="dash-out">0</span> <i class="fas fa-money-bill-wave"></i></div></div>
             </div>
             <div class="section dispatch-sec">
                 <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
@@ -225,7 +224,6 @@
         const statRes = await fetch(`${API_URL}/company-stats`);
         const stats = await statRes.json();
         document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
-        document.getElementById('dash-out').innerText = stats.totalOutstanding.toLocaleString();
         
     } catch (e) { console.error("Sync Error:", e); }
 }
