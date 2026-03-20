@@ -138,7 +138,6 @@
 
 <script>
     const API_URL = 'https://material-backend-trial.onrender.com';
-    // Global arrays to hold data for searching
     let currentStatsData = null;
     let allBuilders = [];
     let allSites = [];
@@ -147,9 +146,9 @@
 
     function formatDate(isoString) { if (!isoString) return "-"; const d = new Date(isoString); return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`; }
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
-    function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
+    function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById('page-title').innerText = id.charAt(0).toUpperCase() + id.slice(1); }
     function openModal(title, content) { document.getElementById('modalTitle').innerText = title; document.getElementById('modalBody').innerHTML = content; document.getElementById('dataModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
-    function closeModal() { document.getElementById('dataModal').style.display = 'none'; documnet.body.style.overflow = 'auto'; }
+    function closeModal() { document.getElementById('dataModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
 
     function validate(fields, msgId) {
         const msg = document.getElementById(msgId);
@@ -158,320 +157,107 @@
     }
 
     async function masterSync() {
-    try {
-        // 1. FETCH BUILDERS
-        const res = await fetch(`${API_URL}/builders`);
-        const builders = await res.json();
-        allBuilders = builders; // Save to global variable for searching
+        try {
+            const res = await fetch(`${API_URL}/builders`);
+            const builders = await res.json();
+            allBuilders = builders;
 
-        // Populate the New Searchable DC Builder List
-        const dBuilderList = document.getElementById('dBuilderList');
-        if (dBuilderList) {
-            dBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const rBuilderList = document.getElementById('rBuilderList');
-        if (rBuilderList) {
-            rBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectReturnBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const repBuilderList = document.getElementById('repBuilderList');
-        if (repBuilderList) {
-            repBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectRepBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const billBuilderList = document.getElementById('billBuilderList');
-        if (billBuilderList) {
-            billBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectBillBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const pBuilderList = document.getElementById('pBuilderList');
-        if (pBuilderList) {
-            pBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectPayBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        // Add this inside masterSync() where other lists are updated
-        const bNameList = document.getElementById('bNameList');
-        if (bNameList) {
-            bNameList.innerHTML = builders.map(b => 
-                `<div onclick="selectExistingBuilder('${b.companyName}')">${b.companyName} (Existing)</div>`
-            ).join('');
-        }
+            const dropdowns = ['dBuilderList', 'rBuilderList', 'repBuilderList', 'billBuilderList', 'pBuilderList'];
+            dropdowns.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = builders.map(b => {
+                        if (id === 'dBuilderList') return `<div onclick="selectBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`;
+                        if (id === 'rBuilderList') return `<div onclick="selectReturnBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`;
+                        if (id === 'repBuilderList') return `<div onclick="selectRepBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`;
+                        if (id === 'billBuilderList') return `<div onclick="selectBillBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`;
+                        if (id === 'pBuilderList') return `<div onclick="selectPayBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`;
+                    }).join('');
+                }
+            });
 
-        // Keep standard dropdowns working for other sections (Billing, Payments, etc.)
-        ['builderSelect', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
-            const s = document.getElementById(id);
-            if(s) { 
-                const cur = s.value; 
-                s.innerHTML = '<option value="">-- Select Builder --</option>'; 
-                builders.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); 
-                s.value = cur; 
+            const bNameList = document.getElementById('bNameList');
+            if (bNameList) {
+                bNameList.innerHTML = builders.map(b => `<div onclick="selectExistingBuilder('${b.companyName}')">${b.companyName} (Existing)</div>`).join('');
             }
-        });
 
-        // 2. FETCH INVENTORY
-        const invRes = await fetch(`${API_URL}/inventory`);
-        fullInventory = await invRes.json();
-        
-        const dItemList = document.getElementById('dItemList');
-        if(dItemList) { 
-            // Filter only items with stock > 0 and create the search list
-            dItemList.innerHTML = fullInventory
-                .filter(i => i.availableStock > 0)
-                .map(i => {
+            const invRes = await fetch(`${API_URL}/inventory`);
+            fullInventory = await invRes.json();
+            const dItemList = document.getElementById('dItemList');
+            if (dItemList) {
+                dItemList.innerHTML = fullInventory.filter(i => i.availableStock > 0).map(i => {
                     const label = `${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]`;
                     return `<div onclick="selectItem('${i._id}', '${label}', ${i.availableStock})">${label}</div>`;
                 }).join('');
-        }
-
-        // 3. UPDATE DASHBOARD STATS
-        const statRes = await fetch(`${API_URL}/company-stats`);
-        const stats = await statRes.json();
-        currentStatsData = stats; // Store it for the modal click
-        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
-        
-    } catch (e) { console.error("Sync Error:", e); }
-}
-    async function saveBuilder() {
-        const body = { 
-            companyName: document.getElementById('compName').value, 
-            mobile: document.getElementById('bMobile').value, 
-            gstNumber: document.getElementById('bGst').value, 
-            address: document.getElementById('bAddr').value 
-        };
-        
-        if (!validate(body, 'msg1')) return;
-
-        try {
-            const res = await fetch(`${API_URL}/add-builder`, { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify(body) 
-            });
-
-            if (res.ok) {
-                document.getElementById('msg1').style.color = "green";
-                document.getElementById('msg1').innerHTML = "✅ Builder Saved Successfully"; 
-                // Clear boxes
-                document.getElementById('compName').value = "";
-                document.getElementById('bMobile').value = "";
-                document.getElementById('bGst').value = "";
-                document.getElementById('bAddr').value = "";
-                
-                await masterSync(); // Refresh dropdowns immediately
-            } else {
-                document.getElementById('msg1').style.color = "red";
-                document.getElementById('msg1').innerHTML = "❌ Server rejected the data.";
             }
-        } catch (e) {
-            document.getElementById('msg1').style.color = "red";
-            document.getElementById('msg1').innerHTML = "❌ Connection Error: Cannot reach server.";
-        }
+
+            const statRes = await fetch(`${API_URL}/company-stats`);
+            const stats = await statRes.json();
+            currentStatsData = stats;
+            document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
+        } catch (e) { console.error("Sync Error:", e); }
     }
+
+    async function saveBuilder() {
+        const body = { companyName: document.getElementById('compName').value, mobile: document.getElementById('bMobile').value, gstNumber: document.getElementById('bGst').value, address: document.getElementById('bAddr').value };
+        if (!validate(body, 'msg1')) return;
+        try {
+            const res = await fetch(`${API_URL}/add-builder`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            if (res.ok) {
+                document.getElementById('msg1').style.color = "green"; document.getElementById('msg1').innerHTML = "✅ Builder Saved";
+                ['compName', 'bMobile', 'bGst', 'bAddr'].forEach(id => document.getElementById(id).value = "");
+                masterSync();
+            }
+        } catch (e) { alert("Error saving builder"); }
+    }
+
     async function saveSite() {
-    const body = { 
-        builderId: document.getElementById('builderSelect').value, 
-        sName: document.getElementById('sName').value, 
-        sAddr: document.getElementById('sAddr').value 
-    };
-
-    // The backend expects 'siteName' and 'siteAddress' based on your Schema
-    // So we map the HTML values to the correct keys
-    const payload = {
-        builderId: body.builderId,
-        siteName: body.sName,
-        siteAddress: body.sAddr
-    };
-
-    if (!validate(payload, 'msg2')) return;
-
-    try {
-        const res = await fetch(`${API_URL}/add-site`, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(payload) 
-        });
-
-        if (res.ok) {
-            document.getElementById('msg2').style.color = "green";
-            document.getElementById('msg2').innerHTML = "✅ Site Linked Successfully";
-            
-            // Clear the boxes
-            document.getElementById('sName').value = "";
-            document.getElementById('sAddr').value = "";
-            
-            masterSync(); // Refresh data
-        } else {
-            document.getElementById('msg2').style.color = "red";
-            document.getElementById('msg2').innerHTML = "❌ Server rejected site data";
-        }
-    } catch (e) {
-        document.getElementById('msg2').innerHTML = "❌ Connection Error";
+        const payload = { builderId: document.getElementById('builderSelect').value, siteName: document.getElementById('sName').value, siteAddress: document.getElementById('sAddr').value };
+        if (!validate(payload, 'msg2')) return;
+        try {
+            const res = await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            if (res.ok) {
+                document.getElementById('msg2').style.color = "green"; document.getElementById('msg2').innerHTML = "✅ Site Linked";
+                ['sName', 'sAddr'].forEach(id => document.getElementById(id).value = "");
+                masterSync();
+            }
+        } catch (e) { alert("Error saving site"); }
     }
-}
 
     async function saveItem() {
-    const body = { 
-        itemName: document.getElementById('itemName').value, 
-        category: document.getElementById('category').value, 
-        godown: document.getElementById('iGodown').value, 
-        totalStock: Number(document.getElementById('qty').value) 
-    };
-    if (!validate(body, 'msg3')) return;
-    
-    const res = await fetch(`${API_URL}/add-item`, { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify(body) 
-    });
-
-    if (res.ok) {
-        document.getElementById('msg3').innerHTML = "✅ Updated";
-        
-        // --- RESET FIELDS ---
-        document.getElementById('qty').value = "";
-        document.getElementById('itemName').value = "";
-        document.getElementById('category').innerHTML = '<option value="">-- Select Type --</option>';
-        
-        masterSync();
+        const body = { itemName: document.getElementById('itemName').value, category: document.getElementById('category').value, godown: document.getElementById('iGodown').value, totalStock: Number(document.getElementById('qty').value) };
+        if (!validate(body, 'msg3')) return;
+        const res = await fetch(`${API_URL}/add-item`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        if (res.ok) { document.getElementById('msg3').innerHTML = "✅ Updated"; document.getElementById('qty').value = ""; masterSync(); }
     }
-}
 
     async function transferStock() {
-    const body = { 
-        itemName: document.getElementById('tItemName').value, 
-        category: document.getElementById('tCategory').value, 
-        fromGodown: document.getElementById('tFrom').value, 
-        toGodown: document.getElementById('tTo').value, 
-        quantity: Number(document.getElementById('tQty').value) 
-    };
-    if (!validate(body, 'msg9')) return;
-    
-    const res = await fetch(`${API_URL}/transfer-stock`, { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify(body) 
-    });
-
-    if(res.ok) { 
-        document.getElementById('msg9').innerHTML = "✅ Transferred";
-        
-        // --- RESET FIELDS ---
-        document.getElementById('tQty').value = "";
-        document.getElementById('tItemName').value = "";
-        document.getElementById('tCategory').innerHTML = '<option value="">-- Select Type --</option>';
-        document.getElementById('tFrom').value = "";
-        document.getElementById('tTo').value = "";
-        
-        masterSync(); 
-    } else { 
-        const r = await res.json(); 
-        alert(r.message); 
+        const body = { itemName: document.getElementById('tItemName').value, category: document.getElementById('tCategory').value, fromGodown: document.getElementById('tFrom').value, toGodown: document.getElementById('tTo').value, quantity: Number(document.getElementById('tQty').value) };
+        if (!validate(body, 'msg9')) return;
+        const res = await fetch(`${API_URL}/transfer-stock`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        if (res.ok) { document.getElementById('msg9').innerHTML = "✅ Transferred"; document.getElementById('tQty').value = ""; masterSync(); }
     }
-}
 
     async function processTxn(type) {
-    const btn = event.target; // Gets the button you clicked
-    const p = type === 'dispatch' ? 'd' : 'r';
-    const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
-    
-    const body = { 
-        builderId: document.getElementById(`${p}Builder`).value, 
-        siteId: document.getElementById(`${p}Site`).value, 
-        itemId: document.getElementById(`${p}Item`).value, 
-        quantity: Number(document.getElementById(`${p}Qty`).value), 
-        date: document.getElementById(`${p}Date`).value, 
-        rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, 
-        loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
-        unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 
-    };
-
-    // 1. Check if fields are empty BEFORE sending
-    if (!validate(body, msgId)) return;
-
-    // 2. Disable button to prevent multiple clicks
-    btn.disabled = true;
-    btn.innerHTML = "Processing...";
-
-    try {
-        const res = await fetch(`${API_URL}/${type}`, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(body) 
-        });
-        
-        const result = await res.json();
-
-        if(res.ok) {
-            // 1. Get names for the receipt (Handles Searchable vs Standard)
-            const builderName = type === 'dispatch' ? 
-                document.getElementById(`dBuilderSearch`).value : 
-                document.getElementById(`rBuilderSearch`).value; // Updated for RC Search
-
-            const siteName = type === 'dispatch' ? 
-                document.getElementById(`dSiteSearch`).value : 
-                document.getElementById(`rSiteSearch`).value; // Updated for RC Search
-
-            const itemName = type === 'dispatch' ? 
-                document.getElementById(`dItemSearch`).value.split('-')[0] : 
-                document.getElementById(`rItemSearch`).value.split('-')[0]; // Updated for RC Search
-
-            lastTxn = { 
-                ...body, 
-                challanNo: result.challanNo, 
-                builder: builderName, 
-                site: siteName, 
-                item: itemName 
-            };
-            
-            document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
-            document.getElementById(msgId).style.color = "green";
-            document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; 
-            
-            // 2. Clear common fields
-            document.getElementById(`${p}Qty`).value = "";
-            document.getElementById(`${p}Date`).value = "";
-
-            // 3. Clear Specific Section Fields
-            if(type === 'dispatch') {
-                document.getElementById(`dRate`).value = "";
-                document.getElementById(`dLoading`).value = "";
-                document.getElementById(`dBuilderSearch`).value = "";
-                document.getElementById(`dSiteSearch`).value = "";
-                document.getElementById(`dItemSearch`).value = ""; // Added
-                document.getElementById(`dBuilder`).value = "";
-                document.getElementById(`dSite`).value = "";
-                document.getElementById(`dItem`).value = ""; // Added
-            } else {
-                // THIS IS THE ELSE BLOCK FOR RETURNS (RC)
-                document.getElementById(`rUnloading`).value = "";
-                document.getElementById(`rBuilderSearch`).value = "";
-                document.getElementById(`rSiteSearch`).value = "";
-                document.getElementById(`rItemSearch`).value = "";
-                document.getElementById(`rBuilder`).value = "";
-                document.getElementById(`rSite`).value = "";
-                document.getElementById(`rItem`).value = "";
-                document.getElementById(`rItemList`).innerHTML = ""; // Clear the results list
-            }
-            
-            await masterSync(); 
-        } else {
-            document.getElementById(msgId).style.color = "red";
-            document.getElementById(msgId).innerHTML = "❌ " + (result.message || "Error occurred");
-        }
-    } catch (e) {
-        document.getElementById(msgId).innerHTML = "❌ Connection Error";
-    } finally {
-        // Re-enable button
-        btn.disabled = false;
-        btn.innerHTML = type === 'dispatch' ? "Confirm Dispatch" : "Confirm Return";
+        const btn = event.target; const p = type === 'dispatch' ? 'd' : 'r'; const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
+        const body = { builderId: document.getElementById(`${p}Builder`).value, siteId: document.getElementById(`${p}Site`).value, itemId: document.getElementById(`${p}Item`).value, quantity: Number(document.getElementById(`${p}Qty`).value), date: document.getElementById(`${p}Date`).value, rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0 };
+        if (!validate(body, msgId)) return;
+        btn.disabled = true; btn.innerHTML = "Processing...";
+        try {
+            const res = await fetch(`${API_URL}/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            const result = await res.json();
+            if (res.ok) {
+                const bName = document.getElementById(`${p}BuilderSearch`).value; const sName = document.getElementById(`${p}SiteSearch`).value; const iName = document.getElementById(`${p}ItemSearch`).value.split('-')[0];
+                lastTxn = { ...body, challanNo: result.challanNo, builder: bName, site: sName, item: iName };
+                document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
+                document.getElementById(msgId).style.color = "green"; document.getElementById(msgId).innerHTML = "✅ " + result.challanNo;
+                ['Qty', 'Date'].forEach(suffix => document.getElementById(`${p}${suffix}`).value = "");
+                if (type === 'dispatch') { ['dRate', 'dLoading', 'dBuilderSearch', 'dSiteSearch', 'dItemSearch', 'dBuilder', 'dSite', 'dItem'].forEach(id => document.getElementById(id).value = ""); }
+                else { ['rUnloading', 'rBuilderSearch', 'rSiteSearch', 'rItemSearch', 'rBuilder', 'rSite', 'rItem'].forEach(id => document.getElementById(id).value = ""); document.getElementById('rItemList').innerHTML = ""; }
+                masterSync();
+            } else { document.getElementById(msgId).style.color = "red"; document.getElementById(msgId).innerHTML = "❌ " + result.message; }
+        } catch (e) { alert("Connection Error"); } finally { btn.disabled = false; btn.innerHTML = type === 'dispatch' ? "Confirm Dispatch" : "Confirm Return"; }
     }
-}
 
     function openStockModal(godown) {
         const items = fullInventory.filter(i => i.godown === godown && i.availableStock > 0);
@@ -483,136 +269,29 @@
     async function recordPayment() {
         const body = { builderId: document.getElementById('pBuilder').value, amountPaid: Number(document.getElementById('pAmount').value), paymentMode: document.getElementById('pMode').value, referenceNo: document.getElementById('pRef').value, date: document.getElementById('pDate').value };
         if (!validate(body, 'msg8')) return;
-        await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        document.getElementById('msg8').innerHTML = "✅ Recorded"; loadLedger(); masterSync();
+        try {
+            const res = await fetch(`${API_URL}/add-payment`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            if (res.ok) {
+                document.getElementById('msg8').style.color = "green"; document.getElementById('msg8').innerHTML = "✅ Recorded";
+                ['pAmount', 'pRef', 'pDate', 'pBuilderSearch', 'pBuilder'].forEach(id => document.getElementById(id).value = "");
+                document.getElementById('pMode').selectedIndex = 0;
+                loadLedger(); masterSync();
+            }
+        } catch (e) { alert("Error recording payment"); }
     }
 
     async function loadLedger() {
         const bId = document.getElementById('pBuilder').value;
-        if (!bId) {
-        document.getElementById('ledgerDisplay').innerHTML = ""; // Clear if no builder
-        return;
-        }
+        if (!bId) { document.getElementById('ledgerDisplay').innerHTML = ""; return; }
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
-        
         let h = `<h4>Payment History</h4><table style="width:100%"><tr><th>Date</th><th>Mode</th><th>Amount</th></tr>`;
-        data.payments.forEach(p => {
-            h += `<tr><td>${formatDate(p.date)}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`;
-        });
-        h += `</table>`;
-        
-        // RESTORING ALL THREE VALUES: BILLED, RECEIVED (PAID), AND OUTSTANDING
-        h += `<div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;">
-              <p>Total Billed Amount: ₹${data.totalBilled.toLocaleString()}</p>
-              <p>Total Received Payment: ₹${data.totalPaid.toLocaleString()}</p>
-              <hr style="border:0.5px solid rgba(255,255,255,0.2)">
-              <h3 style="margin:0;">Total Outstanding: ₹${data.outstanding.toLocaleString()}</h3>
-              </div>`;
-              
+        data.payments.forEach(p => { h += `<tr><td>${formatDate(p.date)}</td><td>${p.paymentMode}</td><td>₹${p.amountPaid}</td></tr>`; });
+        h += `</table><div style="background:#2c3e50; color:white; padding:15px; margin-top:10px; border-radius:8px;">
+              <p>Total Billed: ₹${data.totalBilled.toLocaleString()}</p><p>Total Received: ₹${data.totalPaid.toLocaleString()}</p>
+              <hr><h3 style="margin:0;">Outstanding: ₹${data.outstanding.toLocaleString()}</h3></div>`;
         document.getElementById('ledgerDisplay').innerHTML = h;
     }
-
-    async function loadSites(bId, sId) {
-    const builderId = document.getElementById(bId).value;
-    if(!builderId) return;
-    const res = await fetch(`${API_URL}/sites/${builderId}`);
-    const data = await res.json();
-    const s = document.getElementById(sId);
-    s.innerHTML = '<option value="">-- Select Site --</option>';
-    
-    // If we are in the Billing section, add the "ALL" option
-    if (sId === 'billSite') {
-        s.innerHTML += `<option value="ALL">-- ALL SITES (Total Bill) --</option>`;
-    }
-    
-    data.forEach(x => s.innerHTML += `<option value="${x._id}">${x.siteName}</option>`);
-}
-
-    async function loadReturnItems() {
-        const siteId = document.getElementById('rSite').value; if(!siteId) return;
-        const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-        const data = await res.json();
-        const r = document.getElementById('rItem');
-        r.innerHTML = '<option value="">-- Items on Site --</option>';
-        data.forEach(i => r.innerHTML += `<option value="${i.itemId}">${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]</option>`);
-    }
-
-    // 1. Select Builder in Report Section
-async function selectRepBuilder(id, name) {
-    document.getElementById('repBuilder').value = id;
-    document.getElementById('repBuilderSearch').value = name;
-    document.getElementById('repBuilderList').style.display = 'none';
-    
-    // Reset Site boxes
-    document.getElementById('repSite').value = "";
-    document.getElementById('repSiteSearch').value = "";
-
-    const res = await fetch(`${API_URL}/sites/${id}`);
-    const sites = await res.json();
-    const siteListDiv = document.getElementById('repSiteList');
-
-    // Manually add the "ALL SITES" option at the top of the list
-    let listHtml = `<div onclick="selectRepSite('ALL', '-- ALL SITES (Total Holding) --')" style="font-weight:bold; color:var(--accent);">-- ALL SITES (Total Holding) --</div>`;
-    
-    // Add the rest of the individual sites
-    listHtml += sites.map(s => 
-        `<div onclick="selectRepSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
-    ).join('');
-
-    siteListDiv.innerHTML = listHtml;
-}
-
-// 2. Select Site in Report Section
-function selectRepSite(id, name) {
-    document.getElementById('repSite').value = id;
-    document.getElementById('repSiteSearch').value = name;
-    document.getElementById('repSiteList').style.display = 'none';
-}
-
-// 3. Updated Report Modal Function with Auto-Reset
-async function openSiteReportModal() {
-    const builderId = document.getElementById('repBuilder').value;
-    const siteId = document.getElementById('repSite').value; 
-    
-    if (!builderId || !siteId) return alert("Please select both Builder and Site!");
-
-    let h = ""; // Start empty to build sections
-
-    try {
-        if (siteId === "ALL") {
-            const resSites = await fetch(`${API_URL}/sites/${builderId}`);
-            const sites = await resSites.json();
-            
-            for (let s of sites) {
-                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                const bal = await resBal.json();
-                
-                // Add a Header for each site
-                h += `<h3 style="background:#f4f7f6; padding:10px; border-left:4px solid var(--accent); margin-top:20px;">📍 Site: ${s.siteName}</h3>`;
-                
-                if (bal.length === 0) {
-                    h += `<p style="padding-left:15px; color:gray; font-style:italic;">No items currently held at this site.</p>`;
-                } else {
-                    h += `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-                    bal.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
-                    h += `</table>`;
-                }
-            }
-        } else {
-            // Standard Single Site Report
-            const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-            const data = await res.json();
-            h += `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-            data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
-            h += `</table>`;
-        }
-
-        openModal(siteId === "ALL" ? "Consolidated Site-wise Report" : "Site Holdings", h);
-    } catch (e) { alert("Error generating report"); }
-}
-
-    function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
 
     function updateCategories(pref = '') {
         const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'] };
@@ -622,646 +301,220 @@ async function openSiteReportModal() {
         (list[val] || ['N/A']).forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
     }
 
-    function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
+    async function generateBill() {
+        const bId = document.getElementById('billBuilder').value;
+        const sId = document.getElementById('billSite').value;
+        const start = document.getElementById('billStart').value;
+        const end = document.getElementById('billEnd').value;
+        if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes.");
 
-   
-async function generateBill() {
-    const bId = document.getElementById('billBuilder').value;
-    const sId = document.getElementById('billSite').value;
-    const start = document.getElementById('billStart').value;
-    const end = document.getElementById('billEnd').value;
+        document.getElementById('billDisplay').innerHTML = "Calculating...";
+        document.getElementById('holdingDisplay').innerHTML = "";
 
-    if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes.");
-
-    // Clear previous data immediately so it doesn't flicker
-    document.getElementById('billDisplay').innerHTML = "Calculating...";
-    document.getElementById('holdingDisplay').innerHTML = "";
-
-    try {
-        // 1. Calculate the Money (Bill)
-        const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
-        const data = await resBill.json();
-        
-        let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px;">💰 Calculated Bill</h2>`;
-        
-        if (data.isConsolidated) {
-            data.sites.forEach(site => {
-                if(site.bill.length > 0) {
-                    billH += `<h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger);">Site: ${site.siteName}</h4>`;
-                    billH += renderBillTable(site.bill);
-                    billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>`;
-                }
-            });
-            const gst = document.getElementById('gstToggle').checked ? (data.totalSubtotal + data.totalService) * 0.18 : 0;
-            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst);
-        } else {
-            billH += renderBillTable(data.bill);
-            const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
-            billH += renderBillSummary(data.subtotal, data.service, gst);
-        }
-        
-        billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px;">🖨️ Print Invoice</button>`;
-        document.getElementById('billDisplay').innerHTML = billH;
-
-        // 2. Calculate the Stock (Holdings)
-        let holdingH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px; margin-top:30px;">📦 Current Stock on Site</h2>`;
-        
-        if (sId === 'ALL') {
-            const resSites = await fetch(`${API_URL}/sites/${bId}`);
-            const sites = await resSites.json();
-            for (let s of sites) {
-                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                const bal = await resBal.json();
-                holdingH += `<h4 style="margin-bottom:5px;">Site: ${s.siteName}</h4>` + renderHoldingTable(bal);
+        try {
+            const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
+            const data = await resBill.json();
+            let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:10px;">💰 Calculated Bill</h2>`;
+            if (data.isConsolidated) {
+                data.sites.forEach(site => {
+                    if(site.bill.length > 0) {
+                        billH += `<h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger);">Site: ${site.siteName}</h4>`;
+                        billH += renderBillTable(site.bill);
+                        billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>`;
+                    }
+                });
+                const gst = document.getElementById('gstToggle').checked ? (data.totalSubtotal + data.totalService) * 0.18 : 0;
+                billH += renderBillSummary(data.totalSubtotal, data.totalService, gst);
+            } else {
+                billH += renderBillTable(data.bill);
+                const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
+                billH += renderBillSummary(data.subtotal, data.service, gst);
             }
-        } else {
-            const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
-            const bal = await resBal.json();
-            holdingH += renderHoldingTable(bal);
-        }
+            billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
+            document.getElementById('billDisplay').innerHTML = billH;
 
-        document.getElementById('holdingDisplay').innerHTML = holdingH;
-
-    } catch (e) {
-        console.error(e);
-        alert("❌ Error generating report.");
+            let holdingH = `<hr style="margin: 40px 0; border: 1px dashed #ccc;">`;
+            holdingH += `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
+            if (sId === 'ALL') {
+                const resSites = await fetch(`${API_URL}/sites/${bId}`);
+                const sites = await resSites.json();
+                for (let s of sites) {
+                    const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
+                    const bal = await resBal.json();
+                    holdingH += `<h4 style="margin-bottom:5px;">Site: ${s.siteName}</h4>` + renderHoldingTable(bal);
+                }
+            } else {
+                const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
+                const bal = await resBal.json();
+                holdingH += renderHoldingTable(bal);
+            }
+            document.getElementById('holdingDisplay').innerHTML = holdingH;
+        } catch (e) { alert("Error generating report."); }
     }
-}
-    // Helper: Render the Holding Table
+
     function renderHoldingTable(data) {
-    if (data.length === 0) return `<p style="color:gray; font-style:italic;">No items currently held on this site.</p>`;
-    let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
-             <tr style="background:#eee;"><th>Item</th><th>Type</th><th>Qty on Site</th></tr>`;
-    data.forEach(i => { t += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`; });
-    return t + `</table>`;
+        if (data.length === 0) return `<p style="color:gray;">No items held.</p>`;
+        let t = `<table><tr style="background:#eee;"><th>Item</th><th>Type</th><th>Qty</th></tr>`;
+        data.forEach(i => { t += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`; });
+        return t + `</table>`;
     }
 
-    // Helper: Render the Bill Table
-    function renderBillTable(billItems) {
-    if (billItems.length === 0) return `<p style="color:gray;">No rental activity found for this period.</p>`;
-    let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-             <tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
-    billItems.forEach(i => { 
-    // Split the duration (e.g., "2026-03-01 to 2026-03-20") and format each part
-    const dates = i.duration.split(' to ');
-    const formattedDuration = `${formatDate(dates[0])} to ${formatDate(dates[1])}`;
-    t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${formattedDuration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; });
-    return t + `</table>`;
+    function renderBillTable(items) {
+        if (items.length === 0) return `<p style="color:gray;">No activity.</p>`;
+        let t = `<table><tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
+        items.forEach(i => { 
+            const dates = i.duration.split(' to ');
+            t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${formatDate(dates[0])} to ${formatDate(dates[1])}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; 
+        });
+        return t + `</table>`;
     }
 
-    // Helper: Render the Summary
     function renderBillSummary(sub, ser, gst) {
-    return `<div style="text-align:right; margin-top:15px; border-top:2px solid #333; padding-top:10px;">
-          <p>Rent Subtotal: ₹${sub.toLocaleString()}</p>
-          <p>Service Charges: ₹${ser.toLocaleString()}</p>
-          <p>GST (18%): ₹${gst.toLocaleString()}</p>
-          <h3 style="color:var(--danger);">Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
+        return `<div style="text-align:right; margin-top:15px; border-top:2px solid #333; padding-top:10px;">
+              <p>Subtotal: ₹${sub.toLocaleString()}</p><p>Service: ₹${ser.toLocaleString()}</p><p>GST (18%): ₹${gst.toLocaleString()}</p>
+              <h3 style="color:var(--danger);">Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
     }
-    
-async function printHoldingReport() {
-    const builderId = document.getElementById('repBuilder').value;
-    const siteId = document.getElementById('repSite').value;
-    const builderName = document.getElementById('repBuilderSearch').value;
-    const siteName = document.getElementById('repSiteSearch').value;
-    
-    if (!builderId || !siteId) return alert("Please select Builder and Site before printing!");
-
-    try {
-        let contentHtml = "";
-        if (siteId === "ALL") {
-            const resSites = await fetch(`${API_URL}/sites/${builderId}`);
-            const sites = await resSites.json();
-            for (let s of sites) {
-                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                const bal = await resBal.json();
-                
-                contentHtml += `<h3 style="margin-top:25px; border-bottom:1px solid #333;">Site: ${s.siteName}</h3>`;
-                if (bal.length === 0) {
-                    contentHtml += `<p>No items held.</p>`;
-                } else {
-                    contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Qty</th></tr>`;
-                    bal.forEach(i => {
-                        contentHtml += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
-                    });
-                    contentHtml += `</table>`;
-                }
-            }
-        } else {
-            const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-            const data = await res.json();
-            contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Qty</th></tr>`;
-            data.forEach(i => {
-                contentHtml += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
-            });
-            contentHtml += `</table>`;
-        }
-
-        const win = window.open('', '', 'height=700,width=900');
-        win.document.write(`<html><head><title>Holding Report</title>
-            <style>
-                body{font-family:sans-serif; padding:20px;}
-                table{width:100%; border-collapse:collapse; margin-bottom:10px;}
-                th,td{border:1px solid #000; padding:8px; text-align:left; font-size:13px;}
-                th{background:#f2f2f2;}
-                h1{text-align:center; font-size:22px;}
-                h3{color:#2c3e50;}
-            </style></head><body>
-            <h1>STOCK HOLDING REPORT (SITE-WISE)</h1>
-            <p><b>Builder:</b> ${builderName}</p>
-            <p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p>
-            ${contentHtml}
-            <p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`);
-        win.document.close();
-        win.print();
-
-        // RESET BOXES
-        document.getElementById('repBuilderSearch').value = "";
-        document.getElementById('repSiteSearch').value = "";
-        document.getElementById('repBuilder').value = "";
-        document.getElementById('repSite').value = "";
-
-    } catch (e) { alert("Print Error: " + e.message); }
-}
 
     function printInvoice() {
-    // 1. Get the data currently visible on your screen
-    const builderName = document.getElementById('billBuilderSearch').value;
-    const siteName = document.getElementById('billSiteSearch').value;
-    const start = document.getElementById('billStart').value;
-    const end = document.getElementById('billEnd').value;
-    
-    const holdingContent = document.getElementById('holdingDisplay').innerHTML;
-    const billContent = document.getElementById('billDisplay').innerHTML;
-
-    // 2. Open a clean window for the printer
-    const win = window.open('', '', 'height=900,width=1000');
-    
-    let html = `<html><head><title>Invoice - ${builderName}</title>`;
-    html += `<style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 30px; color: #333; }
-        .header { text-align: center; border-bottom: 3px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
-        .details { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
-        th { background: #f2f2f2; }
-        h2 { font-size: 1.2rem; margin-top: 30px; color: #2c3e50; border-bottom: 1px solid #eee; }
-        h4 { background: #f9f9f9; padding: 5px; margin-bottom: 5px; border-left: 3px solid #3498db; }
-        button { display: none; } /* Hide the print button on paper */
-        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
-    </style></head><body>`;
-
-    // Header logic
-    html += `<div class="header"><h1>CJ CONSTRUCTION</h1><p>Material Rental & ERP Management</p></div>`;
-    
-    html += `<div class="details">
-                <div><strong>To:</strong> ${builderName}<br><strong>Site:</strong> ${siteName}</div>
-                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${formatDate(new Date())}</div>
-             </div>`;
-
-    // Include both Holdings and the Money calculation
-    html += `<div>${billContent}</div>`; // Bill first on paper
-    html += `<div style="margin-top:30px;">${holdingContent}</div>`; // Stock second
-
-    // Signatory Area
-    html += `<div class="footer">
-                <div><p>Receiver's Signature</p></div>
-                <div style="text-align:right;"><p>_______________________<br>Authorized Signatory</p></div>
-             </div>`;
-
-    html += `</body></html>`;
-
-    win.document.write(html);
-    win.document.close();
-    
-    // Slight delay to ensure images/styles load before print dialog opens
-    setTimeout(() => {
-        win.print();
-    }, 500);
+        const bName = document.getElementById('billBuilderSearch').value;
+        const sName = document.getElementById('billSiteSearch').value;
+        const start = document.getElementById('billStart').value;
+        const end = document.getElementById('billEnd').value;
+        const hCont = document.getElementById('holdingDisplay').innerHTML;
+        const bCont = document.getElementById('billDisplay').innerHTML;
+        const win = window.open('', '', 'height=900,width=1000');
+        let html = `<html><head><style>body{font-family:sans-serif;padding:30px;} .header{text-align:center;border-bottom:3px solid #2c3e50;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:8px;font-size:12px;} button{display:none;}</style></head><body>`;
+        html += `<div class="header"><h1>CJ CONSTRUCTION</h1><p>Material Rental Invoice</p></div>`;
+        html += `<p><b>To:</b> ${bName} | <b>Site:</b> ${sName} | <b>Period:</b> ${start} to ${end}</p>`;
+        html += `<div>${bCont}</div><div style="margin-top:40px;">${hCont}</div></body></html>`;
+        win.document.write(html); win.document.close();
+        setTimeout(() => win.print(), 500);
     }
 
     async function loadHistory() {
-    const res = await fetch(`${API_URL}/all-transactions`);
-    const data = await res.json();
-    let h = `<table id="histTable"><tr><th>Date</th><th>Challan</th><th>Type</th><th>Builder / Site</th><th>Item</th><th>Qty</th><th>Rate</th><th>Charges</th></tr>`;
-    data.forEach(t => {
-        const charges = t.type === 'DC' ? (t.loadingCharges || 0) : (t.unloadingCharges || 0);
-        const color = t.type === 'DC' ? 'color:red;' : 'color:green;';
-        h += `<tr>
-                <td>${formatDate(t.date)}</td>
-                <td><b>${t.challanNo}</b></td>
-                <td style="${color} font-weight:bold;">${t.type}</td>
-                <td>${t.builderName}<br><small>${t.siteName}</small></td>
-                <td>${t.itemName}</td>
-                <td>${t.quantity}</td>
-                <td>₹${t.rate || 0}</td>
-                <td>₹${charges}</td>
-                <td><button onclick="openEditModal('${t._id}')" style="background:var(--accent); padding:5px;">✏️ Edit</button></td>
-              </tr>`;
-        // Inside loadHistory() loop:
-    
-    });
-    document.getElementById('historyDisplay').innerHTML = h + `</table>`;
+        const res = await fetch(`${API_URL}/all-transactions`);
+        const data = await res.json();
+        let h = `<table id="histTable"><tr><th>Date</th><th>Challan</th><th>Type</th><th>Builder / Site</th><th>Item</th><th>Qty</th><th>Rate</th><th>Charges</th><th>Action</th></tr>`;
+        data.forEach(t => {
+            const charges = t.type === 'DC' ? (t.loadingCharges || 0) : (t.unloadingCharges || 0);
+            const color = t.type === 'DC' ? 'color:red;' : 'color:green;';
+            h += `<tr><td>${formatDate(t.date)}</td><td><b>${t.challanNo}</b></td><td style="${color} font-weight:bold;">${t.type}</td>
+                <td>${t.builderName}<br><small>${t.siteName}</small></td><td>${t.itemName}</td><td>${t.quantity}</td><td>₹${t.rate || 0}</td><td>₹${charges}</td>
+                <td><button onclick="openEditModal('${t._id}')" style="background:var(--accent); padding:5px;">✏️ Edit</button></td></tr>`;
+        });
+        document.getElementById('historyDisplay').innerHTML = h + `</table>`;
     }
 
     function filterHistory() {
-    const val = document.getElementById('histSearch').value.toUpperCase();
-    const rows = document.querySelectorAll('#histTable tr:not(:first-child)');
-    rows.forEach(row => {
-        row.style.display = row.innerText.toUpperCase().includes(val) ? '' : 'none';
-    });
+        const val = document.getElementById('histSearch').value.toUpperCase();
+        const rows = document.querySelectorAll('#histTable tr:not(:first-child)');
+        rows.forEach(row => { row.style.display = row.innerText.toUpperCase().includes(val) ? '' : 'none'; });
     }
 
-    function printHistory() {
-    const content = document.getElementById('historyDisplay').innerHTML;
-    const win = window.open('', '', 'height=700,width=1000');
-    win.document.write(`<html><head><title>Txn History</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:8px;font-size:12px;}</style></head><body>`);
-    win.document.write(`<h2 style="text-align:center;">Transaction History Log</h2>${content}</body></html>`);
-    win.document.close();
-    win.print();
-    }
-    
-    window.onload = () => {
-        masterSync();
-        const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
-        ['itemName', 'tItemName'].forEach(id => { const el = document.getElementById(id); if(el) { el.innerHTML = '<option value="">-- Select Item --</option>'; items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`); } });
-    };
-    // 1. Function to open the modal and fill it with EXISTING data
-async function openEditModal(txnId) {
-    try {
-        const res = await fetch(`${API_URL}/all-transactions`);
-        const data = await res.json();
-        const txn = data.find(t => t._id === txnId);
-        if (!txn) return alert("Not found");
-
-        // Clear previous success messages
-        const msgDiv = document.getElementById('editMsg');
-        if(msgDiv) msgDiv.innerText = "";
-
-        document.getElementById('editId').value = txn._id;
-        document.getElementById('editDate').value = txn.date.split('T')[0];
-        document.getElementById('editQty').value = txn.quantity;
-        document.getElementById('editRate').value = txn.rate;
-        document.getElementById('saveEditBtn').setAttribute('data-type', txn.type);
-        document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
-
-        // Fetch latest inventory for the dropdown
-        const invRes = await fetch(`${API_URL}/inventory`);
-        const items = await invRes.json();
-        const itemSelect = document.getElementById('editItem');
-        
-        // REFRESH DROPDOWN: Clear duplicates and show current stock
-        itemSelect.innerHTML = items.map(i => 
-            `<option value="${i._id}" ${i._id === txn.itemId ? 'selected' : ''}>
-                ${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]
-            </option>`
-        ).join('');
-
-        document.getElementById('editModal').style.display = 'flex';
-    } catch (e) { alert("Error loading data"); }
-}
-
-// 2. Function to SAVE the edited data
-async function saveEdit() {
-    const id = document.getElementById('editId').value;
-    const type = document.getElementById('saveEditBtn').getAttribute('data-type');
-    
-    const updateData = {
-        date: document.getElementById('editDate').value,
-        itemId: document.getElementById('editItem').value,
-        quantity: parseFloat(document.getElementById('editQty').value),
-        rate: parseFloat(document.getElementById('editRate').value),
-        [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: parseFloat(document.getElementById('editCharges').value)
-    };
-
-    try {
-        const res = await fetch(`${API_URL}/edit-transaction/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
-        const result = await res.json();
-
-        if (res.ok) {
-            // Show message at top of popup
-            const msgDiv = document.getElementById('editMsg');
-            msgDiv.style.color = "green";
-            msgDiv.innerText = "✅ Saved Successfully!";
-
-            // Reset Boxes after 1 second and refresh
-            setTimeout(async () => {
-                document.getElementById('editQty').value = "";
-                document.getElementById('editRate').value = "";
-                document.getElementById('editCharges').value = "";
-                closeEditModal();
-                await loadHistory();
-                await masterSync();
-            }, 1200);
-        } else {
-        // This will now show "Insufficient Stock! MS Plate 3x24 only has 25 available."
-        const msgDiv = document.getElementById('editMsg');
-        msgDiv.style.background = "#fff3f3";
-        msgDiv.style.border = "1px solid var(--danger)";
-        msgDiv.style.color = "var(--danger)";
-        msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
-    }
-    } catch (e) { alert("Server Error"); }
-    }
-    //To Close Editing Popup
-    function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-    }
-    
-
-// 1. Show/Hide dropdown
-function toggleDrop(id) {
-    // Hide all other dropdowns first
-    document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none');
-    document.getElementById(id).style.display = 'block';
-}
-
-// 2. Filter list as user types (Case Insensitive)
-function filterDrop(inputId, listId) {
-    const input = document.getElementById(inputId).value.toUpperCase();
-    const div = document.getElementById(listId);
-    const items = div.getElementsByTagName('div');
-    const selectedBuilder = document.getElementById('dBuilder').value;
-    
-    div.style.display = 'block';
-
-    for (let i = 0; i < items.length; i++) {
-        const txtValue = items[i].textContent || items[i].innerText;
-        items[i].style.display = (txtValue.toUpperCase().indexOf(input) > -1) ? "" : "none";
-    }
-    
-    // Show + button if searching in Sites AND a Builder is already selected
-    if(listId === 'dSiteList') {
-        const plusBtn = document.getElementById('quickAddSiteBtn');
-        // Show button if builder is selected, even if input is empty
-        plusBtn.style.display = (selectedBuilder) ? 'block' : 'none';
-    }
-}
-
-// 3. Close dropdowns if user clicks outside
-window.onclick = function(event) {
-    if (!event.target.matches('input')) {
-        document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none');
-    }
-}
-// Function to handle Builder Selection
-async function selectBuilder(id, name) {
-    document.getElementById('dBuilder').value = id;
-    document.getElementById('dBuilderSearch').value = name;
-    document.getElementById('dBuilderList').style.display = 'none';
-    
-    document.getElementById('dSite').value = "";
-    document.getElementById('dSiteSearch').value = "";
-    
-    // Show the + button now that a builder is selected
-    document.getElementById('quickAddSiteBtn').style.display = 'block';
-
-    const res = await fetch(`${API_URL}/sites/${id}`);
-    const sites = await res.json();
-    allSites = sites;
-
-    const siteListDiv = document.getElementById('dSiteList');
-    siteListDiv.innerHTML = sites.map(s => 
-        `<div onclick="selectSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
-    ).join('');
-}
-
-// Function to handle Site Selection
-function selectSite(id, name) {
-    document.getElementById('dSite').value = id;
-    document.getElementById('dSiteSearch').value = name;
-    document.getElementById('dSiteList').style.display = 'none';
-    document.getElementById('quickAddSiteBtn').style.display = 'none';
-}
-async function saveQuickSite() {
-    const builderId = document.getElementById('dBuilder').value;
-    const siteName = document.getElementById('newQuickSiteName').value;
-
-    if (!builderId) return alert("Please select a Builder first!");
-    if (!siteName) return alert("Please enter a site name!");
-
-    const payload = { builderId, siteName, siteAddress: "Quick Added" };
-
-    try {
-        const res = await fetch(`${API_URL}/add-site`, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(payload) 
-        });
-
-        if (res.ok) {
-            // Re-fetch sites to get the new ID from server
-            const siteRes = await fetch(`${API_URL}/sites/${builderId}`);
-            const sites = await siteRes.json();
-            const newSite = sites.find(s => s.siteName === siteName);
-
-            if (newSite) {
-                selectSite(newSite._id, newSite.siteName); // Auto-select the new site
-            }
-            
-            document.getElementById('quickSiteModal').style.display = 'none';
-            document.getElementById('newQuickSiteName').value = "";
-            alert("✅ Site Added and Selected!");
-        }
-    } catch (e) { alert("Error saving site"); }
-}
-function openQuickSiteModal() {
-    const builderId = document.getElementById('dBuilder').value;
-    const builderName = document.getElementById('dBuilderSearch').value;
-
-    if (!builderId) {
-        alert("⚠️ Stop! Please select a Builder first before adding a site.");
-        return;
+    async function openEditModal(txnId) {
+        try {
+            const res = await fetch(`${API_URL}/all-transactions`);
+            const data = await res.json();
+            const txn = data.find(t => t._id === txnId);
+            if (!txn) return;
+            document.getElementById('editId').value = txn._id;
+            document.getElementById('editDate').value = txn.date.split('T')[0];
+            document.getElementById('editQty').value = txn.quantity;
+            document.getElementById('editRate').value = txn.rate;
+            document.getElementById('saveEditBtn').setAttribute('data-type', txn.type);
+            document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
+            const invRes = await fetch(`${API_URL}/inventory`);
+            const items = await invRes.json();
+            document.getElementById('editItem').innerHTML = items.map(i => `<option value="${i._id}" ${i._id === txn.itemId ? 'selected' : ''}>${i.itemName} (${i.category}) - ${i.godown}</option>`).join('');
+            document.getElementById('editModal').style.display = 'flex';
+        } catch (e) { alert("Error loading txn"); }
     }
 
-    // Set the label in the modal so user knows which builder they are adding to
-    document.getElementById('labelForBuilder').innerText = "Adding Site for: " + builderName;
-    document.getElementById('quickSiteModal').style.display = 'flex';
-}
-function selectItem(id, label, stock) {
-    document.getElementById('dItem').value = id;         // Set hidden ID for DB
-    document.getElementById('dItemSearch').value = label; // Show text in box
-    document.getElementById('dItemList').style.display = 'none'; // Hide list
-    
-    // Update the "Available: X" label if you still use it
-    const stockStatus = document.getElementById('stockStatus');
-    if(stockStatus) stockStatus.innerText = `Available: ${stock}`;
-}
-// 1. Select Builder in Return Section
-async function selectReturnBuilder(id, name) {
-    document.getElementById('rBuilder').value = id;
-    document.getElementById('rBuilderSearch').value = name;
-    document.getElementById('rBuilderList').style.display = 'none';
-    
-    // Reset Site and Item boxes
-    document.getElementById('rSite').value = "";
-    document.getElementById('rSiteSearch').value = "";
-    document.getElementById('rItem').value = "";
-    document.getElementById('rItemSearch').value = "";
-
-    const res = await fetch(`${API_URL}/sites/${id}`);
-    const sites = await res.json();
-    const siteListDiv = document.getElementById('rSiteList');
-    siteListDiv.innerHTML = sites.map(s => 
-        `<div onclick="selectReturnSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
-    ).join('');
-}
-
-// 2. Select Site and Load ONLY its holdings
-async function selectReturnSite(id, name) {
-    document.getElementById('rSite').value = id;
-    document.getElementById('rSiteSearch').value = name;
-    document.getElementById('rSiteList').style.display = 'none';
-
-    // Fetch site balance (Holdings)
-    const res = await fetch(`${API_URL}/site-balance/${id}`);
-    const data = await res.json();
-    
-    const rItemList = document.getElementById('rItemList');
-    rItemList.innerHTML = data.map(i => {
-        const label = `${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]`;
-        return `<div onclick="selectReturnItem('${i.itemId}', '${label}')">${label}</div>`;
-    }).join('');
-}
-
-// 3. Select the Item to return
-function selectReturnItem(id, label) {
-    document.getElementById('rItem').value = id;
-    document.getElementById('rItemSearch').value = label;
-    document.getElementById('rItemList').style.display = 'none';
-}
-    // 1. Select Builder in Billing Section
-async function selectBillBuilder(id, name) {
-    document.getElementById('billBuilder').value = id;
-    document.getElementById('billBuilderSearch').value = name;
-    document.getElementById('billBuilderList').style.display = 'none';
-    
-    // Reset Site boxes
-    document.getElementById('billSite').value = "";
-    document.getElementById('billSiteSearch').value = "";
-
-    const res = await fetch(`${API_URL}/sites/${id}`);
-    const sites = await res.json();
-    const siteListDiv = document.getElementById('billSiteList');
-
-    // Inject "ALL SITES" option + actual sites
-    let listHtml = `<div onclick="selectBillSite('ALL', '-- ALL SITES (Total Bill) --')" style="font-weight:bold; color:var(--danger);">-- ALL SITES (Total Bill) --</div>`;
-    listHtml += sites.map(s => 
-        `<div onclick="selectBillSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`
-    ).join('');
-
-    siteListDiv.innerHTML = listHtml;
-}
-
-// 2. Select Site in Billing Section
-function selectBillSite(id, name) {
-    document.getElementById('billSite').value = id;
-    document.getElementById('billSiteSearch').value = name;
-    document.getElementById('billSiteList').style.display = 'none';
-}
-    // 1. Select Builder in Payment Section
-function selectPayBuilder(id, name) {
-    document.getElementById('pBuilder').value = id;
-    document.getElementById('pBuilderSearch').value = name;
-    document.getElementById('pBuilderList').style.display = 'none';
-    
-    // Automatically load the history/ledger when selected
-    loadLedger(); 
-}
-
-// 2. Updated recordPayment with Auto-Reset
-async function recordPayment() {
-    const body = { 
-        builderId: document.getElementById('pBuilder').value, 
-        amountPaid: Number(document.getElementById('pAmount').value), 
-        paymentMode: document.getElementById('pMode').value, 
-        referenceNo: document.getElementById('pRef').value, 
-        date: document.getElementById('pDate').value 
-    };
-
-    if (!validate(body, 'msg8')) return;
-
-    try {
-        const res = await fetch(`${API_URL}/add-payment`, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(body) 
-        });
-
-        if (res.ok) {
-            document.getElementById('msg8').style.color = "green";
-            document.getElementById('msg8').innerHTML = "✅ Payment Recorded Successfully";
-            
-            // --- AUTO-RESET BOXES ---
-            document.getElementById('pAmount').value = "";
-            document.getElementById('pRef').value = "";
-            document.getElementById('pDate').value = "";
-            document.getElementById('pBuilderSearch').value = "";
-            document.getElementById('pBuilder').value = "";
-            document.getElementById('pMode').selectedIndex = 0; // Reset to Cash
-
-            loadLedger(); // Refresh the table below
-            masterSync(); // Update dashboard stats
-        }
-    } catch (e) {
-        document.getElementById('msg8').innerHTML = "❌ Connection Error";
+    async function saveEdit() {
+        const id = document.getElementById('editId').value;
+        const type = document.getElementById('saveEditBtn').getAttribute('data-type');
+        const body = { date: document.getElementById('editDate').value, itemId: document.getElementById('editItem').value, quantity: parseFloat(document.getElementById('editQty').value), rate: parseFloat(document.getElementById('editRate').value), [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: parseFloat(document.getElementById('editCharges').value) };
+        try {
+            const res = await fetch(`${API_URL}/edit-transaction/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (res.ok) { document.getElementById('editMsg').innerText = "✅ Saved"; setTimeout(() => { closeEditModal(); loadHistory(); masterSync(); }, 1000); }
+            else { const r = await res.json(); document.getElementById('editMsg').innerText = "⚠️ " + r.error; }
+        } catch (e) { alert("Server error"); }
     }
-}
+
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; document.getElementById('editMsg').innerText = ""; }
+
+    function toggleDrop(id) { document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none'); document.getElementById(id).style.display = 'block'; }
+    function filterDrop(inputId, listId) {
+        const input = document.getElementById(inputId).value.toUpperCase();
+        const items = document.getElementById(listId).getElementsByTagName('div');
+        for (let i = 0; i < items.length; i++) { items[i].style.display = (items[i].innerText.toUpperCase().indexOf(input) > -1) ? "" : "none"; }
+        if (listId === 'dSiteList') document.getElementById('quickAddSiteBtn').style.display = document.getElementById('dBuilder').value ? 'block' : 'none';
+    }
+
+    async function selectBuilder(id, name) {
+        document.getElementById('dBuilder').value = id; document.getElementById('dBuilderSearch').value = name;
+        document.getElementById('dBuilderList').style.display = 'none'; document.getElementById('quickAddSiteBtn').style.display = 'block';
+        const res = await fetch(`${API_URL}/sites/${id}`); const sites = await res.json();
+        document.getElementById('dSiteList').innerHTML = sites.map(s => `<div onclick="selectSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`).join('');
+    }
+
+    function selectSite(id, name) { document.getElementById('dSite').value = id; document.getElementById('dSiteSearch').value = name; document.getElementById('dSiteList').style.display = 'none'; }
+    function openQuickSiteModal() { if (!document.getElementById('dBuilder').value) return alert("Select Builder First"); document.getElementById('quickSiteModal').style.display = 'flex'; }
+    async function saveQuickSite() {
+        const bId = document.getElementById('dBuilder').value; const sName = document.getElementById('newQuickSiteName').value;
+        const res = await fetch(`${API_URL}/add-site`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ builderId: bId, siteName: sName, siteAddress: "Quick Added" }) });
+        if (res.ok) { document.getElementById('quickSiteModal').style.display = 'none'; selectBuilder(bId, document.getElementById('dBuilderSearch').value); }
+    }
+
+    function selectItem(id, label, stock) { document.getElementById('dItem').value = id; document.getElementById('dItemSearch').value = label; document.getElementById('dItemList').style.display = 'none'; }
+
+    async function selectReturnBuilder(id, name) {
+        document.getElementById('rBuilder').value = id; document.getElementById('rBuilderSearch').value = name; document.getElementById('rBuilderList').style.display = 'none';
+        const res = await fetch(`${API_URL}/sites/${id}`); const sites = await res.json();
+        document.getElementById('rSiteList').innerHTML = sites.map(s => `<div onclick="selectReturnSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`).join('');
+    }
+
+    async function selectReturnSite(id, name) {
+        document.getElementById('rSite').value = id; document.getElementById('rSiteSearch').value = name; document.getElementById('rSiteList').style.display = 'none';
+        const res = await fetch(`${API_URL}/site-balance/${id}`); const data = await res.json();
+        document.getElementById('rItemList').innerHTML = data.map(i => `<div onclick="selectReturnItem('${i.itemId}', '${i.itemName} (${i.category}) [Bal: ${i.currentBalance}]')">${i.itemName} (${i.category}) [Bal: ${i.currentBalance}]</div>`).join('');
+    }
+
+    function selectReturnItem(id, label) { document.getElementById('rItem').value = id; document.getElementById('rItemSearch').value = label; document.getElementById('rItemList').style.display = 'none'; }
+
+    async function selectBillBuilder(id, name) {
+        document.getElementById('billBuilder').value = id; document.getElementById('billBuilderSearch').value = name; document.getElementById('billBuilderList').style.display = 'none';
+        const res = await fetch(`${API_URL}/sites/${id}`); const sites = await res.json();
+        let h = `<div onclick="selectBillSite('ALL', '-- ALL SITES --')" style="font-weight:bold; color:red;">-- ALL SITES --</div>`;
+        h += sites.map(s => `<div onclick="selectBillSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`).join('');
+        document.getElementById('billSiteList').innerHTML = h;
+    }
+
+    function selectBillSite(id, name) { document.getElementById('billSite').value = id; document.getElementById('billSiteSearch').value = name; document.getElementById('billSiteList').style.display = 'none'; }
+
+    async function selectRepBuilder(id, name) {
+        document.getElementById('repBuilder').value = id; document.getElementById('repBuilderSearch').value = name; document.getElementById('repBuilderList').style.display = 'none';
+        const res = await fetch(`${API_URL}/sites/${id}`); const sites = await res.json();
+        let h = `<div onclick="selectRepSite('ALL', '-- ALL SITES --')" style="font-weight:bold; color:blue;">-- ALL SITES --</div>`;
+        h += sites.map(s => `<div onclick="selectRepSite('${s._id}', '${s.siteName}')">${s.siteName}</div>`).join('');
+        document.getElementById('repSiteList').innerHTML = h;
+    }
+
+    function selectRepSite(id, name) { document.getElementById('repSite').value = id; document.getElementById('repSiteSearch').value = name; document.getElementById('repSiteList').style.display = 'none'; }
+
+    function selectPayBuilder(id, name) { document.getElementById('pBuilder').value = id; document.getElementById('pBuilderSearch').value = name; document.getElementById('pBuilderList').style.display = 'none'; loadLedger(); }
+
     function openMonthlyModal(type) {
-    if (type !== 'billed' || !currentStatsData) return;
+        if (!currentStatsData) return;
+        let h = `<h3>Monthly Billing</h3><table><tr style="background:#eee;"><th>Builder</th><th>Amount</th></tr>`;
+        currentStatsData.breakdown.forEach(b => { if (b.builderTotal > 0) h += `<tr><td>${b.builderName}</td><td>₹${b.builderTotal.toLocaleString()}</td></tr>`; });
+        openModal("Month Billed", h + "</table>");
+    }
 
-    // Get Today's Date and the 1st of the month
-    const now = new Date();
-    const todayFormatted = formatDate(now);
-    const startOfMonth = `01/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+    function selectExistingBuilder(name) { document.getElementById('compName').value = name; document.getElementById('bNameList').style.display = 'none'; }
 
-    let h = `<h3>Current Month Billing Breakdown</h3>
-             <p style="color:var(--accent); font-weight:bold; margin-bottom:15px;">
-                <i class="fas fa-calendar-day"></i> Period: ${startOfMonth} to ${todayFormatted}
-             </p>
-             <table style="width:100%">
-                <tr style="background:#eee;"><th>Builder / Site</th><th>Amount (₹)</th></tr>`;
-
-    currentStatsData.breakdown.forEach(b => {
-        // Only show builders that actually have billing this month
-        if (b.builderTotal > 0) {
-            h += `<tr style="background:#f9f9f9; font-weight:bold;">
-                    <td>🏢 ${b.builderName}</td>
-                    <td>₹${b.builderTotal.toLocaleString()}</td>
-                  </tr>`;
-            
-            b.sites.forEach(s => {
-                if (s.amount > 0) {
-                    h += `<tr>
-                            <td style="padding-left:30px; font-size:0.85rem;">📍 ${s.siteName}</td>
-                            <td style="font-size:0.85rem;">₹${s.amount.toLocaleString()}</td>
-                          </tr>`;
-                }
-            });
-        }
-    });
-
-    h += `<tr style="background:var(--primary); color:white; font-weight:bold;">
-            <td>GRAND TOTAL</td>
-            <td>₹${currentStatsData.currentMonthBilled.toLocaleString()}</td>
-          </tr></table>`;
-
-    openModal("Current Month Billing", h);
-}
-    function selectExistingBuilder(name) {
-    document.getElementById('compName').value = name;
-    document.getElementById('bNameList').style.display = 'none';
-    
-    // Optional: Visual warning that this builder already exists
-    const msg = document.getElementById('msg1');
-    msg.style.color = "var(--warning)";
-    msg.innerHTML = "⚠️ This builder already exists in the system.";
-}
-
-
+    window.onclick = function(event) { if (!event.target.matches('input')) { document.querySelectorAll('.search-results').forEach(d => d.style.display = 'none'); } }
+    window.onload = () => { masterSync(); const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja']; ['itemName', 'tItemName'].forEach(id => { const el = document.getElementById(id); if(el) { el.innerHTML = '<option value="">-- Select Item --</option>'; items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`); } }); };
 </script>
     <div id="editModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3><span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span></div><div id="editMsg" style="height:35px; margin-bottom:15px;"></div><input type="hidden" id="editId"><div class="edit-grid"><div class="edit-field full-width"><label>Material & Category (Godown Source)</label><select id="editItem"></select></div><div class="edit-field"><label>Transaction Date</label><input type="date" id="editDate"></div><div class="edit-field"><label>Quantity</label><input type="number" id="editQty"></div><div class="edit-field"><label>Daily Rate (₹)</label><input type="number" id="editRate"></div><div class="edit-field"><label>Service Charges (Load/Unload)</label><input type="number" id="editCharges"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
     <div id="quickSiteModal" class="modal">
