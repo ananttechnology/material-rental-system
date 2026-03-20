@@ -631,25 +631,39 @@ async function generateBill() {
     const start = document.getElementById('billStart').value;
     const end = document.getElementById('billEnd').value;
 
-    if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes.");
-
-    // IMPORTANT: Clear previous results immediately so nothing "jumps"
-    document.getElementById('billDisplay').innerHTML = "<p>Calculating Bill...</p>";
-    document.getElementById('holdingDisplay').innerHTML = "";
+    if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes: Builder, Site, and Date Range.");
 
     try {
-        // 1. Get the Bill Data First
-        const resBill = await fetch(${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId});
+        // --- 1. FETCH & RENDER HOLDINGS (Current Stock) ---
+        let holdingH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
+        
+        if (sId === 'ALL') {
+            const resSites = await fetch(`${API_URL}/sites/${bId}`);
+            const sites = await resSites.json();
+            for (let s of sites) {
+                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
+                const bal = await resBal.json();
+                holdingH += `<h4 style="margin-bottom:5px; color:var(--secondary);">Site: ${s.siteName}</h4>`;
+                holdingH += renderHoldingTable(bal);
+            }
+        } else {
+            const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
+            const bal = await resBal.json();
+            holdingH += renderHoldingTable(bal);
+        }
+        document.getElementById('holdingDisplay').innerHTML = holdingH;
+
+        // --- 2. FETCH & RENDER BILLING (Rental Money) ---
+        const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
         const data = await resBill.json();
         
-        let billH = <h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px;">💰 Calculated Bill</h2>;
-        
+        let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:30px;">💰 Calculated Bill</h2>`;
         if (data.isConsolidated) {
             data.sites.forEach(site => {
                 if(site.bill.length > 0) {
-                    billH += <h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger);">Site: ${site.siteName}</h4>;
+                    billH += `<h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger);">Site: ${site.siteName}</h4>`;
                     billH += renderBillTable(site.bill);
-                    billH += <p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>;
+                    billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>`;
                 }
             });
             const gst = document.getElementById('gstToggle').checked ? (data.totalSubtotal + data.totalService) * 0.18 : 0;
@@ -660,35 +674,16 @@ async function generateBill() {
             billH += renderBillSummary(data.subtotal, data.service, gst);
         }
         
-        billH += <button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px;"><i class="fas fa-print"></i> Print Invoice</button>;
+        // Add the Print Button at the very end
+        billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
         
-        // Update the TOP div
         document.getElementById('billDisplay').innerHTML = billH;
 
-        // 2. Get the Stock Data Second
-        let holdingH = <h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px; margin-top:30px;">📦 Current Stock on Site</h2>;
-        
-        if (sId === 'ALL') {
-            const resSites = await fetch(${API_URL}/sites/${bId});
-            const sites = await resSites.json();
-            for (let s of sites) {
-                const resBal = await fetch(${API_URL}/site-balance/${s._id});
-                const bal = await resBal.json();
-                holdingH += <h4 style="margin-bottom:5px;">Site: ${s.siteName}</h4> + renderHoldingTable(bal);
-            }
-        } else {
-            const resBal = await fetch(${API_URL}/site-balance/${sId});
-            const bal = await resBal.json();
-            holdingH += renderHoldingTable(bal);
-        }
-
-        // Update the BOTTOM div
-        document.getElementById('holdingDisplay').innerHTML = holdingH;
-
     } catch (e) {
-        alert("❌ Error generating report.");
+        console.error(e);
+        alert("❌ Error generating report. Check console.");
     }
-}
+    }
     // Helper: Render the Holding Table
     function renderHoldingTable(data) {
     if (data.length === 0) return `<p style="color:gray; font-style:italic;">No items currently held on this site.</p>`;
