@@ -633,30 +633,12 @@ async function openSiteReportModal() {
     if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes: Builder, Site, and Date Range.");
 
     try {
-        // --- 1. FETCH & RENDER HOLDINGS (Current Stock) ---
-        let holdingH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
-        
-        if (sId === 'ALL') {
-            const resSites = await fetch(`${API_URL}/sites/${bId}`);
-            const sites = await resSites.json();
-            for (let s of sites) {
-                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                const bal = await resBal.json();
-                holdingH += `<h4 style="margin-bottom:5px; color:var(--secondary);">Site: ${s.siteName}</h4>`;
-                holdingH += renderHoldingTable(bal);
-            }
-        } else {
-            const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
-            const bal = await resBal.json();
-            holdingH += renderHoldingTable(bal);
-        }
-        document.getElementById('holdingDisplay').innerHTML = holdingH;
-
-        // --- 2. FETCH & RENDER BILLING (Rental Money) ---
+        // --- 1. FETCH & RENDER BILLING (Rental Money) FIRST ---
         const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
         const data = await resBill.json();
         
-        let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:30px;">💰 Calculated Bill</h2>`;
+        let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:10px;">💰 Calculated Bill</h2>`;
+        
         if (data.isConsolidated) {
             data.sites.forEach(site => {
                 if(site.bill.length > 0) {
@@ -673,16 +655,39 @@ async function openSiteReportModal() {
             billH += renderBillSummary(data.subtotal, data.service, gst);
         }
         
-        // Add the Print Button at the very end
+        // Add the Print Button right after the summary
         billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
         
+        // Push the Bill to the display
         document.getElementById('billDisplay').innerHTML = billH;
+
+        // --- 2. FETCH & RENDER HOLDINGS (Current Stock) SECOND ---
+        let holdingH = `<hr style="margin: 40px 0; border: 1px dashed #ccc;">`; // Visual separator
+        holdingH += `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
+        
+        if (sId === 'ALL') {
+            const resSites = await fetch(`${API_URL}/sites/${bId}`);
+            const sites = await resSites.json();
+            for (let s of sites) {
+                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
+                const bal = await resBal.json();
+                holdingH += `<h4 style="margin-bottom:5px; color:var(--secondary);">Site: ${s.siteName}</h4>`;
+                holdingH += renderHoldingTable(bal);
+            }
+        } else {
+            const resBal = await fetch(`${API_URL}/site-balance/${sId}`);
+            const bal = await resBal.json();
+            holdingH += renderHoldingTable(bal);
+        }
+
+        // Push the Stock to the display
+        document.getElementById('holdingDisplay').innerHTML = holdingH;
 
     } catch (e) {
         console.error(e);
         alert("❌ Error generating report. Check console.");
     }
-    }
+}
 
     // Helper: Render the Holding Table
     function renderHoldingTable(data) {
@@ -816,8 +821,8 @@ async function printHoldingReport() {
              </div>`;
 
     // Include both Holdings and the Money calculation
-    html += `<div>${holdingContent}</div>`;
-    html += `<div>${billContent}</div>`;
+    html += `<div>${billContent}</div>`; // Bill first on paper
+    html += `<div style="margin-top:30px;">${holdingContent}</div>`; // Stock second
 
     // Signatory Area
     html += `<div class="footer">
