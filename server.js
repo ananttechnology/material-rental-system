@@ -246,16 +246,46 @@ app.get('/statement/:builderId', async (req, res) => {
 });
 
 app.get('/company-stats', async (req, res) => {
-    const builders = await Builder.find();
-    let billed = 0, out = 0;
-    for (let b of builders) {
-        const sites = await Site.find({ builderId: b._id });
-        const payments = await Payment.find({ builderId: b._id });
-        let bBilled = 0;
-        for (let s of sites) { const res = await calculateSiteBill(s._id); bBilled += (res.subtotal + res.service); }
-        billed += bBilled; out += (bBilled - payments.reduce((sum, p) => sum + p.amountPaid, 0));
+    try {
+        const builders = await Builder.find();
+        
+        // Define Current Month Range
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const today = new Date();
+
+        let totalCurrentMonthBilled = 0;
+        let breakdown = [];
+
+        for (let b of builders) {
+            const sites = await Site.find({ builderId: b._id });
+            let builderTotal = 0;
+            let siteBreakdown = [];
+
+            for (let s of sites) {
+                // Use your existing calculateSiteBill logic but pass the current month range
+                const result = await calculateSiteBill(s._id, startOfMonth, today);
+                const siteTotal = result.subtotal + result.service;
+                
+                builderTotal += siteTotal;
+                siteBreakdown.push({ siteName: s.siteName, amount: siteTotal });
+            }
+
+            totalCurrentMonthBilled += builderTotal;
+            breakdown.push({
+                builderName: b.companyName,
+                builderTotal: builderTotal,
+                sites: siteBreakdown
+            });
+        }
+
+        res.json({ 
+            currentMonthBilled: totalCurrentMonthBilled, 
+            breakdown: breakdown // Sending this for the Modal view
+        });
+    } catch (e) {
+        res.status(500).send(e.message);
     }
-    res.json({ currentMonthBilled: billed, totalOutstanding: out });
 });
 app.get('/all-transactions', async (req, res) => {
     try {
