@@ -691,7 +691,11 @@ async function openSiteReportModal() {
     if (billItems.length === 0) return `<p style="color:gray;">No rental activity found for this period.</p>`;
     let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
              <tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
-    billItems.forEach(i => { t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${i.duration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; });
+    billItems.forEach(i => { 
+    // Split the duration (e.g., "2026-03-01 to 2026-03-20") and format each part
+    const dates = i.duration.split(' to ');
+    const formattedDuration = `${formatDate(dates[0])} to ${formatDate(dates[1])}`;
+    t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${formattedDuration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; });
     return t + `</table>`;
     }
 
