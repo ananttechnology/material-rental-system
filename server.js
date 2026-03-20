@@ -124,7 +124,7 @@ app.post('/dispatch', async (req, res) => {
     await item.save();
     
     const count = await Transaction.countDocuments({ type: 'DC' });
-    const challan = await new Transaction({ ...req.body, type: 'DC', challanNo: DC-${1001 + count}, godown: item.godown }).save();
+    const challan = await new Transaction({ ...req.body, type: 'DC', challanNo: `DC-${1001 + count}`, godown: item.godown }).save();
 
     // AUTO-DEPOSIT LOGIC
         if (req.body.deposit && Number(req.body.deposit) > 0) {
@@ -138,6 +138,7 @@ app.post('/dispatch', async (req, res) => {
         }
         res.json(challan);
 });
+
 
 app.post('/return', async (req, res) => {
     try {
