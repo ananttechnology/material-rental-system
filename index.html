@@ -624,10 +624,7 @@ async function openSiteReportModal() {
 
     function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
 
-    ### 2. Update the `generateBill` Function
-Now, use this version of the function. I have added a "Clear" command at the start so you don't see old data while the new bill is loading.
-
-javascript
+   
 async function generateBill() {
     const bId = document.getElementById('billBuilder').value;
     const sId = document.getElementById('billSite').value;
