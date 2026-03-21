@@ -241,7 +241,32 @@
         <div id="inventory" class="page"><div class="form-container"><h2>Inventory Addition</h2><select id="itemName" onchange="updateCategories('')"></select><select id="category"></select><select id="iGodown"><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="qty" placeholder="Quantity"><button onclick="saveItem()">Add Stock</button><div id="msg3"></div></div></div>
         <div id="transfer" class="page"><div class="form-container"><h2>Inter-Godown Transfer</h2><select id="tItemName" onchange="updateCategories('t')"></select><select id="tCategory"></select><select id="tFrom"><option value="">From Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><select id="tTo"><option value="">To Godown</option><option value="Ankleshwar">Ankleshwar</option><option value="Dahej">Dahej</option></select><input type="number" id="tQty" placeholder="Quantity"><button onclick="transferStock()">Confirm Move</button><div id="msg9"></div></div></div>
         <div id="billing" class="page"><div class="section"><h2>Billing Engine</h2><div class="grid"><div class="search-wrapper"><input type="text" id="billBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Billing..." onclick="toggleDrop('billBuilderList')" onkeyup="filterDrop('billBuilderSearch', 'billBuilderList')"><div id="billBuilderList" class="search-results"></div><input type="hidden" id="billBuilder"></div><div class="search-wrapper"><input type="text" id="billSiteSearch" autocomplete="off" placeholder="🔍 Search Site..." onclick="toggleDrop('billSiteList')" onkeyup="filterDrop('billSiteSearch', 'billSiteList')"><div id="billSiteList" class="search-results"></div><input type="hidden" id="billSite"></div></div><div class="grid" style="margin-top:10px;"><input type="date" id="billStart" placeholder="From Date"><input type="date" id="billEnd" placeholder="To Date"></div><label style="display:block; margin: 15px 0;"><input type="checkbox" id="gstToggle"> GST 18%</label><button onclick="generateBill()">Generate Bill</button><div id="billDisplay" style="margin-top: 20px;"></div><div id="holdingDisplay" style="margin-top: 20px;"></div></div></div>
-        <div id="history" class="page"><div class="section"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2><i class="fas fa-list-ul"></i> Transaction History (DC/RC)</h2><button onclick="printHistory()" style="width:auto; padding:10px 20px; background:#2c3e50;">🖨️ Print Full Log</button></div><input type="text" id="histSearch" placeholder="🔍 Search by Builder, Site or Challan..." onkeyup="filterHistory()" style="margin-bottom:20px;"><div id="historyDisplay" style="overflow-x:auto;"></div></div></div>
+
+        <div id="history" class="page">
+    <div class="section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2><i class="fas fa-history"></i> Transaction Log</h2>
+            <button onclick="printHistory()" style="width:auto; padding:10px 20px; background:#2c3e50;">🖨️ Print Log</button>
+        </div>
+        <input type="text" id="historySearch" placeholder="🔍 Search History..." onkeyup="filterHistory()">
+        <table style="width:100%; margin-top:15px;">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Challan #</th>
+                    <th>Builder / Site</th>
+                    <th>Items</th>
+                    <th>Total Qty</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                </tbody>
+        </table>
+    </div>
+</div>
+        
         <div id="dataModal" class="modal"><div class="modal-content"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:20px; padding-bottom:10px;"><h2 id="modalTitle" style="margin:0; color:var(--primary);">Report</h2><span class="close-btn" onclick="closeModal()" style="position:static; line-height:1;">&times;</span></div><div id="modalBody"></div></div></div>
     
     </div>
@@ -391,65 +416,41 @@ function renderReturnBasket() {
         // 1. FETCH BUILDERS
         const res = await fetch(`${API_URL}/builders`);
         const builders = await res.json();
-        allBuilders = builders; // Save to global variable for searching
+        allBuilders = builders;
 
-        // Populate the New Searchable DC Builder List
-        const dBuilderList = document.getElementById('dBuilderList');
-        if (dBuilderList) {
-            dBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const rBuilderList = document.getElementById('rBuilderList');
-        if (rBuilderList) {
-            rBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectReturnBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const repBuilderList = document.getElementById('repBuilderList');
-        if (repBuilderList) {
-            repBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectRepBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const billBuilderList = document.getElementById('billBuilderList');
-        if (billBuilderList) {
-            billBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectBillBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        const pBuilderList = document.getElementById('pBuilderList');
-        if (pBuilderList) {
-            pBuilderList.innerHTML = builders.map(b => 
-                `<div onclick="selectPayBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-            ).join('');
-        }
-        // Add this inside masterSync() where other lists are updated
-        const bNameList = document.getElementById('bNameList');
-        if (bNameList) {
-            bNameList.innerHTML = builders.map(b => 
-                `<div onclick="selectExistingBuilder('${b.companyName}')">${b.companyName} (Existing)</div>`
-            ).join('');
-        }
+        // Populate Searchable Lists
+        const listIds = ['dBuilderList', 'rBuilderList', 'repBuilderList', 'billBuilderList', 'pBuilderList', 'bNameList'];
+        const selectIds = ['builderSelect']; // Standard dropdowns
 
-        // Keep standard dropdowns working for other sections (Billing, Payments, etc.)
-        ['builderSelect', 'rBuilder', 'repBuilder', 'billBuilder', 'pBuilder'].forEach(id => {
-            const s = document.getElementById(id);
-            if(s) { 
-                const cur = s.value; 
-                s.innerHTML = '<option value="">-- Select Builder --</option>'; 
-                builders.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); 
-                s.value = cur; 
+        // Update the searchable builder lists
+        listIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerHTML = builders.map(b => 
+                    `<div onclick="select${id.replace('List', '')}('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+                ).join('');
             }
         });
 
-        // 2. FETCH INVENTORY
+        // 2. FETCH INVENTORY & SYNC DROPDOWNS
         const invRes = await fetch(`${API_URL}/inventory`);
         fullInventory = await invRes.json();
         
+        // POPULATE SIDEBAR DROPDOWNS (Inventory & Transfer)
+        const itemNames = [...new Set(fullInventory.map(i => i.itemName))];
+        const invDropdowns = ['itemName', 'tItemName'];
+        
+        invDropdowns.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerHTML = '<option value="">-- Select Material --</option>' + 
+                               itemNames.map(name => `<option value="${name}">${name}</option>`).join('');
+            }
+        });
+
+        // Update Searchable Dispatch Item List
         const dItemList = document.getElementById('dItemList');
         if(dItemList) { 
-            // Filter only items with stock > 0 and create the search list
             dItemList.innerHTML = fullInventory
                 .filter(i => i.availableStock > 0)
                 .map(i => {
@@ -458,11 +459,11 @@ function renderReturnBasket() {
                 }).join('');
         }
 
-        // 3. UPDATE DASHBOARD STATS
+        // 3. REFRESH HISTORY & DASHBOARD
+        loadHistory(); 
         const statRes = await fetch(`${API_URL}/company-stats`);
-        const stats = await statRes.json();
-        currentStatsData = stats; // Store it for the modal click
-        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
+        currentStatsData = await statRes.json();
+        document.getElementById('dash-billed').innerText = currentStatsData.currentMonthBilled.toLocaleString();
         
     } catch (e) { console.error("Sync Error:", e); }
 }
