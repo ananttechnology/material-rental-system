@@ -131,8 +131,8 @@
         <label><i class="fas fa-warehouse"></i> Dispatch From Godown</label>
         <select id="dispatchGodown" onchange="refreshDispatchItemList()" style="border: 2px solid var(--primary); font-weight: bold;">
         <option value="">-- Select Godown First --</option>
-        <option value="Ankleshwar Godown">Ankleshwar Godown</option>
-        <option value="Dahej Godown">Dahej Godown</option>
+        <option value="Ankleshwar">Ankleshwar</option>
+        <option value="Dahej">Dahej</option>
        </select>
     </div>
 
@@ -412,6 +412,7 @@ function renderReturnBasket() {
     function refreshDispatchItemList() {
     const selectedGodown = document.getElementById('dispatchGodown').value;
     const dItemList = document.getElementById('dItemList');
+    const dItemSearch = document.getElementById('dItemSearch');
     
     if (!selectedGodown) {
         dItemList.innerHTML = `<div style="padding:10px; color:red;">⚠️ Please select a Godown first!</div>`;
@@ -419,7 +420,7 @@ function renderReturnBasket() {
     }
 
     // Filter global inventory by the selected godown and only show items in stock
-    const filtered = fullInventory.filter(i => i.godown === selectedGodown && i.availableStock > 0);
+    const filtered = fullInventory.filter(i => i.godown.trim() === selectedGodown.trim() && i.availableStock > 0);
 
     if (filtered.length === 0) {
         dItemList.innerHTML = `<div style="padding:10px; color:gray;">No stock available in ${selectedGodown}</div>`;
@@ -517,13 +518,15 @@ function renderReturnBasket() {
         
         // DISPATCH Material List
         const dItemList = document.getElementById('dItemList');
-        if(dItemList) { 
-            dItemList.innerHTML = fullInventory
-                .filter(i => i.availableStock > 0)
-                .map(i => {
-                    const label = `${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]`;
-                    return `<div onclick="selectItem('${i._id}', '${label}', ${i.availableStock})">${label}</div>`;
-                }).join('');
+        if (dItemList) { 
+            const currentSelectedGodown = document.getElementById('dispatchGodown').value;
+            if (currentSelectedGodown) {
+            // If a godown is already picked, show ONLY its items
+        refreshDispatchItemList();
+        } else {
+        // If no godown is picked, show a warning instead of a mixed list
+        dItemList.innerHTML = `<div style="padding:10px; color:red; font-weight:bold;">⚠️ Please select a Godown first!</div>`;
+        }
         }
 
         // POPULATE SIDEBAR DROPDOWNS (Inventory Addition & Transfer Stock)
