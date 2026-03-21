@@ -501,4 +501,23 @@ app.put('/edit-payment/:id', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+app.delete('/delete-transaction/:id', async (req, res) => {
+    try {
+        const txn = await Transaction.findById(req.params.id);
+        if (!txn) return res.status(404).json({ message: "Transaction not found" });
+
+        // Rewind stock for EVERY item in the basket
+        for (const item of txn.items) {
+            const factor = (txn.type === 'DC') ? 1 : -1; // Add back if Dispatch, Subtract if Return
+            await Inventory.findByIdAndUpdate(item.itemId, { 
+                $inc: { availableStock: item.quantity * factor } 
+            });
+        }
+
+        await Transaction.findByIdAndDelete(req.params.id);
+        res.json({ message: "Transaction deleted and stock restored" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.listen(5000);
