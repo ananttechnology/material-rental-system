@@ -1858,6 +1858,10 @@ async function savePaymentEdit() {
 function closePayEditModal() {
     document.getElementById('payEditModal').style.display = 'none';
 }
+    window.onload = async () => {
+    console.log("Page loaded, starting master sync...");
+    await masterSync(); // This should call loadInventory, loadHistory, etc.
+};
 
 
 </script>
