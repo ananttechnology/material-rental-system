@@ -329,6 +329,9 @@ function removeFromBasket(index) {
 }
 
 function renderBasket() {
+    const godownSelect = document.getElementById('dispatchGodown');
+    // Lock the dropdown if there is at least one item in the basket
+    godownSelect.disabled = currentBasket.length > 0;
     const tbody = document.getElementById('dispatchBasketBody');
     if (currentBasket.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999; padding:20px;">Basket is empty. Add items above.</td></tr>`;
@@ -410,6 +413,27 @@ function renderReturnBasket() {
     function removeFromReturnBasket(index) {
     returnBasket.splice(index, 1); // Removes the item from memory
     renderReturnBasket();          // Refreshes the table
+}
+    function refreshDispatchItemList() {
+    const selectedGodown = document.getElementById('dispatchGodown').value;
+    const dItemList = document.getElementById('dItemList');
+    
+    if (!selectedGodown) {
+        dItemList.innerHTML = `<div style="padding:10px; color:red;">⚠️ Please select a Godown first!</div>`;
+        return;
+    }
+
+    // Filter global inventory by the selected godown and only show items in stock
+    const filtered = fullInventory.filter(i => i.godown === selectedGodown && i.availableStock > 0);
+
+    if (filtered.length === 0) {
+        dItemList.innerHTML = `<div style="padding:10px; color:gray;">No stock available in ${selectedGodown}</div>`;
+    } else {
+        dItemList.innerHTML = filtered.map(i => {
+            const label = `${i.itemName} (${i.category}) [Stock: ${i.availableStock}]`;
+            return `<div onclick="selectItem('${i._id}', '${label}', ${i.availableStock})">${label}</div>`;
+        }).join('');
+    }
 }
     
 
@@ -494,6 +518,7 @@ function renderReturnBasket() {
         // 2. FETCH INVENTORY
         const invRes = await fetch(`${API_URL}/inventory`);
         fullInventory = await invRes.json();
+        refreshDispatchItemList();
         
         // DISPATCH Material List
         const dItemList = document.getElementById('dItemList');
@@ -743,6 +768,8 @@ function renderReturnBasket() {
                 document.getElementById(`dBuilder`).value = "";
                 document.getElementById(`dSite`).value = "";
                 document.getElementById(`dItem`).value = "";
+                document.getElementById('dispatchGodown').disabled = false; 
+                document.getElementById('dispatchGodown').value = "";
             } else {
                 returnBasket = [];  // Clear Basket Memory
                 renderReturnBasket(); // Clear Basket UI
