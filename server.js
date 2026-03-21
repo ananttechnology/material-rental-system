@@ -416,5 +416,28 @@ app.put('/edit-transaction/:id', async (req, res) => {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
-}); 
+});
+app.put('/edit-payment/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amountPaid, paymentMode, referenceNo, date } = req.body;
+
+        // Validation: Ensure no fields are empty or null
+        if (!amountPaid || !paymentMode || !date) {
+            return res.status(400).json({ error: "All fields are compulsory." });
+        }
+
+        const updatedPayment = await Payment.findByIdAndUpdate(
+            id,
+            { amountPaid: Number(amountPaid), paymentMode, referenceNo, date: new Date(date) },
+            { new: true }
+        );
+
+        if (!updatedPayment) return res.status(404).json({ error: "Payment record not found." });
+
+        res.json({ message: "Payment updated successfully" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.listen(5000);
