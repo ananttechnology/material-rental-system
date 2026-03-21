@@ -500,15 +500,16 @@
     });
     h += `</table>`;
 
-    // UPDATED: Payment History with Reference Column
+    // UPDATED: Payment History with Edit Button
     h += `<h4>Payment History</h4><table style="width:100%">
-            <tr><th>Date</th><th>Mode</th><th>Ref No.</th><th>Amount</th></tr>`;
+            <tr><th>Date</th><th>Mode</th><th>Ref No.</th><th>Amount</th><th>Action</th></tr>`;
     data.payments.forEach(p => {
         h += `<tr>
                 <td>${formatDate(p.date)}</td>
                 <td>${p.paymentMode}</td>
                 <td>${p.referenceNo || '-'}</td>
                 <td>₹${p.amountPaid.toLocaleString()}</td>
+                <td><button onclick="openPaymentEditModal('${p._id}')" style="background:var(--accent); padding:5px 10px; width:auto; font-size:0.8rem;"><i class="fas fa-edit"></i> Edit</button></td>
               </tr>`;
     });
     h += `</table>`;
@@ -1315,24 +1316,75 @@ async function recordPayment() {
     msg.style.color = "var(--warning)";
     msg.innerHTML = "⚠️ This builder already exists in the system.";
 }
+    async function openPaymentEditModal(payId) {
+    const bId = document.getElementById('pBuilder').value;
+    try {
+        const res = await fetch(`${API_URL}/statement/${bId}`);
+        const data = await res.json();
+        const p = data.payments.find(x => x._id === payId);
+        
+        if (!p) return alert("Payment record not found");
+
+        document.getElementById('payEditId').value = p._id;
+        document.getElementById('payEditAmount').value = p.amountPaid;
+        document.getElementById('payEditDate').value = p.date.split('T')[0];
+        document.getElementById('payEditMode').value = p.paymentMode;
+        document.getElementById('payEditRef').value = p.referenceNo || "";
+        document.getElementById('payEditMsg').innerText = "";
+
+        document.getElementById('payEditModal').style.display = 'flex';
+    } catch (e) { alert("Error fetching payment details"); }
+}
+
+async function savePaymentEdit() {
+    const id = document.getElementById('payEditId').value;
+    const body = {
+        amountPaid: document.getElementById('payEditAmount').value,
+        date: document.getElementById('payEditDate').value,
+        paymentMode: document.getElementById('payEditMode').value,
+        referenceNo: document.getElementById('payEditRef').value
+    };
+
+    // Compulsory Validation
+    if (!body.amountPaid || !body.date || !body.paymentMode) {
+        const msg = document.getElementById('payEditMsg');
+        msg.style.color = "red";
+        msg.innerText = "⚠️ Amount, Date, and Mode are compulsory!";
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/edit-payment/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+            const msg = document.getElementById('payEditMsg');
+            msg.style.color = "green";
+            msg.innerText = "✅ Payment Updated!";
+            
+            setTimeout(() => {
+                closePayEditModal();
+                loadLedger(); // This refreshes the whole table and total balance
+                masterSync();
+            }, 1000);
+        } else {
+            alert("Update Failed on Server");
+        }
+    } catch (e) { alert("Connection Error"); }
+}
+
+function closePayEditModal() {
+    document.getElementById('payEditModal').style.display = 'none';
+}
 
 
 </script>
     <div id="editModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3><span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span></div><div id="editMsg" style="height:35px; margin-bottom:15px;"></div><input type="hidden" id="editId"><div class="edit-grid"><div class="edit-field full-width"><label>Material & Category (Godown Source)</label><select id="editItem"></select></div><div class="edit-field"><label>Transaction Date</label><input type="date" id="editDate"></div><div class="edit-field"><label>Quantity</label><input type="number" id="editQty"></div><div class="edit-field"><label>Daily Rate (₹)</label><input type="number" id="editRate"></div><div class="edit-field"><label>Service Charges (Load/Unload)</label><input type="number" id="editCharges"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
-    <div id="quickSiteModal" class="modal">
-    <div class="modal-content" style="max-width: 400px; margin-top: 10%;">
-        <h3 style="color:var(--primary)">➕ Quick Add New Site</h3>
-        <p id="labelForBuilder" style="font-weight:bold; color:var(--accent);"></p>
-        <div class="edit-field">
-            <label>Site Name</label>
-            <input type="text" id="newQuickSiteName" placeholder="Enter Site Name Only">
-        </div>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button onclick="saveQuickSite()" style="background:var(--success);">Save Site</button>
-            <button onclick="document.getElementById('quickSiteModal').style.display='none'" style="background:var(--secondary);">Cancel</button>
-        </div>
-    </div>
-</div>
+    <div id="quickSiteModal" class="modal"><div class="modal-content" style="max-width: 400px; margin-top: 10%;"><h3 style="color:var(--primary)">➕ Quick Add New Site</h3><p id="labelForBuilder" style="font-weight:bold; color:var(--accent);"></p><div class="edit-field"><label>Site Name</label><input type="text" id="newQuickSiteName" placeholder="Enter Site Name Only"></div><div style="display:flex; gap:10px; margin-top:20px;"><button onclick="saveQuickSite()" style="background:var(--success);">Save Site</button><button onclick="document.getElementById('quickSiteModal').style.display='none'" style="background:var(--secondary);">Cancel</button></div></div></div>
+    <div id="payEditModal" class="modal"><div class="modal-content" style="max-width: 500px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-cash-register"></i> Edit Payment / Deposit</h3><span class="close-btn" onclick="closePayEditModal()" style="position:static;">&times;</span></div><div id="payEditMsg" style="height:35px; margin-bottom:15px; text-align:center; font-weight:bold;"></div><input type="hidden" id="payEditId"><div class="edit-grid" style="grid-template-columns: 1fr;"><div class="edit-field"><label>Amount Paid (₹)</label><input type="number" id="payEditAmount"></div><div class="edit-field"><label>Payment Date</label><input type="date" id="payEditDate"></div><div class="edit-field"><label>Payment Mode</label><select id="payEditMode"><option value="Cash">Cash</option><option value="Online">Online / G-Pay</option><option value="Cheque">Cheque</option><option value="Bank">Bank Transfer</option></select></div><div class="edit-field"><label>Reference / Note</label><input type="text" id="payEditRef"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button onclick="savePaymentEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes</button><button onclick="closePayEditModal()" style="background:var(--secondary); flex:1;">Cancel</button></div></div></div>
 </div>
 </body>
 </html>
