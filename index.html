@@ -1321,28 +1321,29 @@ async function recordPayment() {
     msg.innerHTML = "⚠️ This builder already exists in the system.";
 }
     async function openPaymentEditModal(payId) {
-    // 1. Find the button that was clicked to show loading state
     const btn = event.currentTarget; 
     const originalContent = btn.innerHTML;
     
-    // 2. Start Loading State
+    // Reset the SAVE button in the modal to its original state first
+    // This prevents it from showing "Saving..." from a previous session
+    const saveBtn = document.querySelector('#payEditModal button[onclick="savePaymentEdit()"]');
+    if (saveBtn) {
+        saveBtn.classList.remove('loading-btn');
+        saveBtn.innerHTML = `<i class="fas fa-save"></i> Save Changes`;
+    }
+
     btn.classList.add('loading-btn');
     btn.innerHTML = `<div class="btn-loader"></div> Loading...`;
 
     const bId = document.getElementById('pBuilder').value;
     
     try {
-        // Fetch fresh data from server
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
         const p = data.payments.find(x => x._id === payId);
         
-        if (!p) {
-            alert("Payment record not found");
-            return;
-        }
+        if (!p) return alert("Payment record not found");
 
-        // Populate Modal Fields
         document.getElementById('payEditId').value = p._id;
         document.getElementById('payEditAmount').value = p.amountPaid;
         document.getElementById('payEditDate').value = p.date.split('T')[0];
@@ -1350,23 +1351,21 @@ async function recordPayment() {
         document.getElementById('payEditRef').value = p.referenceNo || "";
         document.getElementById('payEditMsg').innerText = "";
 
-        // 3. Open Modal
         document.getElementById('payEditModal').style.display = 'flex';
-        
     } catch (e) { 
-        console.error(e);
-        alert("Error fetching payment details"); 
+        alert("Error fetching data"); 
     } finally {
-        // 4. Reset Button to original state
         btn.classList.remove('loading-btn');
         btn.innerHTML = originalContent;
     }
 }
+
 async function savePaymentEdit() {
-    const btn = event.currentTarget; // The "Save Changes" button
-    const originalContent = btn.innerHTML;
-    const id = document.getElementById('payEditId').value;
+    // Select the button specifically by ID or its function to avoid event currentTarget bugs
+    const saveBtn = document.querySelector('#payEditModal button[onclick="savePaymentEdit()"]');
+    const originalContent = `<i class="fas fa-save"></i> Save Changes`;
     
+    const id = document.getElementById('payEditId').value;
     const body = {
         amountPaid: document.getElementById('payEditAmount').value,
         date: document.getElementById('payEditDate').value,
@@ -1374,17 +1373,14 @@ async function savePaymentEdit() {
         referenceNo: document.getElementById('payEditRef').value
     };
 
-    // 1. Compulsory Validation
     if (!body.amountPaid || !body.date || !body.paymentMode) {
-        const msg = document.getElementById('payEditMsg');
-        msg.style.color = "var(--danger)";
-        msg.innerText = "⚠️ Amount, Date, and Mode are compulsory!";
+        document.getElementById('payEditMsg').innerHTML = "<span style='color:red;'>⚠️ Fill all boxes!</span>";
         return;
     }
 
-    // 2. Start Loading State
-    btn.classList.add('loading-btn');
-    btn.innerHTML = `<div class="btn-loader"></div> Saving...`;
+    // Start Loader
+    saveBtn.classList.add('loading-btn');
+    saveBtn.innerHTML = `<div class="btn-loader"></div> Saving...`;
 
     try {
         const res = await fetch(`${API_URL}/edit-payment/${id}`, {
@@ -1394,30 +1390,23 @@ async function savePaymentEdit() {
         });
 
         if (res.ok) {
-            const msg = document.getElementById('payEditMsg');
-            msg.style.color = "var(--success)";
-            msg.innerText = "✅ Payment Updated Successfully!";
-            
-            // Wait 1 second so user can see the success message
+            document.getElementById('payEditMsg').innerHTML = "<span style='color:green;'>✅ Updated!</span>";
             setTimeout(() => {
                 closePayEditModal();
-                loadLedger(); // Refresh table
-                masterSync(); // Refresh dashboard
+                loadLedger();
+                masterSync();
             }, 1000);
         } else {
-            const result = await res.json();
-            alert("Update Failed: " + (result.error || "Server Error"));
-            // Reset button if failed so they can try again
-            btn.classList.remove('loading-btn');
-            btn.innerHTML = originalContent;
+            alert("Update failed");
+            saveBtn.classList.remove('loading-btn');
+            saveBtn.innerHTML = originalContent;
         }
-    } catch (e) { 
-        alert("Connection Error");
-        btn.classList.remove('loading-btn');
-        btn.innerHTML = originalContent;
+    } catch (e) {
+        alert("Connection error");
+        saveBtn.classList.remove('loading-btn');
+        saveBtn.innerHTML = originalContent;
     }
 }
-
 function closePayEditModal() {
     document.getElementById('payEditModal').style.display = 'none';
 }
