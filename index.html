@@ -68,6 +68,15 @@
         .loading-btn { pointer-events: none; opacity: 0.8; }
         /* Add this to your <style> if not already present */
         #quickSiteModal { display: none; /* Hidden by default */align-items: center; justify-content: center; }
+        /* Multi-Item Basket Styling */
+        .basket-container { margin: 20px 0; border: 1.5px solid #eee; border-radius: 8px; overflow: hidden; }
+        .basket-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.9rem; }
+        .basket-table th { background: #f8f9fa; color: var(--secondary); padding: 10px; text-align: left; border-bottom: 2px solid #eee; }
+        .basket-table td { padding: 10px; border-bottom: 1px solid #eee; }
+        .basket-table tr:last-child td { border-bottom: none; }
+        .remove-item { color: var(--danger); cursor: pointer; text-align: center; width: 40px; transition: 0.2s; }
+        .remove-item:hover { transform: scale(1.2); }
+        .add-to-basket-btn { background: var(--secondary); margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -97,15 +106,68 @@
                 <div class="card" onclick="openMonthlyModal('billed')"><h3>Month Billed</h3><div class="value">₹<span id="dash-billed">0</span> <i class="fas fa-calendar-alt"></i></div></div>
             </div>
             <div class="section dispatch-sec">
-                <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
-                <div class="grid"><div class="search-wrapper"><input type="text" id="dBuilderSearch" autocomplete="off" placeholder="🔍 Select or Search Builder..." onclick="toggleDrop('dBuilderList')" onkeyup="filterDrop('dBuilderSearch', 'dBuilderList')"><div id="dBuilderList" class="search-results"></div><input type="hidden" id="dBuilder"> </div><div class="search-wrapper"><div style="display:flex; gap:5px;"><input type="text" id="dSiteSearch" autocomplete="off" placeholder="🔍 Select or Search Site..." onclick="toggleDrop('dSiteList')" onkeyup="filterDrop('dSiteSearch', 'dSiteList')"><button onclick="openQuickSiteModal()" id="quickAddSiteBtn" style="width:45px; padding:0; background:var(--success); display:none;"><i class="fas fa-plus"></i></button></div><div id="dSiteList" class="search-results"></div><input type="hidden" id="dSite"></div></div>
-                <div class="grid"><div class="search-wrapper"><input type="text" id="dItemSearch" autocomplete="off" placeholder="🔍 Search Material (e.g. Plate)..." onclick="toggleDrop('dItemList')" onkeyup="filterDrop('dItemSearch', 'dItemList')"><div id="dItemList" class="search-results"></div><input type="hidden" id="dItem"></div></div>
-                <div class="grid"><input type="number" id="dQty" placeholder="Quantity"><input type="number" id="dRate" placeholder="Daily Rate (₹)"></div>
-                <div class="grid"><input type="number" id="dLoading" placeholder="Loading Charges (₹)"><input type="number" id="dDeposit" placeholder="Deposit (Advance ₹)" style="border: 1px solid var(--success);"></div><div class="grid"><input type="date" id="dDate"></div>
-                <button onclick="processTxn('dispatch')" style="background: var(--danger);">Confirm Dispatch</button>
-                <div id="msg4" class="msg-area"></div>
-                <button id="btnPrintDC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
+    <h2><i class="fas fa-truck-loading"></i> Dispatch (DC)</h2>
+    
+    <div class="grid">
+        <div class="search-wrapper">
+            <input type="text" id="dBuilderSearch" autocomplete="off" placeholder="🔍 Select Builder..." onclick="toggleDrop('dBuilderList')" onkeyup="filterDrop('dBuilderSearch', 'dBuilderList')">
+            <div id="dBuilderList" class="search-results"></div>
+            <input type="hidden" id="dBuilder"> 
+        </div>
+        <div class="search-wrapper">
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="dSiteSearch" autocomplete="off" placeholder="🔍 Select Site..." onclick="toggleDrop('dSiteList')" onkeyup="filterDrop('dSiteSearch', 'dSiteList')">
+                <button onclick="openQuickSiteModal()" id="quickAddSiteBtn" style="width:45px; padding:0; background:var(--success); display:none;"><i class="fas fa-plus"></i></button>
             </div>
+            <div id="dSiteList" class="search-results"></div>
+            <input type="hidden" id="dSite">
+        </div>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+
+    <div class="grid">
+        <div class="search-wrapper">
+            <input type="text" id="dItemSearch" autocomplete="off" placeholder="🔍 Search Material to add..." onclick="toggleDrop('dItemList')" onkeyup="filterDrop('dItemSearch', 'dItemList')">
+            <div id="dItemList" class="search-results"></div>
+            <input type="hidden" id="dItem">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="number" id="dQty" placeholder="Qty">
+            <input type="number" id="dRate" placeholder="Rate">
+            <button onclick="addToBasket()" style="width:120px; background:var(--accent);"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div class="basket-container">
+        <table class="basket-table">
+            <thead>
+                <tr>
+                    <th>Material Name</th>
+                    <th>Qty</th>
+                    <th>Rate</th>
+                    <th style="width:50px;"></th>
+                </tr>
+            </thead>
+            <tbody id="dispatchBasketBody">
+                <tr><td colspan="4" style="text-align:center; color:#999; padding:20px;">Basket is empty. Add items above.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="grid">
+        <input type="number" id="dLoading" placeholder="Total Loading Charges (₹)">
+        <input type="number" id="dDeposit" placeholder="Deposit (Advance ₹)" style="border: 1px solid var(--success);">
+    </div>
+    <div class="grid">
+        <input type="date" id="dDate">
+    </div>
+
+    <button onclick="processTxn('dispatch')" style="background: var(--danger); margin-top:15px;">Confirm & Generate Challan</button>
+    
+    <div id="msg4" class="msg-area"></div>
+    <button id="btnPrintDC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
+</div>
             <div class="section return-sec">
                 <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
                 <div class="grid"><div class="search-wrapper"><input type="text" id="rBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder..." onclick="toggleDrop('rBuilderList')" onkeyup="filterDrop('rBuilderSearch', 'rBuilderList')"><div id="rBuilderList" class="search-results"></div><input type="hidden" id="rBuilder"></div><div class="search-wrapper"><input type="text" id="rSiteSearch" autocomplete="off" placeholder="🔍 Search Site..." onclick="toggleDrop('rSiteList')" onkeyup="filterDrop('rSiteSearch', 'rSiteList')"><div id="rSiteList" class="search-results"></div><input type="hidden" id="rSite"></div></div><div class="search-wrapper" style="margin-top:20px;"><input type="text" id="rItemSearch" autocomplete="off" placeholder="🔍 Search Items on Site..." onclick="toggleDrop('rItemList')" onkeyup="filterDrop('rItemSearch', 'rItemList')"><div id="rItemList" class="search-results"></div><input type="hidden" id="rItem"></div>
@@ -147,6 +209,56 @@
     let allSites = [];
     let fullInventory = [];
     let lastTxn = null;
+    let currentBasket = []; // Global memory for the current dispatch
+
+function addToBasket() {
+    const itemId = document.getElementById('dItem').value;
+    const itemName = document.getElementById('dItemSearch').value;
+    const qty = parseFloat(document.getElementById('dQty').value);
+    const rate = parseFloat(document.getElementById('dRate').value);
+
+    if (!itemId || !qty || qty <= 0) return alert("Please select item and enter valid quantity!");
+
+    // Check if item already exists in basket
+    const existing = currentBasket.find(i => i.itemId === itemId);
+    if (existing) {
+        existing.quantity += qty;
+    } else {
+        currentBasket.push({ itemId, itemName, quantity: qty, rate: rate || 0 });
+    }
+
+    // Reset Item inputs
+    document.getElementById('dItem').value = "";
+    document.getElementById('dItemSearch').value = "";
+    document.getElementById('dQty').value = "";
+    document.getElementById('dRate').value = "";
+    
+    renderBasket();
+}
+
+function removeFromBasket(index) {
+    currentBasket.splice(index, 1);
+    renderBasket();
+}
+
+function renderBasket() {
+    const tbody = document.getElementById('dispatchBasketBody');
+    if (currentBasket.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#999; padding:20px;">Basket is empty. Add items above.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = currentBasket.map((item, index) => `
+        <tr>
+            <td><strong>${item.itemName}</strong></td>
+            <td>${item.quantity}</td>
+            <td>₹${item.rate}</td>
+            <td class="remove-item" onclick="removeFromBasket(${index})"><i class="fas fa-trash"></i></td>
+        </tr>
+    `).join('');
+}
+
+    
 
     function formatDate(isoString) { if (!isoString) return "-"; const d = new Date(isoString); return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`; }
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
