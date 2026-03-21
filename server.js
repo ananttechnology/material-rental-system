@@ -18,7 +18,7 @@ mongoose.connect(MONGO_URI).then(() => console.log("✅ System Audit: DB Connect
 const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: String, mobile: String, gstNumber: String, address: String }));
 const Site = mongoose.model('Site', new mongoose.Schema({ builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' }, siteName: String, siteAddress: String }));
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({ itemName: String, category: String, godown: String, totalStock: Number, availableStock: Number }));
-const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, itemId: mongoose.Schema.Types.ObjectId, godown: String, quantity: Number, rate: { type: Number, default: 0 }, loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
+const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, items: [{ itemId: mongoose.Schema.Types.ObjectId, itemName: String, quantity: Number, rate: { type: Number, default: 0 } }], loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
 const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: { type: String, default: "" }, date: { type: Date, default: Date.now } }));
 
 // --- BILLING ENGINE LOGIC ---
@@ -31,13 +31,25 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const filterEnd = endDate ? new Date(endDate) : new Date();
 
     txns.forEach(t => {
-        // Only count service charges (loading/unloading) if they fall within the range
         if (!filterStart || (new Date(t.date) >= filterStart && new Date(t.date) <= filterEnd)) {
             service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
         }
-        const key = t.itemId.toString();
-        if (!items[key]) items[key] = { dc: [], rc: [] };
-        t.type === 'DC' ? items[key].dc.push({ ...t._doc }) : items[key].rc.push({ ...t._doc });
+        
+        // Loop through the basket items
+        t.items.forEach(item => {
+            const key = item.itemId.toString();
+            if (!items[key]) items[key] = { dc: [], rc: [] };
+            
+            // Create a flat object so your existing logic doesn't break
+            const flatItem = { 
+                ...t._doc, 
+                quantity: item.quantity, 
+                rate: item.rate,
+                itemName: item.itemName,
+                category: item.category 
+            };
+            t.type === 'DC' ? items[key].dc.push(flatItem) : items[key].rc.push(flatItem);
+        });
     });
 
     for (let id in items) {
@@ -117,56 +129,89 @@ app.post('/transfer-stock', async (req, res) => {
 
 // 1. Modified Dispatch to handle Deposit
 app.post('/dispatch', async (req, res) => {
-    const item = await Inventory.findById(req.body.itemId);
-    if (!item || item.availableStock < req.body.quantity) return res.status(400).json({message: "No Stock"});
-    
-    item.availableStock -= Number(req.body.quantity); 
-    await item.save();
-    
-    const count = await Transaction.countDocuments({ type: 'DC' });
-    const challan = await new Transaction({ ...req.body, type: 'DC', challanNo: `DC-${1001 + count}`, godown: item.godown }).save();
+    try {
+        const { builderId, siteId, items, loadingCharges, deposit, date, godown } = req.body;
 
-    // AUTO-DEPOSIT LOGIC
-        if (req.body.deposit && Number(req.body.deposit) > 0) {
+        // 1. Validate ALL items in basket first
+        for (const cartItem of items) {
+            const inv = await Inventory.findById(cartItem.itemId);
+            if (!inv || inv.availableStock < cartItem.quantity) {
+                return res.status(400).json({ message: `Insufficient Stock for ${cartItem.itemName}` });
+            }
+        }
+
+        // 2. If all valid, deduct stock
+        for (const cartItem of items) {
+            await Inventory.findByIdAndUpdate(cartItem.itemId, { 
+                $inc: { availableStock: -Number(cartItem.quantity) } 
+            });
+        }
+
+        // 3. Create Single Challan
+        const count = await Transaction.countDocuments({ type: 'DC' });
+        const challan = new Transaction({
+            type: 'DC',
+            challanNo: `DC-${1001 + count}`,
+            builderId, siteId, godown, items, loadingCharges, deposit, date
+        });
+        await challan.save();
+
+        // 4. Auto-Deposit Payment
+        if (deposit && Number(deposit) > 0) {
             await new Payment({
-                builderId: req.body.builderId,
-                amountPaid: Number(req.body.deposit),
-                paymentMode: 'Cash',
-                referenceNo: 'Deposit',
-                date: req.body.date || new Date()
-                }).save();
+                builderId, amountPaid: Number(deposit),
+                paymentMode: 'Cash', referenceNo: 'Advance Deposit', date: date || new Date()
+            }).save();
         }
         res.json(challan);
+    } catch (e) { res.status(500).json({ message: e.message }); }
 });
-
 
 app.post('/return', async (req, res) => {
     try {
-        const { itemId, siteId, quantity } = req.body;
-        const qty = Number(quantity);
+        const { siteId, items, unloadingCharges, date, builderId } = req.body;
 
-        // 1. VALIDATION: Check if site actually holds this much
-        const txns = await Transaction.find({ siteId: siteId, itemId: itemId });
-        let currentSiteBalance = 0;
+        // 1. GET CURRENT SITE BALANCE
+        const txns = await Transaction.find({ siteId: siteId });
+        let siteBalances = {};
+        
         txns.forEach(t => {
-            currentSiteBalance += (t.type === 'DC' ? t.quantity : -t.quantity);
+            t.items.forEach(item => {
+                const id = item.itemId.toString();
+                siteBalances[id] = (siteBalances[id] || 0) + (t.type === 'DC' ? item.quantity : -item.quantity);
+            });
         });
 
-        if (qty > currentSiteBalance) {
-            return res.status(400).json({ message: `Return failed! Site only has ${currentSiteBalance} units remaining.` });
+        // 2. VALIDATION: Check every item in the return basket against Site Balance
+        for (const returnItem of items) {
+            const currentBal = siteBalances[returnItem.itemId] || 0;
+            if (Number(returnItem.quantity) > currentBal) {
+                return res.status(400).json({ 
+                    message: `Return Failed! Site only has ${currentBal} units of ${returnItem.itemName} remaining.` 
+                });
+            }
         }
 
-        // 2. PROCESS RETURN: If valid, update inventory
-        const item = await Inventory.findById(itemId);
-        if(!item) return res.status(404).json({message: "Item not found"});
-        
-        item.availableStock += qty;
-        await item.save();
+        // 3. PROCESS: If all valid, update Inventory Stock
+        for (const returnItem of items) {
+            const inv = await Inventory.findById(returnItem.itemId);
+            if (inv) {
+                inv.availableStock += Number(returnItem.quantity);
+                await inv.save();
+            }
+        }
 
+        // 4. CREATE RC CHALLAN
         const count = await Transaction.countDocuments({ type: 'RC' });
         const challanNo = `RC-${1001 + count}`;
         
-        const newTxn = new Transaction({ ...req.body, type: 'RC', challanNo, godown: item.godown });
+        const newTxn = new Transaction({ 
+            ...req.body, 
+            type: 'RC', 
+            challanNo,
+            // Note: godown will be handled per item in history, 
+            // but we store the primary godown context if needed
+        });
         await newTxn.save();
 
         res.json({ challanNo });
@@ -199,17 +244,24 @@ app.post('/add-site', async (req, res) => {
 app.get('/site-balance/:siteId', async (req, res) => {
     const txns = await Transaction.find({ siteId: req.params.siteId });
     let bal = {};
-    for (let t of txns) { 
-        const id = t.itemId.toString();
-        bal[id] = (bal[id] || 0) + (t.type === 'DC' ? t.quantity : -t.quantity); 
-    }
-    let out = [];
-    for (let id in bal) {
-        if (bal[id] > 0) {
-            const info = await Inventory.findById(id);
-            if (info) out.push({ itemId: id, itemName: info.itemName, category: info.category, godown: info.godown, currentBalance: bal[id] });
-        }
-    }
+    
+    txns.forEach(t => {
+        t.items.forEach(item => {
+            const id = item.itemId.toString();
+            if (!bal[id]) bal[id] = { name: item.itemName, cat: item.category, qty: 0, godown: t.godown };
+            bal[id].qty += (t.type === 'DC' ? item.quantity : -item.quantity);
+        });
+    });
+
+    let out = Object.keys(bal)
+        .filter(id => bal[id].qty > 0)
+        .map(id => ({
+            itemId: id,
+            itemName: bal[id].name,
+            category: bal[id].cat,
+            godown: bal[id].godown,
+            currentBalance: bal[id].qty
+        }));
     res.json(out);
 });
 
@@ -342,20 +394,22 @@ app.get('/company-stats', async (req, res) => {
 });
 app.get('/all-transactions', async (req, res) => {
     try {
-        const txns = await Transaction.find().sort({ date: -1 }); // Newest first
+        const txns = await Transaction.find().sort({ date: -1 });
         const builders = await Builder.find();
         const sites = await Site.find();
-        const items = await Inventory.find();
 
         const history = txns.map(t => {
-            const b = builders.find(x => x._id.toString() === t.builderId.toString());
-            const s = sites.find(x => x._id.toString() === t.siteId.toString());
-            const i = items.find(x => x._id.toString() === t.itemId.toString());
+            const b = builders.find(x => x._id.toString() === t.builderId?.toString());
+            const s = sites.find(x => x._id.toString() === t.siteId?.toString());
+            
+            // Map the items array to a readable string for the "Item Name" column
+            const itemsSummary = t.items.map(i => `${i.itemName} (${i.quantity})`).join(", ");
+
             return {
                 ...t._doc,
                 builderName: b ? b.companyName : 'N/A',
                 siteName: s ? s.siteName : 'N/A',
-                itemName: i ? i.itemName + " (" + i.category + ")" : 'N/A'
+                itemName: itemsSummary || 'No Items' 
             };
         });
         res.json(history);
@@ -363,50 +417,56 @@ app.get('/all-transactions', async (req, res) => {
         res.status(500).send(e.message);
     }
 });
+
 app.put('/edit-transaction/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { date, itemId, quantity, rate, loadingCharges, unloadingCharges } = req.body;
+        const { date, items, loadingCharges, unloadingCharges } = req.body; // 'items' is now the new basket
 
         const oldTxn = await Transaction.findById(id);
         if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
 
-        const oldQty = parseFloat(oldTxn.quantity) || 0;
-        const newQty = parseFloat(quantity) || 0;
-        const oldItemId = oldTxn.itemId.toString();
-        const newItemId = itemId;
-
-        // STEP 1: UNDO OLD STOCK (Temporary)
-        const oldInvItem = await Inventory.findById(oldItemId);
-        if (oldInvItem) {
-            if (oldTxn.type === 'DC') oldInvItem.availableStock += oldQty;
-            else oldInvItem.availableStock -= oldQty;
-            // We don't save yet, just update the object in memory
+        // STEP 1: UNDO OLD STOCK IMPACT
+        for (const oldItem of oldTxn.items) {
+            const inv = await Inventory.findById(oldItem.itemId);
+            if (inv) {
+                // If it was a Dispatch, give stock back. If Return, take it back.
+                if (oldTxn.type === 'DC') inv.availableStock += oldItem.quantity;
+                else inv.availableStock -= oldItem.quantity;
+                await inv.save();
+            }
         }
 
-        // STEP 2: SAFETY CHECK FOR NEW ITEM
-        const newInvItem = (oldItemId === newItemId) ? oldInvItem : await Inventory.findById(newItemId);
-        if (!newInvItem) return res.status(404).json({ error: "New item not found" });
-
-        // If it's a Dispatch (DC), check if we have enough
-        if (oldTxn.type === 'DC' && newInvItem.availableStock < newQty) {
-            return res.status(400).json({ 
-                error: `Insufficient Stock! ${newInvItem.itemName} only has ${newInvItem.availableStock} available.` 
-            });
+        // STEP 2: VALIDATE NEW BASKET STOCK (Only for Dispatches)
+        if (oldTxn.type === 'DC') {
+            for (const newItem of items) {
+                const inv = await Inventory.findById(newItem.itemId);
+                if (!inv || inv.availableStock < newItem.quantity) {
+                    // CRITICAL: If validation fails, we must RE-DEDUCT what we undid above 
+                    // to keep the DB consistent before erroring out.
+                    for (const oldItem of oldTxn.items) {
+                        await Inventory.findByIdAndUpdate(oldItem.itemId, { 
+                            $inc: { availableStock: oldTxn.type === 'DC' ? -oldItem.quantity : oldItem.quantity } 
+                        });
+                    }
+                    return res.status(400).json({ error: `Insufficient stock for ${newItem.itemName}` });
+                }
+            }
         }
 
-        // STEP 3: APPLY NEW STOCK
-        if (oldTxn.type === 'DC') newInvItem.availableStock -= newQty;
-        else newInvItem.availableStock += newQty;
+        // STEP 3: APPLY NEW STOCK IMPACT
+        for (const newItem of items) {
+            const inv = await Inventory.findById(newItem.itemId);
+            if (inv) {
+                if (oldTxn.type === 'DC') inv.availableStock -= newItem.quantity;
+                else inv.availableStock += newItem.quantity;
+                await inv.save();
+            }
+        }
 
-        // STEP 4: SAVE EVERYTHING (Atomic-like)
-        if (oldInvItem && oldItemId !== newItemId) await oldInvItem.save();
-        await newInvItem.save();
-
+        // STEP 4: UPDATE TRANSACTION RECORD
         oldTxn.date = date;
-        oldTxn.itemId = newItemId;
-        oldTxn.quantity = newQty;
-        oldTxn.rate = parseFloat(rate) || 0;
+        oldTxn.items = items; // Save the new basket
         if (oldTxn.type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
         else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
         
@@ -417,6 +477,7 @@ app.put('/edit-transaction/:id', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
 app.put('/edit-payment/:id', async (req, res) => {
     try {
         const { id } = req.params;
