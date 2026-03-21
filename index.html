@@ -77,6 +77,7 @@
         .remove-item { color: var(--danger); cursor: pointer; text-align: center; width: 40px; transition: 0.2s; }
         .remove-item:hover { transform: scale(1.2); }
         .add-to-basket-btn { background: var(--secondary); margin-bottom: 10px; }
+        .truncate-text { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -169,14 +170,59 @@
     <button id="btnPrintDC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('DC')">🖨️ Print Dispatch Challan</button>
 </div>
             <div class="section return-sec">
-                <h2><i class="fas fa-truck-pickup"></i> Return (RC)</h2>
-                <div class="grid"><div class="search-wrapper"><input type="text" id="rBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder..." onclick="toggleDrop('rBuilderList')" onkeyup="filterDrop('rBuilderSearch', 'rBuilderList')"><div id="rBuilderList" class="search-results"></div><input type="hidden" id="rBuilder"></div><div class="search-wrapper"><input type="text" id="rSiteSearch" autocomplete="off" placeholder="🔍 Search Site..." onclick="toggleDrop('rSiteList')" onkeyup="filterDrop('rSiteSearch', 'rSiteList')"><div id="rSiteList" class="search-results"></div><input type="hidden" id="rSite"></div></div><div class="search-wrapper" style="margin-top:20px;"><input type="text" id="rItemSearch" autocomplete="off" placeholder="🔍 Search Items on Site..." onclick="toggleDrop('rItemList')" onkeyup="filterDrop('rItemSearch', 'rItemList')"><div id="rItemList" class="search-results"></div><input type="hidden" id="rItem"></div>
-                <div class="grid"><input type="number" id="rQty" placeholder="Qty Returned"><input type="number" id="rUnloading" placeholder="Unloading Charges (₹)"></div>
-                <input type="date" id="rDate">
-                <button onclick="processTxn('return')" style="background: var(--accent);">Confirm Return</button>
-                <div id="msg5" class="msg-area"></div>
-                <button id="btnPrintRC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('RC')">🖨️ Print Return Challan</button>
-            </div>
+    <h2><i class="fas fa-truck-moving"></i> Return (RC)</h2>
+    
+    <div class="grid">
+        <div class="search-wrapper">
+            <input type="text" id="rBuilderSearch" autocomplete="off" placeholder="🔍 Select Builder..." onclick="toggleDrop('rBuilderList')" onkeyup="filterDrop('rBuilderSearch', 'rBuilderList')">
+            <div id="rBuilderList" class="search-results"></div>
+            <input type="hidden" id="rBuilder">
+        </div>
+        <div class="search-wrapper">
+            <input type="text" id="rSiteSearch" autocomplete="off" placeholder="🔍 Select Site..." onclick="toggleDrop('rSiteList')" onkeyup="filterDrop('rSiteSearch', 'rSiteList')">
+            <div id="rSiteList" class="search-results"></div>
+            <input type="hidden" id="rSite">
+        </div>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+
+    <div class="grid">
+        <div class="search-wrapper">
+            <input type="text" id="rItemSearch" autocomplete="off" placeholder="🔍 Select Item from Site..." onclick="toggleDrop('rItemList')" onkeyup="filterDrop('rItemSearch', 'rItemList')">
+            <div id="rItemList" class="search-results"></div>
+            <input type="hidden" id="rItem">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="number" id="rQty" placeholder="Return Qty">
+            <button onclick="addToReturnBasket()" style="width:120px; background:var(--accent);"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div class="basket-container">
+        <table class="basket-table">
+            <thead>
+                <tr>
+                    <th>Material Name</th>
+                    <th>Qty to Return</th>
+                    <th style="width:50px;"></th>
+                </tr>
+            </thead>
+            <tbody id="returnBasketBody">
+                <tr><td colspan="3" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="grid">
+        <input type="number" id="rUnloading" placeholder="Unloading Charges (₹)">
+        <input type="date" id="rDate">
+    </div>
+
+    <button onclick="processTxn('return')" style="background: var(--accent); margin-top:15px;">Confirm Return</button>
+    <div id="msg5" class="msg-area"></div>
+    <button id="btnPrintRC" style="display:none; background:#343a40; margin-top:10px;" onclick="printChallan('RC')">🖨️ Print Return Challan</button>
+</div>
             <div class="section report-sec">
                 <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
                 <div class="grid"><div class="search-wrapper"><input type="text" id="repBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Report..." onclick="toggleDrop('repBuilderList')" onkeyup="filterDrop('repBuilderSearch', 'repBuilderList')"><div id="repBuilderList" class="search-results"></div><input type="hidden" id="repBuilder"></div><div class="search-wrapper"><input type="text" id="repSiteSearch" autocomplete="off" placeholder="🔍 Search Site for Report..." onclick="toggleDrop('repSiteList')" onkeyup="filterDrop('repSiteSearch', 'repSiteList')"><div id="repSiteList" class="search-results"></div><input type="hidden" id="repSite"></div></div>
@@ -210,6 +256,8 @@
     let fullInventory = [];
     let lastTxn = null;
     let currentBasket = []; // Global memory for the current dispatch
+    let returnBasket = [];
+    let editBasket = []; // Memory to hold the items being edited
 
 function addToBasket() {
     const itemId = document.getElementById('dItem').value;
@@ -257,7 +305,73 @@ function renderBasket() {
         </tr>
     `).join('');
 }
+    function addToReturnBasket() {
+    const itemId = document.getElementById('rItem').value;
+    const itemLabel = document.getElementById('rItemSearch').value; 
+    const qtyInput = document.getElementById('rQty');
+    const qty = parseFloat(qtyInput.value);
 
+    // 1. Validation: Ensure item is selected and quantity is valid
+    if (!itemId || !itemLabel) {
+        alert("Please select an item from the site holdings list first!");
+        return;
+    }
+    if (isNaN(qty) || qty <= 0) {
+        alert("Please enter a valid quantity to return!");
+        qtyInput.focus();
+        return;
+    }
+
+    // 2. Extract clean Item Name from the label (removes the [Bal: X] part for the table)
+    const itemName = itemLabel.split('[')[0].trim();
+
+    // 3. Check if item already exists in the return basket
+    const existing = returnBasket.find(i => i.itemId === itemId);
+    if (existing) {
+        existing.quantity += qty;
+    } else {
+        returnBasket.push({ 
+            itemId: itemId, 
+            itemName: itemName, 
+            quantity: qty 
+        });
+    }
+
+    // 4. Clear the item selection fields for the next item
+    document.getElementById('rItem').value = "";
+    document.getElementById('rItemSearch').value = "";
+    qtyInput.value = "";
+    
+    // 5. Update the UI Table
+    renderReturnBasket();
+}
+
+function removeFromReturnBasket(index) {
+    returnBasket.splice(index, 1);
+    renderReturnBasket();
+}
+
+function renderReturnBasket() {
+    const tbody = document.getElementById('returnBasketBody');
+    
+    // Fixed: Added backticks (``) around the HTML string below
+    if (returnBasket.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = returnBasket.map((item, index) => `
+        <tr>
+            <td><strong>${item.itemName}</strong></td>
+            <td>${item.quantity}</td>
+            <td class="remove-item" onclick="removeFromReturnBasket(${index})"><i class="fas fa-trash"></i></td>
+        </tr>
+    `).join('');
+}
+    function removeFromReturnBasket(index) {
+    returnBasket.splice(index, 1); // Removes the item from memory
+    renderReturnBasket();          // Refreshes the table
+}
     
 
     function formatDate(isoString) { if (!isoString) return "-"; const d = new Date(isoString); return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`; }
@@ -495,20 +609,33 @@ function renderBasket() {
     const p = type === 'dispatch' ? 'd' : 'r';
     const msgId = type === 'dispatch' ? 'msg4' : 'msg5';
     
+    // Select the correct basket based on type
+    const basket = type === 'dispatch' ? currentBasket : returnBasket;
+
+    // Validation: Check if basket is empty
+    if (basket.length === 0) {
+        document.getElementById(msgId).style.color = "orange";
+        document.getElementById(msgId).innerHTML = "⚠️ Basket is empty! Add items first.";
+        return;
+    }
+
     const body = { 
         builderId: document.getElementById(`${p}Builder`).value, 
         siteId: document.getElementById(`${p}Site`).value, 
-        itemId: document.getElementById(`${p}Item`).value, 
-        quantity: Number(document.getElementById(`${p}Qty`).value), 
+        items: basket, // NEW: Sending the array
         date: document.getElementById(`${p}Date`).value, 
-        rate: type === 'dispatch' ? Number(document.getElementById(`dRate`).value) : 0, 
         loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
         unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0,
-        // NEW: Deposit only for dispatch
         deposit: type === 'dispatch' ? Number(document.getElementById(`dDeposit`).value) : 0 
     };
 
-    if (!validate(body, msgId)) return;
+    // Use your existing validate function (make sure it handles 'items' check if you updated it, 
+    // otherwise these simple checks suffice)
+    if (!body.builderId || !body.siteId || !body.date) {
+        document.getElementById(msgId).style.color = "red";
+        document.getElementById(msgId).innerHTML = "⚠️ Select Builder, Site and Date!";
+        return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = "Processing...";
@@ -523,37 +650,34 @@ function renderBasket() {
         const result = await res.json();
 
         if(res.ok) {
-            const builderName = type === 'dispatch' ? 
-                document.getElementById(`dBuilderSearch`).value : 
-                document.getElementById(`rBuilderSearch`).value;
+            const builderName = document.getElementById(`${p}BuilderSearch`).value;
+            const siteName = document.getElementById(`${p}SiteSearch`).value;
 
-            const siteName = type === 'dispatch' ? 
-                document.getElementById(`dSiteSearch`).value : 
-                document.getElementById(`rSiteSearch`).value;
-
-            const itemName = type === 'dispatch' ? 
-                document.getElementById(`dItemSearch`).value.split('-')[0] : 
-                document.getElementById(`rItemSearch`).value.split('-')[0];
+            // Prepare a summary of items for the Print Preview
+            const itemNames = basket.map(i => i.itemName).join(", ");
 
             lastTxn = { 
                 ...body, 
                 challanNo: result.challanNo, 
                 builder: builderName, 
                 site: siteName, 
-                item: itemName 
+                item: itemNames // For the Print function
             };
             
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
             document.getElementById(msgId).style.color = "green";
             document.getElementById(msgId).innerHTML = "✅ " + result.challanNo; 
             
+            // Common Clear
             document.getElementById(`${p}Qty`).value = "";
             document.getElementById(`${p}Date`).value = "";
 
             if(type === 'dispatch') {
+                currentBasket = []; // Clear Basket Memory
+                renderBasket();     // Clear Basket UI
                 document.getElementById(`dRate`).value = "";
                 document.getElementById(`dLoading`).value = "";
-                document.getElementById(`dDeposit`).value = ""; // NEW: Clear deposit
+                document.getElementById(`dDeposit`).value = "";
                 document.getElementById(`dBuilderSearch`).value = "";
                 document.getElementById(`dSiteSearch`).value = "";
                 document.getElementById(`dItemSearch`).value = "";
@@ -561,6 +685,8 @@ function renderBasket() {
                 document.getElementById(`dSite`).value = "";
                 document.getElementById(`dItem`).value = "";
             } else {
+                returnBasket = [];  // Clear Basket Memory
+                renderReturnBasket(); // Clear Basket UI
                 document.getElementById(`rUnloading`).value = "";
                 document.getElementById(`rBuilderSearch`).value = "";
                 document.getElementById(`rSiteSearch`).value = "";
@@ -784,9 +910,80 @@ async function openSiteReportModal() {
         sel.innerHTML = '<option value="">-- Select Type --</option>';
         (list[val] || ['N/A']).forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
     }
+    function printChallan(type) {
+    if (!lastTxn) return alert("No transaction found to print!");
 
-    function printChallan(type) { const win = window.open('', '', 'height=600,width=800'); win.document.write(`<html><body><h2>${type} CHALLAN</h2><p>No: ${lastTxn.challanNo}</p><p>Builder: ${lastTxn.builder}</p><p>Item: ${lastTxn.item}</p><p>Qty: ${lastTxn.quantity}</p></body></html>`); win.document.close(); win.print(); }
+    const win = window.open('', '', 'height=800,width=1000');
+    
+    // 1. Generate Rows for the items in the basket
+    const itemRows = lastTxn.items.map(i => `
+        <tr>
+            <td style="border:1px solid #000; padding:8px;">${i.itemName}</td>
+            <td style="border:1px solid #000; padding:8px; text-align:center;">${i.quantity}</td>
+            ${type === 'DC' ? `<td style="border:1px solid #000; padding:8px; text-align:right;">₹${i.rate}</td>` : ''}
+        </tr>
+    `).join('');
 
+    // 2. Build the full Print Document
+    win.document.write(`
+        <html>
+        <head>
+            <title>Challan - ${lastTxn.challanNo}</title>
+            <style>
+                body { font-family: sans-serif; padding: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                .details { margin-bottom: 20px; line-height: 1.6; }
+                .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>ANANT TECHNOLOGY</h2>
+                <h3>${type === 'DC' ? 'DISPATCH (DC)' : 'RETURN (RC)'} CHALLAN</h3>
+            </div>
+            
+            <div class="details">
+                <p><strong>Challan No:</strong> ${lastTxn.challanNo}</p>
+                <p><strong>Date:</strong> ${new Date(lastTxn.date).toLocaleDateString()}</p>
+                <p><strong>Builder:</strong> ${lastTxn.builder}</p>
+                <p><strong>Site:</strong> ${lastTxn.site}</p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="border:1px solid #000; padding:8px; background:#eee;">Description</th>
+                        <th style="border:1px solid #000; padding:8px; background:#eee; width:100px;">Qty</th>
+                        ${type === 'DC' ? `<th style="border:1px solid #000; padding:8px; background:#eee; width:100px;">Rate/Day</th>` : ''}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemRows}
+                </tbody>
+            </table>
+
+            <div class="details" style="margin-top:20px;">
+                ${type === 'DC' ? `<p><strong>Loading Charges:</strong> ₹${lastTxn.loadingCharges || 0}</p>` : `<p><strong>Unloading Charges:</strong> ₹${lastTxn.unloadingCharges || 0}</p>`}
+                ${lastTxn.deposit ? `<p><strong>Advance Deposit:</strong> ₹${lastTxn.deposit}</p>` : ''}
+            </div>
+
+            <div class="footer">
+                <p>_______________________<br>Receiver's Signature</p>
+                <p>_______________________<br>Authorized Signatory</p>
+            </div>
+        </body>
+        </html>
+    `);
+
+    win.document.close();
+    
+    // Wait for content to load before printing
+    win.onload = function() {
+        win.print();
+        win.close();
+    };
+}
    
 async function generateBill() {
     const bId = document.getElementById('billBuilder').value;
@@ -1012,86 +1209,215 @@ async function printHoldingReport() {
     }
 
     async function loadHistory() {
-    const res = await fetch(`${API_URL}/all-transactions`);
-    const data = await res.json();
-    let h = `<table id="histTable"><tr><th>Date</th><th>Challan</th><th>Type</th><th>Builder / Site</th><th>Item</th><th>Qty</th><th>Rate</th><th>Charges</th></tr>`;
-    data.forEach(t => {
-        const charges = t.type === 'DC' ? (t.loadingCharges || 0) : (t.unloadingCharges || 0);
-        const color = t.type === 'DC' ? 'color:red;' : 'color:green;';
-        h += `<tr>
-                <td>${formatDate(t.date)}</td>
-                <td><b>${t.challanNo}</b></td>
-                <td style="${color} font-weight:bold;">${t.type}</td>
-                <td>${t.builderName}<br><small>${t.siteName}</small></td>
-                <td>${t.itemName}</td>
-                <td>${t.quantity}</td>
-                <td>₹${t.rate || 0}</td>
-                <td>₹${charges}</td>
-                <td><button onclick="openEditModal('${t._id}')" style="background:var(--accent); padding:5px;">✏️ Edit</button></td>
-              </tr>`;
-        // Inside loadHistory() loop:
-    
-    });
-    document.getElementById('historyDisplay').innerHTML = h + `</table>`;
+    try {
+        const res = await fetch(`${API_URL}/all-transactions`);
+        const data = await res.json();
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = "";
+
+        data.sort((a, b) => new Date(b.date) - new Date(a.date)); // Show newest first
+
+        data.forEach(txn => {
+            const row = document.createElement('tr');
+            
+            // NEW: Create a summary string for the items in the basket
+            // This shows something like: "Plate (5), Column (2)..."
+            const itemSummary = txn.items.map(i => `${i.itemName} (${i.quantity})`).join(", ");
+            
+            // Calculate total items in this challan for the Qty column
+            const totalQty = txn.items.reduce((sum, i) => sum + i.quantity, 0);
+
+            row.innerHTML = `
+                <td>${new Date(txn.date).toLocaleDateString()}</td>
+                <td class="txn-${txn.type.toLowerCase()}"><strong>${txn.type}</strong></td>
+                <td>${txn.challanNo}</td>
+                <td>
+                    <div style="font-weight:bold;">${txn.builderName}</div>
+                    <div style="font-size:0.8rem; color:#666;">${txn.siteName}</div>
+                </td>
+                <td title="${itemSummary}">
+                    <div class="truncate-text">${itemSummary}</div>
+                </td>
+                <td><strong>${totalQty}</strong></td>
+                <td>
+                    <button class="btn-edit" onclick="openEditModal('${txn._id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn-delete" onclick="deleteTxn('${txn._id}', '${txn.type}')"><i class="fas fa-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (e) {
+        console.error("History Load Error:", e);
     }
+}
 
     function filterHistory() {
-    const val = document.getElementById('histSearch').value.toUpperCase();
-    const rows = document.querySelectorAll('#histTable tr:not(:first-child)');
+    const query = document.getElementById('historySearch').value.toLowerCase();
+    const rows = document.querySelectorAll('#historyBody tr');
+
     rows.forEach(row => {
-        row.style.display = row.innerText.toUpperCase().includes(val) ? '' : 'none';
+        const text = row.innerText.toLowerCase();
+        // This naturally works because row.innerText includes the summarized item names 
+        // generated by your new loadHistory function.
+        row.style.display = text.includes(query) ? '' : 'none';
     });
-    }
+}
 
     function printHistory() {
-    const content = document.getElementById('historyDisplay').innerHTML;
+    const rows = Array.from(document.querySelectorAll('#historyBody tr'))
+                      .filter(row => row.style.display !== 'none');
+
     const win = window.open('', '', 'height=700,width=1000');
-    win.document.write(`<html><head><title>Txn History</title><style>table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:8px;font-size:12px;}</style></head><body>`);
-    win.document.write(`<h2 style="text-align:center;">Transaction History Log</h2>${content}</body></html>`);
+    win.document.write(`
+        <html>
+        <head>
+            <title>Transaction History Report</title>
+            <style>
+                body { font-family: sans-serif; padding: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .dc { color: red; font-weight: bold; }
+                .rc { color: blue; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <h2>Transaction History Report</h2>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Challan</th>
+                        <th>Builder/Site</th>
+                        <th>Items Summary</th>
+                        <th>Total Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(row => `<tr>${row.innerHTML}</tr>`).join('')}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    
+    // Hide the Action buttons (Edit/Delete) in the printed version
+    win.document.querySelectorAll('td:last-child').forEach(el => el.remove());
+    win.document.querySelectorAll('th:last-child').forEach(el => el.remove());
+
     win.document.close();
     win.print();
-    }
-    
-    window.onload = () => {
-        masterSync();
-        const items = ['MS Plate', 'MS Props Jack', 'Cuplock Vertical', 'MS Ledger', 'Ms Pipe', 'Channel', 'Ms Clamp', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapeda', 'Wood Chavi', 'Sikanja'];
-        ['itemName', 'tItemName'].forEach(id => { const el = document.getElementById(id); if(el) { el.innerHTML = '<option value="">-- Select Item --</option>'; items.forEach(i => el.innerHTML += `<option value="${i}">${i}</option>`); } });
-    };
+}
     // 1. Function to open the modal and fill it with EXISTING data
 async function openEditModal(txnId) {
     try {
         const res = await fetch(`${API_URL}/all-transactions`);
         const data = await res.json();
         const txn = data.find(t => t._id === txnId);
-        if (!txn) return alert("Not found");
+        if (!txn) return alert("Transaction not found");
 
-        // Clear previous success messages
         const msgDiv = document.getElementById('editMsg');
         if(msgDiv) msgDiv.innerText = "";
 
+        // 1. Fill basic fields
         document.getElementById('editId').value = txn._id;
         document.getElementById('editDate').value = txn.date.split('T')[0];
-        document.getElementById('editQty').value = txn.quantity;
-        document.getElementById('editRate').value = txn.rate;
         document.getElementById('saveEditBtn').setAttribute('data-type', txn.type);
+        
+        // 2. Handle Charges based on Type
         document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
 
-        // Fetch latest inventory for the dropdown
+        // 3. Load the basket from the transaction into memory
+        editBasket = JSON.parse(JSON.stringify(txn.items)); 
+        renderEditBasket(txn.type);
+
+        // --- NEW CODE ADDED HERE: Populate the "Add Item" dropdown inside the modal ---
         const invRes = await fetch(`${API_URL}/inventory`);
-        const items = await invRes.json();
-        const itemSelect = document.getElementById('editItem');
+        const invData = await invRes.json();
+        const eList = document.getElementById('eItemList');
         
-        // REFRESH DROPDOWN: Clear duplicates and show current stock
-        itemSelect.innerHTML = items.map(i => 
-            `<option value="${i._id}" ${i._id === txn.itemId ? 'selected' : ''}>
-                ${i.itemName} (${i.category}) - ${i.godown} [Stock: ${i.availableStock}]
-            </option>`
-        ).join('');
+        // This builds the list of items you can pick from to add to this old challan
+        eList.innerHTML = invData.map(i => `
+            <div onclick="document.getElementById('eItemSearch').value='${i.itemName} (${i.category})'; 
+                          document.getElementById('eItem').value='${i._id}'; 
+                          document.getElementById('eItemList').style.display='none';">
+                ${i.itemName} (${i.category})
+            </div>
+        `).join('');
+        // ----------------------------------------------------------------------------
 
         document.getElementById('editModal').style.display = 'flex';
-    } catch (e) { alert("Error loading data"); }
+    } catch (e) { 
+        console.error(e);
+        alert("Error loading data"); 
+    }
+}
+// 1. Function to add a brand new item to the edit list
+async function addItemToEditBasket() {
+    const itemId = document.getElementById('eItem').value;
+    const itemName = document.getElementById('eItemSearch').value;
+    const type = document.getElementById('saveEditBtn').getAttribute('data-type');
+
+    if (!itemId) return alert("Select an item first!");
+
+    // Add to the memory array
+    editBasket.push({
+        itemId: itemId,
+        itemName: itemName,
+        quantity: 0, // User will type the quantity in the list below
+        rate: 0
+    });
+
+    // Clear the search inputs
+    document.getElementById('eItem').value = "";
+    document.getElementById('eItemSearch').value = "";
+    
+    renderEditBasket(type);
 }
 
+// 2. Function to remove an item from the edit list
+function removeItemFromEdit(index) {
+    if (confirm("Are you sure you want to remove this item from the challan?")) {
+        const type = document.getElementById('saveEditBtn').getAttribute('data-type');
+        editBasket.splice(index, 1);
+        renderEditBasket(type);
+    }
+}
+
+// 3. Update the renderEditBasket to include a Delete Icon
+function renderEditBasket(type) {
+    const container = document.getElementById('editBasketContainer');
+    if (!editBasket || editBasket.length === 0) {
+        container.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>Basket is empty.</div>";
+        return;
+    }
+
+    container.innerHTML = editBasket.map((item, index) => `
+        <div style="background:white; padding:10px; border-radius:6px; margin-bottom:10px; border:1px solid #eee; position:relative;">
+            <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; padding-right:30px;">${item.itemName}</div>
+            
+            <i class="fas fa-times-circle" onclick="removeItemFromEdit(${index})" style="position:absolute; top:10px; right:10px; color:var(--danger); cursor:pointer;"></i>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div class="edit-field">
+                    <label style="font-size:0.7rem;">Quantity</label>
+                    <input type="number" value="${item.quantity}" oninput="updateEditItem(${index}, 'quantity', this.value)" style="padding:5px;">
+                </div>
+                ${type === 'DC' ? `
+                <div class="edit-field">
+                    <label style="font-size:0.7rem;">Daily Rate (₹)</label>
+                    <input type="number" value="${item.rate}" oninput="updateEditItem(${index}, 'rate', this.value)" style="padding:5px;">
+                </div>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateEditItem(index, field, value) {
+    editBasket[index][field] = parseFloat(value) || 0;
+}
 // 2. Function to SAVE the edited data
 async function saveEdit() {
     const id = document.getElementById('editId').value;
@@ -1099,10 +1425,8 @@ async function saveEdit() {
     
     const updateData = {
         date: document.getElementById('editDate').value,
-        itemId: document.getElementById('editItem').value,
-        quantity: parseFloat(document.getElementById('editQty').value),
-        rate: parseFloat(document.getElementById('editRate').value),
-        [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: parseFloat(document.getElementById('editCharges').value)
+        items: editBasket, // NEW: Sending the updated array
+        [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: parseFloat(document.getElementById('editCharges').value) || 0
     };
 
     try {
@@ -1114,35 +1438,39 @@ async function saveEdit() {
         const result = await res.json();
 
         if (res.ok) {
-            // Show message at top of popup
             const msgDiv = document.getElementById('editMsg');
             msgDiv.style.color = "green";
             msgDiv.innerText = "✅ Saved Successfully!";
 
-            // Reset Boxes after 1 second and refresh
             setTimeout(async () => {
-                document.getElementById('editQty').value = "";
-                document.getElementById('editRate').value = "";
-                document.getElementById('editCharges').value = "";
                 closeEditModal();
                 await loadHistory();
                 await masterSync();
             }, 1200);
         } else {
-        // This will now show "Insufficient Stock! MS Plate 3x24 only has 25 available."
-        const msgDiv = document.getElementById('editMsg');
-        msgDiv.style.background = "#fff3f3";
-        msgDiv.style.border = "1px solid var(--danger)";
-        msgDiv.style.color = "var(--danger)";
-        msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
-    }
+            const msgDiv = document.getElementById('editMsg');
+            msgDiv.style.color = "red";
+            msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
+        }
     } catch (e) { alert("Server Error"); }
-    }
+}
     //To Close Editing Popup
     function closeEditModal() {
     document.getElementById('editModal').style.display = 'none';
     }
     
+   async function deleteTxn(id) {
+    if (!confirm("Are you sure you want to delete this entire challan? All stock changes will be reversed.")) return;
+    try {
+        const res = await fetch(`${API_URL}/delete-transaction/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            await loadHistory();
+            await masterSync();
+        } else {
+            alert("Delete failed");
+        }
+    } catch (e) { alert("Connection error"); }
+} 
 
 // 1. Show/Hide dropdown
 function toggleDrop(id) {
@@ -1288,15 +1616,20 @@ async function selectReturnSite(id, name) {
     document.getElementById('rSiteSearch').value = name;
     document.getElementById('rSiteList').style.display = 'none';
 
-    // Fetch site balance (Holdings)
+    // Fetch site balance (Holdings) from Server
     const res = await fetch(`${API_URL}/site-balance/${id}`);
     const data = await res.json();
     
     const rItemList = document.getElementById('rItemList');
-    rItemList.innerHTML = data.map(i => {
-        const label = `${i.itemName} (${i.category}) - ${i.godown} [Bal: ${i.currentBalance}]`;
-        return `<div onclick="selectReturnItem('${i.itemId}', '${label}')">${label}</div>`;
-    }).join('');
+    if (data.length === 0) {
+        rItemList.innerHTML = `<div style="color:red; padding:10px;">No items currently at this site.</div>`;
+    } else {
+        rItemList.innerHTML = data.map(i => {
+            const label = `${i.itemName} (${i.category}) [Bal: ${i.currentBalance}]`;
+            // We pass the ID and the Label to your existing selectReturnItem function
+            return `<div onclick="selectReturnItem('${i.itemId}', '${label}')">${label}</div>`;
+        }).join('');
+    }
 }
 
 // 3. Select the Item to return
@@ -1304,6 +1637,9 @@ function selectReturnItem(id, label) {
     document.getElementById('rItem').value = id;
     document.getElementById('rItemSearch').value = label;
     document.getElementById('rItemList').style.display = 'none';
+    
+    // Auto-focus the quantity field for faster entry
+    document.getElementById('rQty').focus();
 }
     // 1. Select Builder in Billing Section
 async function selectBillBuilder(id, name) {
@@ -1525,7 +1861,33 @@ function closePayEditModal() {
 
 
 </script>
-    <div id="editModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3><span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span></div><div id="editMsg" style="height:35px; margin-bottom:15px;"></div><input type="hidden" id="editId"><div class="edit-grid"><div class="edit-field full-width"><label>Material & Category (Godown Source)</label><select id="editItem"></select></div><div class="edit-field"><label>Transaction Date</label><input type="date" id="editDate"></div><div class="edit-field"><label>Quantity</label><input type="number" id="editQty"></div><div class="edit-field"><label>Daily Rate (₹)</label><input type="number" id="editRate"></div><div class="edit-field"><label>Service Charges (Load/Unload)</label><input type="number" id="editCharges"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
+    <div id="editModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-edit"></i> Edit Transaction</h3><span class="close-btn" onclick="closeEditModal()" style="position:static;">&times;</span></div><div id="editMsg" style="height:35px; margin-bottom:15px;"></div><input type="hidden" id="editId">
+        <div class="edit-grid">
+    <div class="edit-field">
+        <label>Transaction Date</label>
+        <input type="date" id="editDate">
+    </div>
+    <div class="edit-field">
+        <label>Service Charges (Load/Unload)</label>
+        <input type="number" id="editCharges">
+    </div>
+</div>
+
+<div style="margin-top:20px;">
+    <label style="font-size: 0.8rem; font-weight: bold; color: var(--secondary); text-transform: uppercase;">Materials in this Challan</label>
+    
+    <div style="display:flex; gap:10px; margin-top:10px; background:#eee; padding:10px; border-radius:8px;">
+        <div class="search-wrapper" style="flex:2;">
+            <input type="text" id="eItemSearch" placeholder="🔍 Add new item to this list..." onclick="toggleDrop('eItemList')" onkeyup="filterDrop('eItemSearch', 'eItemList')" style="padding:8px; font-size:0.85rem;">
+            <div id="eItemList" class="search-results"></div>
+            <input type="hidden" id="eItem">
+        </div>
+        <button onclick="addItemToEditBasket()" style="flex:1; padding:8px; background:var(--accent); font-size:0.85rem;"><i class="fas fa-plus"></i> Add</button>
+    </div>
+
+    <div id="editBasketContainer" style="margin-top:10px; max-height: 250px; overflow-y: auto; background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+        </div></div>
+        <div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button id="saveEditBtn" onclick="saveEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes </button><button onclick="closeEditModal()" style="background:var(--secondary); flex:1;"> Cancel </button></div></div></div>
     <div id="quickSiteModal" class="modal"><div class="modal-content" style="max-width: 400px; margin-top: 10%;"><h3 style="color:var(--primary)">➕ Quick Add New Site</h3><p id="labelForBuilder" style="font-weight:bold; color:var(--accent);"></p><div class="edit-field"><label>Site Name</label><input type="text" id="newQuickSiteName" placeholder="Enter Site Name Only"></div><div style="display:flex; gap:10px; margin-top:20px;"><button onclick="saveQuickSite()" style="background:var(--success);">Save Site</button><button onclick="document.getElementById('quickSiteModal').style.display='none'" style="background:var(--secondary);">Cancel</button></div></div></div>
     <div id="payEditModal" class="modal"><div class="modal-content" style="max-width: 500px;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; margin-bottom:15px; padding-bottom:10px;"><h3 style="margin:0; color:var(--primary);"><i class="fas fa-cash-register"></i> Edit Payment / Deposit</h3><span class="close-btn" onclick="closePayEditModal()" style="position:static;">&times;</span></div><div id="payEditMsg" style="height:35px; margin-bottom:15px; text-align:center; font-weight:bold;"></div><input type="hidden" id="payEditId"><div class="edit-grid" style="grid-template-columns: 1fr;"><div class="edit-field"><label>Amount Paid (₹)</label><input type="number" id="payEditAmount"></div><div class="edit-field"><label>Payment Date</label><input type="date" id="payEditDate"></div><div class="edit-field"><label>Payment Mode</label><select id="payEditMode"><option value="Cash">Cash</option><option value="Online">Online / G-Pay</option><option value="Cheque">Cheque</option><option value="Bank">Bank Transfer</option></select></div><div class="edit-field"><label>Reference / Note</label><input type="text" id="payEditRef"></div></div><div style="display:flex; gap:12px; margin-top:25px; border-top:1px solid #eee; padding-top:20px;"><button onclick="savePaymentEdit()" style="background:var(--success); flex:2;"><i class="fas fa-save"></i> Save Changes</button><button onclick="closePayEditModal()" style="background:var(--secondary); flex:1;">Cancel</button></div></div></div>
 </div>
