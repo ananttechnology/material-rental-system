@@ -416,39 +416,72 @@ function renderReturnBasket() {
         // 1. FETCH BUILDERS
         const res = await fetch(`${API_URL}/builders`);
         const builders = await res.json();
-        allBuilders = builders;
+        allBuilders = builders; 
 
-        // Populate Searchable Lists
-        const listIds = ['dBuilderList', 'rBuilderList', 'repBuilderList', 'billBuilderList', 'pBuilderList', 'bNameList'];
-        const selectIds = ['builderSelect']; // Standard dropdowns
+        // DISPATCH Builder List
+        const dBuilderList = document.getElementById('dBuilderList');
+        if (dBuilderList) {
+            dBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
 
-        // Update the searchable builder lists
-        listIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.innerHTML = builders.map(b => 
-                    `<div onclick="select${id.replace('List', '')}('${b._id}', '${b.companyName}')">${b.companyName}</div>`
-                ).join('');
+        // RETURN Builder List
+        const rBuilderList = document.getElementById('rBuilderList');
+        if (rBuilderList) {
+            rBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectReturnBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+
+        // REPORT Builder List
+        const repBuilderList = document.getElementById('repBuilderList');
+        if (repBuilderList) {
+            repBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectRepBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+
+        // BILLING Builder List
+        const billBuilderList = document.getElementById('billBuilderList');
+        if (billBuilderList) {
+            billBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectBillBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+
+        // PAYMENT Builder List
+        const pBuilderList = document.getElementById('pBuilderList');
+        if (pBuilderList) {
+            pBuilderList.innerHTML = builders.map(b => 
+                `<div onclick="selectPayBuilder('${b._id}', '${b.companyName}')">${b.companyName}</div>`
+            ).join('');
+        }
+
+        // NEW BUILDER (Check existing) List
+        const bNameList = document.getElementById('bNameList');
+        if (bNameList) {
+            bNameList.innerHTML = builders.map(b => 
+                `<div onclick="selectExistingBuilder('${b.companyName}')">${b.companyName} (Existing)</div>`
+            ).join('');
+        }
+
+        // Standard dropdowns for simple forms
+        ['builderSelect'].forEach(id => {
+            const s = document.getElementById(id);
+            if(s) { 
+                const cur = s.value; 
+                s.innerHTML = '<option value="">-- Select Builder --</option>'; 
+                builders.forEach(x => s.innerHTML += `<option value="${x._id}">${x.companyName}</option>`); 
+                s.value = cur; 
             }
         });
 
-        // 2. FETCH INVENTORY & SYNC DROPDOWNS
+        // 2. FETCH INVENTORY
         const invRes = await fetch(`${API_URL}/inventory`);
         fullInventory = await invRes.json();
         
-        // POPULATE SIDEBAR DROPDOWNS (Inventory & Transfer)
-        const itemNames = [...new Set(fullInventory.map(i => i.itemName))];
-        const invDropdowns = ['itemName', 'tItemName'];
-        
-        invDropdowns.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.innerHTML = '<option value="">-- Select Material --</option>' + 
-                               itemNames.map(name => `<option value="${name}">${name}</option>`).join('');
-            }
-        });
-
-        // Update Searchable Dispatch Item List
+        // DISPATCH Material List
         const dItemList = document.getElementById('dItemList');
         if(dItemList) { 
             dItemList.innerHTML = fullInventory
@@ -459,11 +492,22 @@ function renderReturnBasket() {
                 }).join('');
         }
 
+        // POPULATE SIDEBAR DROPDOWNS (Inventory Addition & Transfer Stock)
+        const itemNames = [...new Set(fullInventory.map(i => i.itemName))];
+        ['itemName', 'tItemName'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.innerHTML = '<option value="">-- Select Material --</option>' + 
+                               itemNames.map(name => `<option value="${name}">${name}</option>`).join('');
+            }
+        });
+
         // 3. REFRESH HISTORY & DASHBOARD
         loadHistory(); 
         const statRes = await fetch(`${API_URL}/company-stats`);
-        currentStatsData = await statRes.json();
-        document.getElementById('dash-billed').innerText = currentStatsData.currentMonthBilled.toLocaleString();
+        const stats = await statRes.json();
+        currentStatsData = stats; 
+        document.getElementById('dash-billed').innerText = stats.currentMonthBilled.toLocaleString();
         
     } catch (e) { console.error("Sync Error:", e); }
 }
