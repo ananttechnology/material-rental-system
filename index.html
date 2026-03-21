@@ -127,6 +127,20 @@
 
     <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
 
+    <div class="edit-field" style="margin-bottom: 10px;">
+        <label><i class="fas fa-warehouse"></i> Dispatch From Godown</label>
+        <select id="dispatchGodown" onchange="refreshDispatchItemList()" style="border: 2px solid var(--primary); font-weight: bold;">
+        <option value="">-- Select Godown First --</option>
+        <option value="Ankleshwar Godown">Ankleshwar Godown</option>
+        <option value="Dahej Godown">Dahej Godown</option>
+       </select>
+    </div>
+
+    <div class="search-wrapper">
+            <input type="text" id="dItemSearch" ... >
+            <div id="dItemList" class="search-results"></div>
+    </div>
+
     <div class="grid">
         <div class="search-wrapper">
             <input type="text" id="dItemSearch" autocomplete="off" placeholder="🔍 Search Material to add..." onclick="toggleDrop('dItemList')" onkeyup="filterDrop('dItemSearch', 'dItemList')">
