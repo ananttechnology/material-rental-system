@@ -62,6 +62,10 @@
         .search-results div { padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
         .search-results div:hover { background-color: var(--light); color: var(--accent); }
         .search-results div.add-new { background: #eef9f3; color: var(--success); font-weight: bold; position: sticky; top: 0; }
+        .btn-loader { border: 2px solid #f3f3f3; border-top: 2px solid var(--accent); border-radius: 50%; width: 12px; height: 12px; animation: spin 0.8s linear infinite; display: inline-block; margin-right: 5px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(3600deg); } }
+        /* Optional: Disable button while loading to prevent double-clicks */
+        .loading-btn { pointer-events: none; opacity: 0.8; }
         /* Add this to your <style> if not already present */
         #quickSiteModal { display: none; /* Hidden by default */align-items: center; justify-content: center; }
 </style>
@@ -1317,14 +1321,28 @@ async function recordPayment() {
     msg.innerHTML = "⚠️ This builder already exists in the system.";
 }
     async function openPaymentEditModal(payId) {
+    // 1. Find the button that was clicked to show loading state
+    const btn = event.currentTarget; 
+    const originalContent = btn.innerHTML;
+    
+    // 2. Start Loading State
+    btn.classList.add('loading-btn');
+    btn.innerHTML = `<div class="btn-loader"></div> Loading...`;
+
     const bId = document.getElementById('pBuilder').value;
+    
     try {
+        // Fetch fresh data from server
         const res = await fetch(`${API_URL}/statement/${bId}`);
         const data = await res.json();
         const p = data.payments.find(x => x._id === payId);
         
-        if (!p) return alert("Payment record not found");
+        if (!p) {
+            alert("Payment record not found");
+            return;
+        }
 
+        // Populate Modal Fields
         document.getElementById('payEditId').value = p._id;
         document.getElementById('payEditAmount').value = p.amountPaid;
         document.getElementById('payEditDate').value = p.date.split('T')[0];
@@ -1332,12 +1350,23 @@ async function recordPayment() {
         document.getElementById('payEditRef').value = p.referenceNo || "";
         document.getElementById('payEditMsg').innerText = "";
 
+        // 3. Open Modal
         document.getElementById('payEditModal').style.display = 'flex';
-    } catch (e) { alert("Error fetching payment details"); }
+        
+    } catch (e) { 
+        console.error(e);
+        alert("Error fetching payment details"); 
+    } finally {
+        // 4. Reset Button to original state
+        btn.classList.remove('loading-btn');
+        btn.innerHTML = originalContent;
+    }
 }
-
 async function savePaymentEdit() {
+    const btn = event.currentTarget; // The "Save Changes" button
+    const originalContent = btn.innerHTML;
     const id = document.getElementById('payEditId').value;
+    
     const body = {
         amountPaid: document.getElementById('payEditAmount').value,
         date: document.getElementById('payEditDate').value,
@@ -1345,13 +1374,17 @@ async function savePaymentEdit() {
         referenceNo: document.getElementById('payEditRef').value
     };
 
-    // Compulsory Validation
+    // 1. Compulsory Validation
     if (!body.amountPaid || !body.date || !body.paymentMode) {
         const msg = document.getElementById('payEditMsg');
-        msg.style.color = "red";
+        msg.style.color = "var(--danger)";
         msg.innerText = "⚠️ Amount, Date, and Mode are compulsory!";
         return;
     }
+
+    // 2. Start Loading State
+    btn.classList.add('loading-btn');
+    btn.innerHTML = `<div class="btn-loader"></div> Saving...`;
 
     try {
         const res = await fetch(`${API_URL}/edit-payment/${id}`, {
@@ -1362,18 +1395,27 @@ async function savePaymentEdit() {
 
         if (res.ok) {
             const msg = document.getElementById('payEditMsg');
-            msg.style.color = "green";
-            msg.innerText = "✅ Payment Updated!";
+            msg.style.color = "var(--success)";
+            msg.innerText = "✅ Payment Updated Successfully!";
             
+            // Wait 1 second so user can see the success message
             setTimeout(() => {
                 closePayEditModal();
-                loadLedger(); // This refreshes the whole table and total balance
-                masterSync();
+                loadLedger(); // Refresh table
+                masterSync(); // Refresh dashboard
             }, 1000);
         } else {
-            alert("Update Failed on Server");
+            const result = await res.json();
+            alert("Update Failed: " + (result.error || "Server Error"));
+            // Reset button if failed so they can try again
+            btn.classList.remove('loading-btn');
+            btn.innerHTML = originalContent;
         }
-    } catch (e) { alert("Connection Error"); }
+    } catch (e) { 
+        alert("Connection Error");
+        btn.classList.remove('loading-btn');
+        btn.innerHTML = originalContent;
+    }
 }
 
 function closePayEditModal() {
