@@ -18,13 +18,13 @@ mongoose.connect(MONGO_URI).then(() => console.log("✅ System Audit: DB Connect
 const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: String, mobile: String, gstNumber: String, address: String }));
 const Site = mongoose.model('Site', new mongoose.Schema({ builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' }, siteName: String, siteAddress: String }));
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({ itemName: String, category: String, godown: String, totalStock: Number, availableStock: Number }));
-const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, items: [{ itemId: mongoose.Schema.Types.ObjectId, itemName: String, quantity: Number, rate: { type: Number, default: 0 } }], loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
+const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, items: [{ itemId: mongoose.Schema.Types.ObjectId, itemName: String, quantity: Number, rate: { type: Number, default: 0 }, damagedQty: { type: Number, default: 0 }, damagedRate: { type: Number, default: 0 } }], loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
 const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: { type: String, default: "" }, date: { type: Date, default: Date.now } }));
 
 // --- BILLING ENGINE LOGIC ---
 async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const txns = await Transaction.find({ siteId }).sort({ date: 1 });
-    let service = 0, bill = [], items = {};
+    let service = 0, bill = [], items = {};, damageTotal = 0;
     
     // Convert strings to Date objects if they exist
     const filterStart = startDate ? new Date(startDate) : null;
@@ -33,6 +33,15 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     txns.forEach(t => {
         if (!filterStart || (new Date(t.date) >= filterStart && new Date(t.date) <= filterEnd)) {
             service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+            NEW: Add Damage Penalty logic for Return (RC) transactions
+            if (t.type === 'RC') {
+                t.items.forEach(item => {
+                    if (item.damagedQty > 0) {
+                        // Multiply damaged units by the penalty rate
+                        damageTotal += (Number(item.damagedQty) * (Number(item.damageRate) || 0));
+                    }
+                });
+            }
         }
         
         // Loop through the basket items
@@ -98,7 +107,9 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
             }
         });
     }
-    return { bill, service, subtotal: bill.reduce((s, i) => s + i.total, 0) };
+    // NEW: Updated return object to include damageTotal
+    const subtotal = bill.reduce((s, i) => s + i.total, 0);
+    return { bill, service, subtotal, damageTotal, grandTotal: subtotal + service + damageTotal };
 }
 
 // --- ROUTES ---
@@ -171,13 +182,14 @@ app.post('/return', async (req, res) => {
     try {
         const { siteId, items, unloadingCharges, date, builderId } = req.body;
 
-        // 1. GET CURRENT SITE BALANCE
+        // 1. GET CURRENT SITE BALANCE (Exact same logic as your code)
         const txns = await Transaction.find({ siteId: siteId });
         let siteBalances = {};
         
         txns.forEach(t => {
             t.items.forEach(item => {
                 const id = item.itemId.toString();
+                // Logic: Adds if DC, Subtracts if RC
                 siteBalances[id] = (siteBalances[id] || 0) + (t.type === 'DC' ? item.quantity : -item.quantity);
             });
         });
@@ -185,6 +197,7 @@ app.post('/return', async (req, res) => {
         // 2. VALIDATION: Check every item in the return basket against Site Balance
         for (const returnItem of items) {
             const currentBal = siteBalances[returnItem.itemId] || 0;
+            // Validate the Total Quantity being returned (both good and damaged)
             if (Number(returnItem.quantity) > currentBal) {
                 return res.status(400).json({ 
                     message: `Return Failed! Site only has ${currentBal} units of ${returnItem.itemName} remaining.` 
@@ -192,25 +205,29 @@ app.post('/return', async (req, res) => {
             }
         }
 
-        // 3. PROCESS: If all valid, update Inventory Stock
+        // 3. PROCESS: Update Inventory Stock
         for (const returnItem of items) {
             const inv = await Inventory.findById(returnItem.itemId);
             if (inv) {
-                inv.availableStock += Number(returnItem.quantity);
-                await inv.save();
+                // NEW LOGIC: Only "Good" items return to available inventory.
+                // Subtract damagedQty from the total quantity returned.
+                const returnToStock = Number(returnItem.quantity) - (Number(returnItem.damagedQty) || 0);
+                
+                if (returnToStock > 0) {
+                    inv.availableStock += returnToStock;
+                    await inv.save();
+                }
             }
         }
 
-        // 4. CREATE RC CHALLAN
+        // 4. CREATE RC CHALLAN (Using your counter and naming convention)
         const count = await Transaction.countDocuments({ type: 'RC' });
         const challanNo = `RC-${1001 + count}`;
         
         const newTxn = new Transaction({ 
             ...req.body, 
             type: 'RC', 
-            challanNo,
-            // Note: godown will be handled per item in history, 
-            // but we store the primary godown context if needed
+            challanNo
         });
         await newTxn.save();
 
@@ -278,7 +295,8 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
                 sites: [],
                 grandTotal: 0,
                 totalService: 0,
-                totalSubtotal: 0
+                totalSubtotal: 0,
+                totalDamage: 0
             };
 
             for (let s of sites) {
@@ -287,11 +305,14 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
                     siteName: s.siteName,
                     bill: siteBill.bill,
                     subtotal: siteBill.subtotal,
-                    service: siteBill.service
+                    service: siteBill.service,
+                    damageTotal: siteBill.damageTotal
                 });
                 consolidatedData.totalSubtotal += siteBill.subtotal;
                 consolidatedData.totalService += siteBill.service;
+                consolidatedData.totalDamage += (siteBill.damageTotal || 0);
             }
+            consolidatedData.grandTotal = consolidatedData.totalSubtotal + consolidatedData.totalService + consolidatedData.totalDamage;
             res.json(consolidatedData);
         } else {
             // 2. Logic for Single Site Billing (Existing Functionality)
