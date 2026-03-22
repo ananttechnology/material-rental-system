@@ -370,7 +370,9 @@ function renderBasket() {
         returnBasket.push({ 
             itemId: itemId, 
             itemName: itemName, 
-            quantity: qty 
+            quantity: qty,
+            damagedQty: 0,
+            damageRate: 0
         });
     }
 
@@ -383,25 +385,35 @@ function renderBasket() {
     renderReturnBasket();
 }
 
-function removeFromReturnBasket(index) {
-    returnBasket.splice(index, 1);
-    renderReturnBasket();
-}
-
 function renderReturnBasket() {
     const tbody = document.getElementById('returnBasketBody');
     
-    // Fixed: Added backticks (``) around the HTML string below
     if (returnBasket.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = returnBasket.map((item, index) => `
         <tr>
             <td><strong>${item.itemName}</strong></td>
-            <td>${item.quantity}</td>
-            <td class="remove-item" onclick="removeFromReturnBasket(${index})"><i class="fas fa-trash"></i></td>
+            <td>
+                <input type="number" value="${item.quantity}" 
+                    oninput="returnBasket[${index}].quantity = parseFloat(this.value) || 0" 
+                    style="width:60px; padding:4px;">
+            </td>
+            <td>
+                <input type="number" placeholder="0" 
+                    oninput="returnBasket[${index}].damagedQty = parseFloat(this.value) || 0" 
+                    style="width:60px; padding:4px; border:1px solid #ffcccc;">
+            </td>
+            <td>
+                <input type="number" placeholder="Rate" 
+                    oninput="returnBasket[${index}].damageRate = parseFloat(this.value) || 0" 
+                    style="width:70px; padding:4px; border:1px solid #ffcccc;">
+            </td>
+            <td class="remove-item" onclick="removeFromReturnBasket(${index})">
+                <i class="fas fa-trash"></i>
+            </td>
         </tr>
     `).join('');
 }
@@ -736,14 +748,19 @@ function renderReturnBasket() {
             const siteName = document.getElementById(`${p}SiteSearch`).value;
 
             // Prepare a summary of items for the Print Preview
-            const itemNames = basket.map(i => i.itemName).join(", ");
+            // Updated Summary for Print: Now mentions damages if any
+            const itemSummary = basket.map(i => {
+                let text = `${i.itemName} (${i.quantity})`;
+                if (i.damagedQty > 0) text += ` [Damaged: ${i.damagedQty}]`;
+                return text;
+            }).join(", ");
 
             lastTxn = { 
                 ...body, 
                 challanNo: result.challanNo, 
                 builder: builderName, 
                 site: siteName, 
-                item: itemNames // For the Print function
+                item: itemSummary // For the Print function
             };
             
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
@@ -1077,7 +1094,6 @@ async function generateBill() {
 
     if (!bId || !sId || !start || !end) return alert("⚠️ Please fill all boxes: Builder, Site, and Date Range.");
 
-    // Clear old data immediately so the user knows it's working
     const billBox = document.getElementById('billDisplay');
     const stockBox = document.getElementById('holdingDisplay');
     
@@ -1085,35 +1101,38 @@ async function generateBill() {
     if (stockBox) stockBox.innerHTML = "";
 
     try {
-        // --- 1. FETCH & RENDER BILLING (Money) ---
         const resBill = await fetch(`${API_URL}/calculate-bill/${sId}?start=${start}&end=${end}&builderId=${bId}`);
         const data = await resBill.json();
         
         let billH = `<h2 style="color:var(--primary); border-bottom: 2px solid var(--danger); padding-bottom:10px; margin-top:10px;">💰 Calculated Bill</h2>`;
         
+        const isGst = document.getElementById('gstToggle').checked;
+
         if (data.isConsolidated) {
             data.sites.forEach(site => {
                 if(site.bill && site.bill.length > 0) {
                     billH += `<h4 style="background:#f8f9fa; padding:8px; border-left:4px solid var(--danger); margin-top:20px;">Site: ${site.siteName}</h4>`;
                     billH += renderBillTable(site.bill);
-                    billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${(site.subtotal + site.service).toLocaleString()}</p>`;
+                    // NEW: Site subtotal now includes damageTotal if present
+                    const siteTotal = site.subtotal + site.service + (site.damageTotal || 0);
+                    billH += `<p style="text-align:right; font-weight:bold;">Site Subtotal: ₹${siteTotal.toLocaleString()}</p>`;
                 }
             });
-            const gst = document.getElementById('gstToggle').checked ? (data.totalSubtotal + data.totalService) * 0.18 : 0;
-            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst);
+            
+            const gst = isGst ? (data.totalSubtotal + data.totalService + (data.totalDamage || 0)) * 0.18 : 0;
+            // NEW: Passing data.totalDamage
+            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst, data.totalDamage || 0);
         } else {
             billH += renderBillTable(data.bill);
-            const gst = document.getElementById('gstToggle').checked ? (data.subtotal + data.service) * 0.18 : 0;
-            billH += renderBillSummary(data.subtotal, data.service, gst);
+            const gst = isGst ? (data.subtotal + data.service + (data.damageTotal || 0)) * 0.18 : 0;
+            // NEW: Passing data.damageTotal
+            billH += renderBillSummary(data.subtotal, data.service, gst, data.damageTotal || 0);
         }
         
-        // Add Print Button
         billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem; width:100%;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
-        
-        // Show the Bill
         billBox.innerHTML = billH;
 
-        // --- 2. FETCH & RENDER HOLDINGS (Stock) ---
+        // --- 2. HOLDINGS (STOCK) Logic remains exactly the same as your code ---
         let holdingH = `<hr style="margin: 40px 0; border: 1px dashed #ccc;">`; 
         holdingH += `<h2 style="color:var(--primary); border-bottom: 2px solid var(--accent); padding-bottom:10px;">📦 Current Stock on Site</h2>`;
         
@@ -1131,13 +1150,11 @@ async function generateBill() {
             const bal = await resBal.json();
             holdingH += renderHoldingTable(bal);
         }
-
-        // Show the Stock
         stockBox.innerHTML = holdingH;
 
     } catch (e) {
         console.error("Billing Error:", e);
-        billBox.innerHTML = `<p style="color:red;">❌ Error: ${e.message}. Please check console.</p>`;
+        billBox.innerHTML = `<p style="color:red;">❌ Error: ${e.message}.</p>`;
     }
 }
     // Helper: Render the Holding Table
@@ -1163,15 +1180,19 @@ async function generateBill() {
     }
 
     // Helper: Render the Summary
-    function renderBillSummary(sub, ser, gst) {
+    function renderBillSummary(sub, ser, gst, dmg = 0) {
+    const grandTotal = sub + ser + gst + dmg;
+    
     return `<div style="text-align:right; margin-top:15px; border-top:2px solid #333; padding-top:10px;">
           <p>Rent Subtotal: ₹${sub.toLocaleString()}</p>
           <p>Service Charges: ₹${ser.toLocaleString()}</p>
+          <p style="color:red;">Damage/Loss Charges: ₹${dmg.toLocaleString()}</p>
           <p>GST (18%): ₹${gst.toLocaleString()}</p>
-          <h3 style="color:var(--danger);">Grand Total: ₹${(sub + ser + gst).toLocaleString()}</h3></div>`;
-    }
+          <h3 style="color:var(--danger); border-top:1px solid #eee; display:inline-block; padding-top:5px;">Grand Total: ₹${grandTotal.toLocaleString()}</h3>
+    </div>`;
+}
     
-async function printHoldingReport() {
+    async function printHoldingReport() {
     const builderId = document.getElementById('repBuilder').value;
     const siteId = document.getElementById('repSite').value;
     const builderName = document.getElementById('repBuilderSearch').value;
@@ -1234,7 +1255,7 @@ async function printHoldingReport() {
         document.getElementById('repSite').value = "";
 
     } catch (e) { alert("Print Error: " + e.message); }
-}
+    }
 
     function printInvoice() {
     // 1. Get the data currently visible on your screen
@@ -1254,13 +1275,22 @@ async function printHoldingReport() {
         body { font-family: 'Segoe UI', sans-serif; padding: 30px; color: #333; }
         .header { text-align: center; border-bottom: 3px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
         .details { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
-        th { background: #f2f2f2; }
+        th { background: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
         h2 { font-size: 1.2rem; margin-top: 30px; color: #2c3e50; border-bottom: 1px solid #eee; }
-        h4 { background: #f9f9f9; padding: 5px; margin-bottom: 5px; border-left: 3px solid #3498db; }
-        button { display: none; } /* Hide the print button on paper */
+        h4 { background: #f9f9f9; padding: 5px; margin-bottom: 5px; border-left: 3px solid #3498db; -webkit-print-color-adjust: exact; }
+        
+        /* Force red color to show up on print for Damage Charges */
+        .damage-row { color: #d9534f !important; font-weight: bold; -webkit-print-color-adjust: exact; }
+        
+        button, .btn-print-action { display: none !important; } /* Hide the print button on paper */
         .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+        @media print {
+            body { padding: 10px; }
+            .no-print { display: none; }
+        }
     </style></head><body>`;
 
     // Header logic
@@ -1268,12 +1298,13 @@ async function printHoldingReport() {
     
     html += `<div class="details">
                 <div><strong>To:</strong> ${builderName}<br><strong>Site:</strong> ${siteName}</div>
-                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${formatDate(new Date())}</div>
+                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
              </div>`;
 
     // Include both Holdings and the Money calculation
-    html += `<div>${billContent}</div>`; // Bill first on paper
-    html += `<div style="margin-top:30px;">${holdingContent}</div>`; // Stock second
+    // Note: Our updated renderBillSummary now lives inside billContent
+    html += `<div>${billContent}</div>`; 
+    html += `<div style="margin-top:30px;">${holdingContent}</div>`; 
 
     // Signatory Area
     html += `<div class="footer">
@@ -1286,11 +1317,11 @@ async function printHoldingReport() {
     win.document.write(html);
     win.document.close();
     
-    // Slight delay to ensure images/styles load before print dialog opens
     setTimeout(() => {
         win.print();
+        // Optional: win.close(); // Uncomment if you want the window to close after printing
     }, 500);
-    }
+}
 
     async function loadHistory() {
     try {
