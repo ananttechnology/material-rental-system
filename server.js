@@ -33,7 +33,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     txns.forEach(t => {
         if (!filterStart || (new Date(t.date) >= filterStart && new Date(t.date) <= filterEnd)) {
             service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
-            NEW: Add Damage Penalty logic for Return (RC) transactions
+            //NEW: Add Damage Penalty logic for Return (RC) transactions
             if (t.type === 'RC') {
                 t.items.forEach(item => {
                     if (item.damagedQty > 0) {
