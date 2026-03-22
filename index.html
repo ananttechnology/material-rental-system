@@ -402,14 +402,14 @@ function renderReturnBasket() {
                     style="width:60px; padding:4px;">
             </td>
             <td>
-                <input type="number" placeholder="0" 
-                    oninput="returnBasket[${index}].damagedQty = parseFloat(this.value) || 0" 
-                    style="width:60px; padding:4px; border:1px solid #ffcccc;">
+                <input type="number" placeholder="Damaged Qty" 
+                    onchange="updateReturnItem(${index}, 'damagedQty', this.value)" 
+                    style="width:80px; border:1px solid red; padding:2px;">
             </td>
             <td>
-                <input type="number" placeholder="Rate" 
-                    oninput="returnBasket[${index}].damageRate = parseFloat(this.value) || 0" 
-                    style="width:70px; padding:4px; border:1px solid #ffcccc;">
+                <input type="number" placeholder="Penalty Rate" 
+                    onchange="updateReturnItem(${index}, 'damageRate', this.value)" 
+                    style="width:80px; border:1px solid red; padding:2px;">
             </td>
             <td class="remove-item" onclick="removeFromReturnBasket(${index})">
                 <i class="fas fa-trash"></i>
