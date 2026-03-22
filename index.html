@@ -1119,13 +1119,13 @@ async function generateBill() {
                 }
             });
             
-            //const gst = isGst ? (data.totalSubtotal + data.totalService + (data.totalDamage || 0)) * 0.18 : 0;
-            const gst = isGst ? (data.subtotal + data.service + (data.damageTotal || 0)) * 0.18 : 0;
+            const gst = isGst ? (data.totalSubtotal + data.totalService + (data.totalDamage || 0)) * 0.18 : 0;
+            
             // NEW: Passing data.totalDamage
             billH += renderBillSummary(data.totalSubtotal, data.totalService, gst, data.totalDamage || 0);
         } else {
             billH += renderBillTable(data.bill);
-            
+            const gst = isGst ? (data.subtotal + data.service + (data.damageTotal || 0)) * 0.18 : 0;
             // NEW: Passing data.damageTotal
             billH += renderBillSummary(data.subtotal, data.service, gst, data.damageTotal || 0);
         }
