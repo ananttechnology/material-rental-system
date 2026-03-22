@@ -24,7 +24,7 @@ const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongo
 // --- BILLING ENGINE LOGIC ---
 async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const txns = await Transaction.find({ siteId }).sort({ date: 1 });
-    let service = 0, bill = [], items = {};, damageTotal = 0;
+    let service = 0, bill = [], items = {}, damageTotal = 0;
     
     // Convert strings to Date objects if they exist
     const filterStart = startDate ? new Date(startDate) : null;
