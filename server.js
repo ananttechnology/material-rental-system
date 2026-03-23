@@ -327,7 +327,8 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
                     bill: siteBill.bill,
                     subtotal: siteBill.subtotal,
                     service: siteBill.service,
-                    damageTotal: siteBill.damageTotal
+                    damageTotal: siteBill.damageTotal,
+                    damageList: siteBill.damageList
                 });
                 consolidatedData.totalSubtotal += siteBill.subtotal;
                 consolidatedData.totalService += siteBill.service;
