@@ -1139,15 +1139,15 @@ async function generateBill() {
                 }
             });
             
-            const gst = isGst ? (data.totalSubtotal + data.totalService + (data.totalDamage || 0)) * 0.18 : 0;
+            //const gst = isGst ? (data.totalSubtotal + data.totalService + (data.totalDamage || 0)) * 0.18 : 0;
             
             // NEW: Passing data.totalDamage
-            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst, data.totalDamage || 0);
+            //billH += renderBillSummary(data.totalSubtotal, data.totalService, gst, data.totalDamage || 0);
         } else {
-            billH += renderBillTable(data.bill);
+            billH += renderBillTable(data.bill, data.damageList || []);
             const gst = isGst ? (data.subtotal + data.service + (data.damageTotal || 0)) * 0.18 : 0;
             // NEW: Passing data.damageTotal
-            billH += renderBillSummary(data.subtotal, data.service, gst, data.damageTotal || 0, data.damageList || []);
+            billH += renderBillSummary(data.subtotal, data.service, gst, data.damageTotal || 0, data.damageList || 0);
         }
         
         billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem; width:100%;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
@@ -1198,20 +1198,24 @@ async function generateBill() {
     billItems.forEach(i => { 
         const dates = i.duration.split(' to ');
         const formattedDuration = `${formatDate(dates[0])} to ${formatDate(dates[1])}`;
-        t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${formattedDuration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total}</td></tr>`; 
+        t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${formattedDuration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total.toLocaleString()}</td></tr>`; 
     });
 
     // 2. Damage Rows (If any exist)
     if (damageItems.length > 0) {
-        t += `<tr style="background:#fff1f0;"><td colspan="6" style="font-weight:bold; color:red;">Material Damage / Loss Penalties</td></tr>`;
+        t += `<tr style="background:#fff1f0;">
+                <td colspan="6" style="font-weight:bold; color:var(--danger); border-top:2px solid #333;">
+                    <i class="fas fa-exclamation-triangle"></i> Material Damage / Loss Penalties
+                </td>
+              </tr>`;
         damageItems.forEach(d => {
-            t += `<tr style="color:#d32f2f;">
-                    <td>${d.name} [DAMAGED]</td>
+            t += `<tr style="color:var(--danger);">
+                    <td>${d.name} [DAMAGED/LOSS]</td>
                     <td>${d.qty}</td>
                     <td>${formatDate(d.date)}</td>
-                    <td>-</td>
+                    <td style="text-align:center;">-</td>
                     <td>₹${d.rate}</td>
-                    <td>₹${d.total}</td>
+                    <td>₹${d.total.toLocaleString()}</td>
                   </tr>`;
         });
     }
@@ -1499,7 +1503,7 @@ async function openEditModal(txnId) {
         document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
 
         // 3. Load the basket into memory with explicit damage fields
-        // We use .map to ensure every item has damagedQty and damageRate initialized
+        // We use .map to ensure every item has damagedQty and damagedRate initialized
         editBasket = txn.items.map(item => ({
             ...item,
             quantity: Number(item.quantity) || 0,
