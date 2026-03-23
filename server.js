@@ -44,7 +44,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
                 t.items.forEach(item => {
                     // We use Number() to ensure math works even if data is a string
                     const dQty = Number(item.damagedQty) || 0;
-                    const dRate = Number(item.damageRate) || 0;
+                    const dRate = Number(item.damagedRate) || 0;
                     if (dQty > 0) {
                         const currentDmg = dQty * dRate;
                         damageTotal += currentDmg;
