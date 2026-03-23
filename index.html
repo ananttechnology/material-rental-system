@@ -1413,6 +1413,7 @@ async function generateBill() {
                 </td>
                 <td><strong>${totalQty}</strong></td>
                 <td>
+                    <button class="btn-print" onclick="printHistoryChallan('${txn._id}')" style="background:#34495e; margin-right:5px;"><i class="fas fa-print"></i></button>
                     <button class="btn-edit" onclick="openEditModal('${txn._id}')"><i class="fas fa-edit"></i></button>
                     <button class="btn-delete" onclick="deleteTxn('${txn._id}', '${txn.type}')"><i class="fas fa-trash"></i></button>
                 </td>
@@ -1482,6 +1483,38 @@ async function generateBill() {
 
     win.document.close();
     win.print();
+}
+
+    async function printHistoryChallan(id) {
+    try {
+        // 1. Get all transactions (or find in your existing data array)
+        const res = await fetch(`${API_URL}/all-transactions`);
+        const data = await res.json();
+        
+        // 2. Find the specific transaction by ID
+        const txn = data.find(t => t._id === id);
+        if (!txn) return alert("Challan data not found!");
+
+        // 3. Map the data into the format the print engine expects
+        // We set 'lastTxn' so the printChallan function thinks it's a fresh transaction
+        lastTxn = {
+            challanNo: txn.challanNo,
+            date: txn.date,
+            builder: txn.builderName,
+            site: txn.siteName,
+            items: txn.items,
+            loadingCharges: txn.loadingCharges || 0,
+            unloadingCharges: txn.unloadingCharges || 0,
+            deposit: txn.deposit || 0
+        };
+
+        // 4. Call your existing high-quality print engine
+        printChallan(txn.type);
+
+    } catch (e) {
+        console.error("Print History Error:", e);
+        alert("Failed to load challan for printing.");
+    }
 }
     // 1. Function to open the modal and fill it with EXISTING data
 async function openEditModal(txnId) {
