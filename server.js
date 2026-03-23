@@ -442,7 +442,7 @@ app.get('/all-transactions', async (req, res) => {
 app.put('/edit-transaction/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { date, items, loadingCharges, unloadingCharges } = req.body; // 'items' is now the new basket
+        const { date, items, loadingCharges, unloadingCharges } = req.body;
 
         const oldTxn = await Transaction.findById(id);
         if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
@@ -451,9 +451,13 @@ app.put('/edit-transaction/:id', async (req, res) => {
         for (const oldItem of oldTxn.items) {
             const inv = await Inventory.findById(oldItem.itemId);
             if (inv) {
-                // If it was a Dispatch, give stock back. If Return, take it back.
-                if (oldTxn.type === 'DC') inv.availableStock += oldItem.quantity;
-                else inv.availableStock -= oldItem.quantity;
+                if (oldTxn.type === 'DC') {
+                    inv.availableStock += oldItem.quantity;
+                } else {
+                    // NEW: Subtract only what was previously added as "Good" stock
+                    const oldGoodQty = Number(oldItem.quantity) - (Number(oldItem.damagedQty) || 0);
+                    inv.availableStock -= oldGoodQty;
+                }
                 await inv.save();
             }
         }
@@ -462,13 +466,16 @@ app.put('/edit-transaction/:id', async (req, res) => {
         if (oldTxn.type === 'DC') {
             for (const newItem of items) {
                 const inv = await Inventory.findById(newItem.itemId);
+                // Note: availableStock is already "restored" from Step 1 here
                 if (!inv || inv.availableStock < newItem.quantity) {
-                    // CRITICAL: If validation fails, we must RE-DEDUCT what we undid above 
-                    // to keep the DB consistent before erroring out.
+                    // ROLLBACK: Put stock back to original state before erroring
                     for (const oldItem of oldTxn.items) {
-                        await Inventory.findByIdAndUpdate(oldItem.itemId, { 
-                            $inc: { availableStock: oldTxn.type === 'DC' ? -oldItem.quantity : oldItem.quantity } 
-                        });
+                        const invRoll = await Inventory.findById(oldItem.itemId);
+                        if(invRoll) {
+                           if(oldTxn.type === 'DC') invRoll.availableStock -= oldItem.quantity;
+                           else invRoll.availableStock += (Number(oldItem.quantity) - (Number(oldItem.damagedQty) || 0));
+                           await invRoll.save();
+                        }
                     }
                     return res.status(400).json({ error: `Insufficient stock for ${newItem.itemName}` });
                 }
@@ -479,15 +486,20 @@ app.put('/edit-transaction/:id', async (req, res) => {
         for (const newItem of items) {
             const inv = await Inventory.findById(newItem.itemId);
             if (inv) {
-                if (oldTxn.type === 'DC') inv.availableStock -= newItem.quantity;
-                else inv.availableStock += newItem.quantity;
+                if (oldTxn.type === 'DC') {
+                    inv.availableStock -= newItem.quantity;
+                } else {
+                    // NEW: Add only the "Good" quantity from the new edit
+                    const newGoodQty = Number(newItem.quantity) - (Number(newItem.damagedQty) || 0);
+                    inv.availableStock += newGoodQty;
+                }
                 await inv.save();
             }
         }
 
         // STEP 4: UPDATE TRANSACTION RECORD
         oldTxn.date = date;
-        oldTxn.items = items; // Save the new basket
+        oldTxn.items = items; // This now saves damagedQty/damageRate correctly
         if (oldTxn.type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
         else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
         
