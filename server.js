@@ -24,32 +24,34 @@ const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongo
 // --- BILLING ENGINE LOGIC ---
 async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const txns = await Transaction.find({ siteId }).sort({ date: 1 });
-    let service = 0, bill = [], items = {}, damageTotal = 0;
+    let service = 0, bill = [], items = {}, damageTotal = 0; // damageTotal initialized
     
-    // Convert strings to Date objects if they exist
     const filterStart = startDate ? new Date(startDate) : null;
     const filterEnd = endDate ? new Date(endDate) : new Date();
 
     txns.forEach(t => {
-        if (!filterStart || (new Date(t.date) >= filterStart && new Date(t.date) <= filterEnd)) {
+        // Fix 1: Ensure we check the transaction date correctly for Service & Damage
+        const txnDate = new Date(t.date);
+        if (!filterStart || (txnDate >= filterStart && txnDate <= filterEnd)) {
             service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
-            //NEW: Add Damage Penalty logic for Return (RC) transactions
-            if (t.type === 'RC') {
+            
+            // Fix 2: Add Damage Penalty logic specifically here
+            if (t.type === 'RC' && t.items) {
                 t.items.forEach(item => {
-                    if (item.damagedQty > 0) {
-                        // Multiply damaged units by the penalty rate
-                        damageTotal += (Number(item.damagedQty) * (Number(item.damageRate) || 0));
+                    // We use Number() to ensure math works even if data is a string
+                    const dQty = Number(item.damagedQty) || 0;
+                    const dRate = Number(item.damageRate) || 0;
+                    if (dQty > 0) {
+                        damageTotal += (dQty * dRate);
                     }
                 });
             }
         }
         
-        // Loop through the basket items
         t.items.forEach(item => {
             const key = item.itemId.toString();
             if (!items[key]) items[key] = { dc: [], rc: [] };
             
-            // Create a flat object so your existing logic doesn't break
             const flatItem = { 
                 ...t._doc, 
                 quantity: item.quantity, 
@@ -66,13 +68,12 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
         if(!info) continue;
         let dcs = items[id].dc, rcs = items[id].rc;
 
+        // Your original matching logic (Unchanged)
         rcs.forEach(r => {
             let q = r.quantity;
             dcs.forEach(d => {
                 if (d.quantity > 0 && q > 0) {
                     let take = Math.min(d.quantity, q);
-                    
-                    // Logic: Start rent at (Dispatch Date OR Filter Start), End at (Return Date)
                     let rentStart = filterStart && new Date(d.date) < filterStart ? filterStart : new Date(d.date);
                     let rentEnd = new Date(r.date);
 
@@ -94,7 +95,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
         dcs.forEach(d => {
             if (d.quantity > 0) {
                 let rentStart = filterStart && new Date(d.date) < filterStart ? filterStart : new Date(d.date);
-                let rentEnd = filterEnd; // For items on site, we stop at the filter end date
+                let rentEnd = filterEnd; 
 
                 if (rentStart <= rentEnd) {
                     let days = Math.max(1, Math.floor((rentEnd - rentStart) / 86400000) + 1);
@@ -107,11 +108,11 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
             }
         });
     }
-    // NEW: Updated return object to include damageTotal
+
     const subtotal = bill.reduce((s, i) => s + i.total, 0);
+    // grandTotal now correctly includes the calculated damageTotal
     return { bill, service, subtotal, damageTotal, grandTotal: subtotal + service + damageTotal };
 }
-
 // --- ROUTES ---
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
 app.get('/sites/:builderId', async (req, res) => res.json(await Site.find({ builderId: req.params.builderId })));
