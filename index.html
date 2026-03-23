@@ -757,7 +757,7 @@ function renderReturnBasket() {
                 challanNo: result.challanNo, 
                 builder: builderName, 
                 site: siteName, 
-                item: itemSummary // For the Print function
+                item: JSON.parse(JSON.stringify(basket)) // For the Print function, deep copy of basket
             };
             
             document.getElementById(type === 'dispatch' ? 'btnPrintDC' : 'btnPrintRC').style.display = 'block';
@@ -1013,16 +1013,36 @@ async function openSiteReportModal() {
 
     const win = window.open('', '', 'height=800,width=1000');
     
-    // 1. Generate Rows for the items in the basket
-    const itemRows = lastTxn.items.map(i => `
-        <tr>
-            <td style="border:1px solid #000; padding:8px;">${i.itemName}</td>
-            <td style="border:1px solid #000; padding:8px; text-align:center;">${i.quantity}</td>
-            ${type === 'DC' ? `<td style="border:1px solid #000; padding:8px; text-align:right;">₹${i.rate}</td>` : ''}
-        </tr>
-    `).join('');
+    // 1. Generate Rows with conditional logic for RC damage details
+    const itemRows = lastTxn.items.map(i => {
+        const total = Number(i.quantity) || 0;
+        const dmg = Number(i.damagedQty) || 0;
+        const good = total - dmg;
+        const rate = Number(i.rate) || Number(i.damagedRate) || 0;
 
-    // 2. Build the full Print Document
+        if (type === 'DC') {
+            return `
+                <tr>
+                    <td style="border:1px solid #000; padding:8px;">${i.itemName}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:center;">${total}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:right;">₹${rate}</td>
+                </tr>`;
+        } else {
+            // Updated RC row: Shows Total, Good, and Damaged (if any)
+            return `
+                <tr>
+                    <td style="border:1px solid #000; padding:8px;">
+                        ${i.itemName}
+                        ${dmg > 0 ? `<br><small style="color:red;">* Penalty for ${dmg} units @ ₹${rate}</small>` : ''}
+                    </td>
+                    <td style="border:1px solid #000; padding:8px; text-align:center;">${total}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:center;">${good}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:center;">${dmg}</td>
+                </tr>`;
+        }
+    }).join('');
+
+    // 2. Build the full Print Document with dynamic headers
     win.document.write(`
         <html>
         <head>
@@ -1030,6 +1050,8 @@ async function openSiteReportModal() {
             <style>
                 body { font-family: sans-serif; padding: 20px; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #000; padding: 8px; font-size: 13px; }
+                th { background: #eee; }
                 .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
                 .details { margin-bottom: 20px; line-height: 1.6; }
                 .footer { margin-top: 50px; display: flex; justify-content: space-between; }
@@ -1051,9 +1073,12 @@ async function openSiteReportModal() {
             <table>
                 <thead>
                     <tr>
-                        <th style="border:1px solid #000; padding:8px; background:#eee;">Description</th>
-                        <th style="border:1px solid #000; padding:8px; background:#eee; width:100px;">Qty</th>
-                        ${type === 'DC' ? `<th style="border:1px solid #000; padding:8px; background:#eee; width:100px;">Rate/Day</th>` : ''}
+                        <th>Description</th>
+                        <th style="width:80px; text-align:center;">Total Qty</th>
+                        ${type === 'DC' ? `<th style="width:100px; text-align:right;">Rate/Day</th>` : `
+                            <th style="width:80px; text-align:center;">Good Qty</th>
+                            <th style="width:80px; text-align:center;">Dmg Qty</th>
+                        `}
                     </tr>
                 </thead>
                 <tbody>
@@ -1075,8 +1100,6 @@ async function openSiteReportModal() {
     `);
 
     win.document.close();
-    
-    // Wait for content to load before printing
     win.onload = function() {
         win.print();
         win.close();
