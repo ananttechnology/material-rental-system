@@ -417,6 +417,10 @@ function renderReturnBasket() {
         </tr>
     `).join('');
 }
+    function updateReturItem(index, field, value){
+        returnBasket[index][field] = Number(value) || 0;
+        console.log("Updated Basket:", returnBasket);
+    }
     function removeFromReturnBasket(index) {
     returnBasket.splice(index, 1); // Removes the item from memory
     renderReturnBasket();          // Refreshes the table
@@ -1331,17 +1335,29 @@ async function generateBill() {
         const tbody = document.getElementById('historyBody');
         tbody.innerHTML = "";
 
-        data.sort((a, b) => new Date(b.date) - new Date(a.date)); // Show newest first
+        data.sort((a, b) => new Date(b.date) - new Date(a.date)); 
 
         data.forEach(txn => {
             const row = document.createElement('tr');
             
-            // NEW: Create a summary string for the items in the basket
-            // This shows something like: "Plate (5), Column (2)..."
-            const itemSummary = txn.items.map(i => `${i.itemName} (${i.quantity})`).join(", ");
+            // LOGIC: Create a detailed summary showing Good vs Damaged for RC
+            const itemSummary = txn.items.map(i => {
+                if (txn.type === 'RC') {
+                    const damaged = Number(i.damagedQty) || 0;
+                    const total = Number(i.quantity);
+                    const good = total - damaged;
+                    
+                    // If there are damages, show the breakdown
+                    if (damaged > 0) {
+                        return `${i.itemName} (Total: ${total} | Good: ${good}, Damaged: ${damaged})`;
+                    }
+                }
+                // Default for DC or RC with 0 damage
+                return `${i.itemName} (${i.quantity})`;
+            }).join(", ");
             
-            // Calculate total items in this challan for the Qty column
-            const totalQty = txn.items.reduce((sum, i) => sum + i.quantity, 0);
+            // Total Quantity logic remains based on total items moved
+            const totalQty = txn.items.reduce((sum, i) => sum + Number(i.quantity), 0);
 
             row.innerHTML = `
                 <td>${new Date(txn.date).toLocaleDateString()}</td>
@@ -1352,7 +1368,9 @@ async function generateBill() {
                     <div style="font-size:0.8rem; color:#666;">${txn.siteName}</div>
                 </td>
                 <td title="${itemSummary}">
-                    <div class="truncate-text">${itemSummary}</div>
+                    <div class="truncate-text" style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        ${itemSummary}
+                    </div>
                 </td>
                 <td><strong>${totalQty}</strong></td>
                 <td>
@@ -1483,7 +1501,9 @@ async function addItemToEditBasket() {
         itemId: itemId,
         itemName: itemName,
         quantity: 0, // User will type the quantity in the list below
-        rate: 0
+        rate: 0,
+        damagedQty: 0,
+        damageRate: 0
     });
 
     // Clear the search inputs
@@ -1502,7 +1522,7 @@ function removeItemFromEdit(index) {
     }
 }
 
-// 3. Update the renderEditBasket to include a Delete Icon
+// 3. Update the renderEditBasket to include a Delete Icon & damaged quantity
 function renderEditBasket(type) {
     const container = document.getElementById('editBasketContainer');
     if (!editBasket || editBasket.length === 0) {
@@ -1518,19 +1538,31 @@ function renderEditBasket(type) {
 
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                 <div class="edit-field">
-                    <label style="font-size:0.7rem;">Quantity</label>
-                    <input type="number" value="${item.quantity}" oninput="updateEditItem(${index}, 'quantity', this.value)" style="padding:5px;">
+                    <label style="font-size:0.7rem;">Total Qty</label>
+                    <input type="number" value="${item.quantity}" oninput="updateEditItem(${index}, 'quantity', this.value)" style="padding:5px; width:100%;">
                 </div>
+
                 ${type === 'DC' ? `
                 <div class="edit-field">
                     <label style="font-size:0.7rem;">Daily Rate (₹)</label>
-                    <input type="number" value="${item.rate}" oninput="updateEditItem(${index}, 'rate', this.value)" style="padding:5px;">
+                    <input type="number" value="${item.rate || 0}" oninput="updateEditItem(${index}, 'rate', this.value)" style="padding:5px; width:100%;">
+                </div>` : ''}
+
+                ${type === 'RC' ? `
+                <div class="edit-field">
+                    <label style="font-size:0.7rem; color:red;">Damaged Qty</label>
+                    <input type="number" value="${item.damagedQty || 0}" oninput="updateEditItem(${index}, 'damagedQty', this.value)" style="padding:5px; width:100%; border:1px solid #ffcccc;">
+                </div>
+                <div class="edit-field">
+                    <label style="font-size:0.7rem; color:red;">Penalty Rate (₹)</label>
+                    <input type="number" value="${item.damageRate || 0}" oninput="updateEditItem(${index}, 'damageRate', this.value)" style="padding:5px; width:100%; border:1px solid #ffcccc;">
                 </div>` : ''}
             </div>
         </div>
     `).join('');
 }
 
+// Helper to ensure values are stored as Numbers in the array
 function updateEditItem(index, field, value) {
     editBasket[index][field] = parseFloat(value) || 0;
 }
