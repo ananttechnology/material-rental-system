@@ -372,7 +372,7 @@ function renderBasket() {
             itemName: itemName, 
             quantity: qty,
             damagedQty: 0,
-            damageRate: 0
+            damagedRate: 0
         });
     }
 
@@ -402,7 +402,7 @@ function renderReturnBasket() {
                 <input type="number" value="${item.damagedQty || ''}" placeholder="Qty" onchange="updateReturnItem(${index}, 'damagedQty', this.value)" style="width:60px; border:1px solid red; padding:2px;">
             </td>
             <td>
-                <input type="number" value="${item.damageRate || ''}" placeholder="Rate" onchange="updateReturnItem(${index}, 'damageRate', this.value)" style="width:60px; border:1px solid red; padding:2px;">
+                <input type="number" value="${item.damagedRate || ''}" placeholder="Rate" onchange="updateReturnItem(${index}, 'damagedRate', this.value)" style="width:60px; border:1px solid red; padding:2px;">
             </td>
             <td class="remove-item" onclick="removeFromReturnBasket(${index})">
                 <i class="fas fa-trash"></i>
@@ -1463,7 +1463,7 @@ async function openEditModal(txnId) {
             quantity: Number(item.quantity) || 0,
             rate: Number(item.rate) || 0,
             damagedQty: Number(item.damagedQty) || 0,
-            damageRate: Number(item.damageRate) || 0
+            damagedRate: Number(item.damagedRate) || 0
         }));
 
         renderEditBasket(txn.type);
@@ -1502,7 +1502,7 @@ async function addItemToEditBasket() {
         quantity: 0, // User will type the quantity in the list below
         rate: 0,
         damagedQty: 0,
-        damageRate: 0
+        damagedRate: 0
     });
 
     // Clear the search inputs
@@ -1554,7 +1554,7 @@ function renderEditBasket(type) {
                 </div>
                 <div class="edit-field">
                     <label style="font-size:0.7rem; color:red;">Penalty Rate (₹)</label>
-                    <input type="number" value="${item.damageRate || 0}" oninput="updateEditItem(${index}, 'damageRate', this.value)" style="padding:5px; width:100%; border:1px solid #ffcccc;">
+                    <input type="number" value="${item.damagedRate || 0}" oninput="updateEditItem(${index}, 'damagedRate', this.value)" style="padding:5px; width:100%; border:1px solid #ffcccc;">
                 </div>` : ''}
             </div>
         </div>
