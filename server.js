@@ -28,23 +28,35 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     
     const filterStart = startDate ? new Date(startDate) : null;
     const filterEnd = endDate ? new Date(endDate) : new Date();
+    console.log(`--- Billing Debug for Site: ${siteId} ---`);
+    console.log(`Filter Range: ${filterStart} to ${filterEnd}`);
+    console.log(`Total Transactions Found: ${txns.length}`);
 
     txns.forEach(t => {
         // Fix 1: Ensure we check the transaction date correctly for Service & Damage
         const txnDate = new Date(t.date);
         if (!filterStart || (txnDate >= filterStart && txnDate <= filterEnd)) {
-            service += (Number(t.loadingCharges) || 0) + Number(t.unloadingCharges) || 0);
+            //service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
             
             // Fix 2: Add Damage Penalty logic specifically here
             if (t.type === 'RC' && t.items) {
+                console.log(`Processing RC Challan: ${t.challanNo} on Date: ${txnDate}`);
                 t.items.forEach(item => {
                     // We use Number() to ensure math works even if data is a string
-                    const dQty = parseFloat(item.damagedQty) || 0;
-                    const dRate = parseFloat(item.damageRate) || 0;
+                    const dQty = Number(item.damagedQty) || 0;
+                    const dRate = Number(item.damageRate) || 0;
                     if (dQty > 0) {
-                        damageTotal += (dQty * dRate);
+                        currentDmg = dQty * dRate;
+                        damageTotal += currentDmg;
+                        console.log(`>> DAMAGE FOUND: ${item.itemName} | Qty: ${dQty} | Rate: ${dRate} | Sum: ${currentDmg}`);
                     }
                 });
+            }
+            service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+        } else {
+            // This will tell us if the transaction is being ignored because of the date
+            if (t.type === 'RC') {
+                console.log(`SKIPPED RC ${t.challanNo}: Date ${txnDate} is OUTSIDE filter range.`);
             }
         }
         
@@ -109,6 +121,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
         });
     }
 
+    console.log(`Final calculated damageTotal: ${damageTotal}`);
     const subtotal = bill.reduce((s, i) => s + i.total, 0);
     // grandTotal now correctly includes the calculated damageTotal
     return { bill, service, subtotal, damageTotal, grandTotal: subtotal + service + damageTotal };
