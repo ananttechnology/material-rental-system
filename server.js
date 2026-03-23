@@ -24,13 +24,13 @@ const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongo
 // --- BILLING ENGINE LOGIC ---
 async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const txns = await Transaction.find({ siteId }).sort({ date: 1 });
-    let service = 0, bill = [], items = {}, damageTotal = 0; // damageTotal initialized
+    let service = 0, bill = [], items = {}, damageTotal = 0, damageList = []; // damageTotal initialized
     
     const filterStart = startDate ? new Date(startDate) : null;
     const filterEnd = endDate ? new Date(endDate) : new Date();
-    console.log(`--- Billing Debug for Site: ${siteId} ---`);
-    console.log(`Filter Range: ${filterStart} to ${filterEnd}`);
-    console.log(`Total Transactions Found: ${txns.length}`);
+    //console.log(`--- Billing Debug for Site: ${siteId} ---`);
+    //console.log(`Filter Range: ${filterStart} to ${filterEnd}`);
+    //console.log(`Total Transactions Found: ${txns.length}`);
 
     txns.forEach(t => {
         // Fix 1: Ensure we check the transaction date correctly for Service & Damage
@@ -40,7 +40,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
             
             // Fix 2: Add Damage Penalty logic specifically here
             if (t.type === 'RC' && t.items) {
-                console.log(`Processing RC Challan: ${t.challanNo} on Date: ${txnDate}`);
+                //console.log(`Processing RC Challan: ${t.challanNo} on Date: ${txnDate}`);
                 t.items.forEach(item => {
                     // We use Number() to ensure math works even if data is a string
                     const dQty = Number(item.damagedQty) || 0;
@@ -48,7 +48,14 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
                     if (dQty > 0) {
                         const currentDmg = dQty * dRate;
                         damageTotal += currentDmg;
-                        console.log(`>> DAMAGE FOUND: ${item.itemName} | Qty: ${dQty} | Rate: ${dRate} | Sum: ${currentDmg}`);
+                        //console.log(`>> DAMAGE FOUND: ${item.itemName} | Qty: ${dQty} | Rate: ${dRate} | Sum: ${currentDmg}`);
+                        damageList.push({
+                            name: item.itemName,
+                            qty: dQty,
+                            rate: dRate,
+                            total: dQty * dRate,
+                            date: t.date
+                        });
                     }
                 });
             }
@@ -56,7 +63,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
         } else {
             // This will tell us if the transaction is being ignored because of the date
             if (t.type === 'RC') {
-                console.log(`SKIPPED RC ${t.challanNo}: Date ${txnDate} is OUTSIDE filter range.`);
+                //console.log(`SKIPPED RC ${t.challanNo}: Date ${txnDate} is OUTSIDE filter range.`);
             }
         }
         
@@ -121,10 +128,10 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
         });
     }
 
-    console.log(`Final calculated damageTotal: ${damageTotal}`);
+    //console.log(`Final calculated damageTotal: ${damageTotal}`);
     const subtotal = bill.reduce((s, i) => s + i.total, 0);
     // grandTotal now correctly includes the calculated damageTotal
-    return { bill, service, subtotal, damageTotal, grandTotal: subtotal + service + damageTotal };
+    return { bill, service, subtotal, damageTotal, damageList, grandTotal: subtotal + service + damageTotal };
 }
 // --- ROUTES ---
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
