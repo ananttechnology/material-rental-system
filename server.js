@@ -46,7 +46,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
                     const dQty = Number(item.damagedQty) || 0;
                     const dRate = Number(item.damageRate) || 0;
                     if (dQty > 0) {
-                        currentDmg = dQty * dRate;
+                        const currentDmg = dQty * dRate;
                         damageTotal += currentDmg;
                         console.log(`>> DAMAGE FOUND: ${item.itemName} | Qty: ${dQty} | Rate: ${dRate} | Sum: ${currentDmg}`);
                     }
