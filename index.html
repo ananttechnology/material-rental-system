@@ -388,7 +388,7 @@ function renderBasket() {
 function renderReturnBasket() {
     const tbody = document.getElementById('returnBasketBody');
     if (returnBasket.length === 0) {
-        tbody.innerHTML = <tr><td colspan="5" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>;
+        tbody.innerHTML = <tr><td> colspan="5" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>;
         return;
     }
 
