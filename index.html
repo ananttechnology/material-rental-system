@@ -387,37 +387,30 @@ function renderBasket() {
 
 function renderReturnBasket() {
     const tbody = document.getElementById('returnBasketBody');
-    
     if (returnBasket.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>`;
+        tbody.innerHTML = <tr><td colspan="5" style="text-align:center; color:#999; padding:20px;">Return basket is empty.</td></tr>;
         return;
     }
 
-    tbody.innerHTML = returnBasket.map((item, index) => `
+    tbody.innerHTML = returnBasket.map((item, index) => 
         <tr>
             <td><strong>${item.itemName}</strong></td>
             <td>
-                <input type="number" value="${item.quantity}" 
-                    oninput="returnBasket[${index}].quantity = parseFloat(this.value) || 0" 
-                    style="width:60px; padding:4px;">
+                <input type="number" value="${item.quantity}" oninput="returnBasket[${index}].quantity = parseFloat(this.value) || 0" style="width:60px; padding:4px;">
             </td>
             <td>
-                <input type="number" placeholder="Damaged Qty" 
-                    onchange="updateReturnItem(${index}, 'damagedQty', this.value)" 
-                    style="width:80px; border:1px solid red; padding:2px;">
+                <input type="number" value="${item.damagedQty || ''}" placeholder="Qty" onchange="updateReturnItem(${index}, 'damagedQty', this.value)" style="width:60px; border:1px solid red; padding:2px;">
             </td>
             <td>
-                <input type="number" placeholder="Penalty Rate" 
-                    onchange="updateReturnItem(${index}, 'damageRate', this.value)" 
-                    style="width:80px; border:1px solid red; padding:2px;">
+                <input type="number" value="${item.damageRate || ''}" placeholder="Rate" onchange="updateReturnItem(${index}, 'damageRate', this.value)" style="width:60px; border:1px solid red; padding:2px;">
             </td>
             <td class="remove-item" onclick="removeFromReturnBasket(${index})">
                 <i class="fas fa-trash"></i>
             </td>
         </tr>
-    `).join('');
+    ).join('');
 }
-    function updateReturItem(index, field, value){
+    function updateReturnItem(index, field, value){
         returnBasket[index][field] = Number(value) || 0;
         console.log("Updated Basket:", returnBasket);
     }
