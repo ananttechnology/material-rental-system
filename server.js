@@ -33,14 +33,14 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
         // Fix 1: Ensure we check the transaction date correctly for Service & Damage
         const txnDate = new Date(t.date);
         if (!filterStart || (txnDate >= filterStart && txnDate <= filterEnd)) {
-            service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+            service += (Number(t.loadingCharges) || 0) + Number(t.unloadingCharges) || 0);
             
             // Fix 2: Add Damage Penalty logic specifically here
             if (t.type === 'RC' && t.items) {
                 t.items.forEach(item => {
                     // We use Number() to ensure math works even if data is a string
-                    const dQty = Number(item.damagedQty) || 0;
-                    const dRate = Number(item.damageRate) || 0;
+                    const dQty = parseFloat(item.damagedQty) || 0;
+                    const dRate = parseFloat(item.damageRate) || 0;
                     if (dQty > 0) {
                         damageTotal += (dQty * dRate);
                     }
