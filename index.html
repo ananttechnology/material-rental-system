@@ -1463,16 +1463,23 @@ async function openEditModal(txnId) {
         // 2. Handle Charges based on Type
         document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
 
-        // 3. Load the basket from the transaction into memory
-        editBasket = JSON.parse(JSON.stringify(txn.items)); 
+        // 3. Load the basket into memory with explicit damage fields
+        // We use .map to ensure every item has damagedQty and damageRate initialized
+        editBasket = txn.items.map(item => ({
+            ...item,
+            quantity: Number(item.quantity) || 0,
+            rate: Number(item.rate) || 0,
+            damagedQty: Number(item.damagedQty) || 0,
+            damageRate: Number(item.damageRate) || 0
+        }));
+
         renderEditBasket(txn.type);
 
-        // --- NEW CODE ADDED HERE: Populate the "Add Item" dropdown inside the modal ---
+        // --- Add Item Dropdown Logic ---
         const invRes = await fetch(`${API_URL}/inventory`);
         const invData = await invRes.json();
         const eList = document.getElementById('eItemList');
         
-        // This builds the list of items you can pick from to add to this old challan
         eList.innerHTML = invData.map(i => `
             <div onclick="document.getElementById('eItemSearch').value='${i.itemName} (${i.category})'; 
                           document.getElementById('eItem').value='${i._id}'; 
@@ -1480,7 +1487,6 @@ async function openEditModal(txnId) {
                 ${i.itemName} (${i.category})
             </div>
         `).join('');
-        // ----------------------------------------------------------------------------
 
         document.getElementById('editModal').style.display = 'flex';
     } catch (e) { 
@@ -1571,10 +1577,15 @@ async function saveEdit() {
     const id = document.getElementById('editId').value;
     const type = document.getElementById('saveEditBtn').getAttribute('data-type');
     
+    // We explicitly calculate the charge to avoid any confusion in the database update
+    const chargeValue = parseFloat(document.getElementById('editCharges').value) || 0;
+
     const updateData = {
         date: document.getElementById('editDate').value,
-        items: editBasket, // NEW: Sending the updated array
-        [type === 'DC' ? 'loadingCharges' : 'unloadingCharges']: parseFloat(document.getElementById('editCharges').value) || 0
+        items: editBasket, 
+        // Logic: Map the single edit box to the correct DB field
+        loadingCharges: type === 'DC' ? chargeValue : 0,
+        unloadingCharges: type === 'RC' ? chargeValue : 0
     };
 
     try {
@@ -1600,7 +1611,10 @@ async function saveEdit() {
             msgDiv.style.color = "red";
             msgDiv.innerText = "⚠️ " + (result.error || "Update Failed");
         }
-    } catch (e) { alert("Server Error"); }
+    } catch (e) { 
+        console.error(e);
+        alert("Server Error"); 
+    }
 }
     //To Close Editing Popup
     function closeEditModal() {
