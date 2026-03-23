@@ -539,7 +539,7 @@ function renderReturnBasket() {
         }
 
         // POPULATE SIDEBAR DROPDOWNS (Inventory Addition & Transfer Stock)
-        const itemNames = [...new Set(fullInventory.map(i => i.itemName))];
+        const itemNames = ['MS Plate'];
         ['itemName', 'tItemName'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
