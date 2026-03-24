@@ -234,7 +234,7 @@
 </div>
             <div class="section report-sec">
                 <h2><i class="fas fa-file-contract"></i> Site Holding Report</h2>
-                <div class="grid"><div class="search-wrapper"><input type="text" id="repBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Report..." onclick="toggleDrop('repBuilderList')" onkeyup="filterDrop('repBuilderSearch', 'repBuilderList')"><div id="repBuilderList" class="search-results"></div><input type="hidden" id="repBuilder"></div><div class="search-wrapper"><input type="text" id="repSiteSearch" autocomplete="off" placeholder="🔍 Search Site for Report..." onclick="toggleDrop('repSiteList')" onkeyup="filterDrop('repSiteSearch', 'repSiteList')"><div id="repSiteList" class="search-results"></div><input type="hidden" id="repSite"></div></div>
+                <div class="grid"><div class="search-wrapper"><input type="text" id="repBuilderSearch" autocomplete="off" placeholder="🔍 Search Builder for Report..." onclick="toggleDrop('repBuilderList')" onkeyup="filterDrop('repBuilderSearch', 'repBuilderList')"><div id="repBuilderList" class="search-results"></div><input type="hidden" id="repBuilder"></div><div class="search-wrapper"><input type="text" id="repSiteSearch" autocomplete="off" placeholder="🔍 Search Site for Report..." onclick="toggleDrop('repSiteList')" onkeyup="filterDrop('repSiteSearch', 'repSiteList')"><div id="repSiteList" class="search-results"></div><input type="hidden" id="repSite"></div><div class="search-wrapper"><input type="date" id="repHoldStart" title="Start Date"></div><div class="search-wrapper"><input type="date" id="repHoldEnd" title="End Date"></div></div>
                 <button onclick="openSiteReportModal()" style="background: var(--warning); color: #000; margin-top:20px;">🔍 Generate Holding List</button>
                 <button onclick="printHoldingReport()" style="background: #34495e; color: white; margin-top:10px;">🖨️ Print Holding Report</button>
             </div>
@@ -961,44 +961,64 @@ function selectRepSite(id, name) {
 async function openSiteReportModal() {
     const builderId = document.getElementById('repBuilder').value;
     const siteId = document.getElementById('repSite').value; 
+    const start = document.getElementById('repHoldStart').value;
+    const end = document.getElementById('repHoldEnd').value;
     
+    // Validation
     if (!builderId || !siteId) return alert("Please select both Builder and Site!");
+    if (!start || !end) return alert("Please select both Start and End dates for the period report!");
 
-    let h = ""; // Start empty to build sections
+    let h = ""; 
+    const query = `start=${start}&end=${end}&builderId=${builderId}`;
 
     try {
-        if (siteId === "ALL") {
-            const resSites = await fetch(`${API_URL}/sites/${builderId}`);
-            const sites = await resSites.json();
-            
-            for (let s of sites) {
-                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                const bal = await resBal.json();
-                
-                // Add a Header for each site
+        const res = await fetch(`${API_URL}/calculate-bill/${siteId}?${query}`);
+        const data = await res.json();
+
+        if (data.isConsolidated) {
+            // Logic for ALL SITES
+            for (let s of data.sites) {
                 h += `<h3 style="background:#f4f7f6; padding:10px; border-left:4px solid var(--accent); margin-top:20px;">📍 Site: ${s.siteName}</h3>`;
                 
-                if (bal.length === 0) {
-                    h += `<p style="padding-left:15px; color:gray; font-style:italic;">No items currently held at this site.</p>`;
+                if (s.bill.length === 0) {
+                    h += `<p style="padding-left:15px; color:gray; font-style:italic;">No items held during this period.</p>`;
                 } else {
-                    h += `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-                    bal.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
+                    h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                    s.bill.forEach(item => {
+                        // Formatting the duration string if needed
+                        h += `<tr>
+                            <td>${item.name} (${item.cat})</td>
+                            <td>${item.qty}</td>
+                            <td>${item.duration}</td>
+                        </tr>`;
+                    });
                     h += `</table>`;
                 }
             }
         } else {
-            // Standard Single Site Report
-            const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-            const data = await res.json();
-            h += `<table><tr><th>Item</th><th>Type</th><th>Stock</th></tr>`;
-            data.forEach(i => h += `<tr><td>${i.itemName} (${i.category})</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`);
-            h += `</table>`;
+            // Logic for SINGLE SITE
+            h += `<h3 style="margin-bottom:10px;">Report Period: ${new Date(start).toLocaleDateString('en-IN')} to ${new Date(end).toLocaleDateString('en-IN')}</h3>`;
+            if (data.bill.length === 0) {
+                h += `<p>No items found for this period.</p>`;
+            } else {
+                h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                data.bill.forEach(item => {
+                    h += `<tr>
+                        <td>${item.name} (${item.cat})</td>
+                        <td>${item.qty}</td>
+                        <td>${item.duration}</td>
+                    </tr>`;
+                });
+                h += `</table>`;
+            }
         }
 
-        openModal(siteId === "ALL" ? "Consolidated Site-wise Report" : "Site Holdings", h);
-    } catch (e) { alert("Error generating report"); }
+        openModal(siteId === "ALL" ? "Consolidated Holding Report" : "Site Holding Report", h);
+    } catch (e) { 
+        console.error(e);
+        alert("Error generating report logic"); 
+    }
 }
-
     function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
 
     function updateCategories(pref = '') {
@@ -1240,38 +1260,57 @@ async function generateBill() {
     const builderId = document.getElementById('repBuilder').value;
     const siteId = document.getElementById('repSite').value;
     const builderName = document.getElementById('repBuilderSearch').value;
-    const siteName = document.getElementById('repSiteSearch').value;
+    const start = document.getElementById('repHoldStart').value;
+    const end = document.getElementById('repHoldEnd').value;
     
     if (!builderId || !siteId) return alert("Please select Builder and Site before printing!");
+    if (!start || !end) return alert("Please select Start and End dates for the report period!");
 
     try {
         let contentHtml = "";
-        if (siteId === "ALL") {
-            const resSites = await fetch(`${API_URL}/sites/${builderId}`);
-            const sites = await resSites.json();
-            for (let s of sites) {
-                const resBal = await fetch(`${API_URL}/site-balance/${s._id}`);
-                const bal = await resBal.json();
-                
+        const query = `start=${start}&end=${end}&builderId=${builderId}`;
+        
+        // Use the Billing Engine instead of site-balance
+        const res = await fetch(`${API_URL}/calculate-bill/${siteId}?${query}`);
+        const data = await res.json();
+
+        if (data.isConsolidated) {
+            // Logic for ALL SITES
+            for (let s of data.sites) {
                 contentHtml += `<h3 style="margin-top:25px; border-bottom:1px solid #333;">Site: ${s.siteName}</h3>`;
-                if (bal.length === 0) {
-                    contentHtml += `<p>No items held.</p>`;
+                
+                if (s.bill.length === 0) {
+                    contentHtml += `<p>No items held during this period.</p>`;
                 } else {
-                    contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Qty</th></tr>`;
-                    bal.forEach(i => {
-                        contentHtml += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
+                    contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                    s.bill.forEach(item => {
+                        contentHtml += `<tr>
+                            <td>${item.name}</td>
+                            <td>${item.cat}</td>
+                            <td>${item.qty}</td>
+                            <td>${item.duration}</td>
+                        </tr>`;
                     });
                     contentHtml += `</table>`;
                 }
             }
         } else {
-            const res = await fetch(`${API_URL}/site-balance/${siteId}`);
-            const data = await res.json();
-            contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Source</th><th>Qty</th></tr>`;
-            data.forEach(i => {
-                contentHtml += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.godown}</td><td>${i.currentBalance}</td></tr>`;
-            });
-            contentHtml += `</table>`;
+            // Logic for SINGLE SITE
+            contentHtml += `<h3 style="margin-top:20px;">Site: ${document.getElementById('repSiteSearch').value}</h3>`;
+            if (data.bill.length === 0) {
+                contentHtml += `<p>No items found for this period.</p>`;
+            } else {
+                contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                data.bill.forEach(item => {
+                    contentHtml += `<tr>
+                        <td>${item.name}</td>
+                        <td>${item.cat}</td>
+                        <td>${item.qty}</td>
+                        <td>${item.duration}</td>
+                    </tr>`;
+                });
+                contentHtml += `</table>`;
+            }
         }
 
         const win = window.open('', '', 'height=700,width=900');
@@ -1281,25 +1320,34 @@ async function generateBill() {
                 table{width:100%; border-collapse:collapse; margin-bottom:10px;}
                 th,td{border:1px solid #000; padding:8px; text-align:left; font-size:13px;}
                 th{background:#f2f2f2;}
-                h1{text-align:center; font-size:22px;}
-                h3{color:#2c3e50;}
+                h1{text-align:center; font-size:22px; margin-bottom:5px;}
+                h3{color:#2c3e50; margin-bottom:5px;}
+                .meta-info{margin-bottom:20px; border-bottom:2px solid #000; padding-bottom:10px;}
             </style></head><body>
             <h1>STOCK HOLDING REPORT (SITE-WISE)</h1>
-            <p><b>Builder:</b> ${builderName}</p>
-            <p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p>
+            <div class="meta-info">
+                <p><b>Builder:</b> ${builderName}</p>
+                <p><b>Report Period:</b> ${new Date(start).toLocaleDateString('en-IN')} to ${new Date(end).toLocaleDateString('en-IN')}</p>
+                <p><b>Generated On:</b> ${new Date().toLocaleDateString('en-IN')}</p>
+            </div>
             ${contentHtml}
             <p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`);
         win.document.close();
         win.print();
 
-        // RESET BOXES
+        // Optional: Reset fields after print
         document.getElementById('repBuilderSearch').value = "";
         document.getElementById('repSiteSearch').value = "";
         document.getElementById('repBuilder').value = "";
         document.getElementById('repSite').value = "";
+        document.getElementById('repHoldStart').value = "";
+        document.getElementById('repHoldEnd').value = "";
 
-    } catch (e) { alert("Print Error: " + e.message); }
+    } catch (e) { 
+        console.error(e);
+        alert("Print Error: " + e.message); 
     }
+}
 
     function printInvoice() {
     // 1. Get the data currently visible on your screen
