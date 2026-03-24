@@ -1065,7 +1065,7 @@ async function openSiteReportModal() {
             
             <div class="details">
                 <p><strong>Challan No:</strong> ${lastTxn.challanNo}</p>
-                <p><strong>Date:</strong> ${new Date(lastTxn.date).toLocaleDateString()}</p>
+                <p><strong>Date:</strong> ${new Date(lastTxn.date).toLocaleDateString('en-IN')}</p>
                 <p><strong>Builder:</strong> ${lastTxn.builder}</p>
                 <p><strong>Site:</strong> ${lastTxn.site}</p>
             </div>
@@ -1286,7 +1286,7 @@ async function generateBill() {
             </style></head><body>
             <h1>STOCK HOLDING REPORT (SITE-WISE)</h1>
             <p><b>Builder:</b> ${builderName}</p>
-            <p><b>Report Date:</b> ${new Date().toLocaleDateString()}</p>
+            <p><b>Report Date:</b> ${new Date().toLocaleDateString('en-IN')}</p>
             ${contentHtml}
             <p style="margin-top:50px; text-align:right;">Authorized Signatory</p></body></html>`);
         win.document.close();
@@ -1399,7 +1399,7 @@ async function generateBill() {
             const totalQty = txn.items.reduce((sum, i) => sum + Number(i.quantity), 0);
 
             row.innerHTML = `
-                <td>${new Date(txn.date).toLocaleDateString()}</td>
+                <td>${new Date(txn.date).toLocaleDateString('en-IN')}</td>
                 <td class="txn-${txn.type.toLowerCase()}"><strong>${txn.type}</strong></td>
                 <td>${txn.challanNo}</td>
                 <td>
