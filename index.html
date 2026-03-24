@@ -1342,7 +1342,7 @@ async function generateBill() {
     
     html += `<div class="details">
                 <div><strong>To:</strong> ${builderName}<br><strong>Site:</strong> ${siteName}</div>
-                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
+                <div style="text-align:right;"><strong>Period:</strong> ${start} to ${end}<br><strong>Generated:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
              </div>`;
 
     // Include both Holdings and the Money calculation
