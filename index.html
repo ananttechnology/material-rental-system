@@ -539,7 +539,7 @@ function renderReturnBasket() {
         }
 
         // POPULATE SIDEBAR DROPDOWNS (Inventory Addition & Transfer Stock)
-        const itemNames = ['MS Plate'];
+        const itemNames = ['MS Plate', 'MS Props Jack', 'Cuploack Vertical', 'MS Ledger', 'Ms Pipe', 'Ms Clamp', 'Channel', 'Acrow Span', 'Base Jack', 'U Jack', 'Joint Pin', 'Ms Khapada', 'Wood Chavi', 'Sikanja'];
         ['itemName', 'tItemName'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -1002,7 +1002,7 @@ async function openSiteReportModal() {
     function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
 
     function updateCategories(pref = '') {
-        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'] };
+        const list = { 'MS Plate': ['3x24','3x21','3x18','3x15','3x12','3x9','3x6'], 'MS Props Jack': ['3x3','2.5x2.5','2x2'], 'Cuplock Vertical': ['3 Mtr','2.5 Mtr','2 Mtr','1.5 Mtr','1 Mtr','0.5 Mtr'], 'MS Ledger': ['900 mm','1200 mm','1500 mm'], 'Ms Pipe': ['6 mtr', '3 mtr'], 'Ms Clamp': ['Fix', 'Clamp Round(360'], 'Channel': ['6 mtr', '3 mtr'], 'Acrow Span': ['N/A'], 'Base Jack': ['N/A'], 'U jack': ['N/A'], 'Joint Pin': ['N/A'], 'Ms Khapada': ['N/A'], 'WoodChavi': ['N/A'], 'Sikanja': ['N/A'] };
         const val = document.getElementById(pref === 't' ? 'tItemName' : 'itemName').value;
         const sel = document.getElementById(pref === 't' ? 'tCategory' : 'category');
         sel.innerHTML = '<option value="">-- Select Type --</option>';
