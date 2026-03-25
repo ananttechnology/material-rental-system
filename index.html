@@ -970,27 +970,7 @@ async function openSiteReportModal() {
 
     let h = ""; 
     const query = `start=${start}&end=${end}&builderId=${builderId}`;
-    // Helper function to format the "MM/DD/YYYY to MM/DD/YYYY" string into "DD/MM/YYYY"
-    const formatDuration = (dur) => {
-    if (!dur) return "";
-    // We use a regex / to / to handle "to" even if there are extra spaces
-    return dur.split(/\s+to\s+/).map(d => {
-        if (d.trim().toLowerCase() === 'on site') return 'On Site';
-        
-        // Try to parse the date
-        const dateObj = new Date(d);
-        
-        // If the date is valid, format it to dd/mm/yyyy
-        if (!isNaN(dateObj.getTime())) {
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const year = dateObj.getFullYear();
-            return `${day}/${month}/${year}`;
-        }
-        return d; // Return original if parsing fails
-    }).join(' to ');
-};
-
+    
     try {
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}?${query}`);
         const data = await res.json();
@@ -1285,26 +1265,6 @@ async function generateBill() {
     
     if (!builderId || !siteId) return alert("Please select Builder and Site before printing!");
     if (!start || !end) return alert("Please select Start and End dates for the report period!");
-        // Helper function to format the "MM/DD/YYYY to MM/DD/YYYY" string into "DD/MM/YYYY"
-    const formatDuration = (dur) => {
-    if (!dur) return "";
-    // We use a regex / to / to handle "to" even if there are extra spaces
-    return dur.split(/\s+to\s+/).map(d => {
-        if (d.trim().toLowerCase() === 'on site') return 'On Site';
-        
-        // Try to parse the date
-        const dateObj = new Date(d);
-        
-        // If the date is valid, format it to dd/mm/yyyy
-        if (!isNaN(dateObj.getTime())) {
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const year = dateObj.getFullYear();
-            return `${day}/${month}/${year}`;
-        }
-        return d; // Return original if parsing fails
-    }).join(' to ');
-};
 
     try {
         let contentHtml = "";
