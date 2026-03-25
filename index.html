@@ -968,11 +968,20 @@ async function openSiteReportModal() {
     if (!start || !end) return alert("Please select dates!");
 
     // Helper to match your Billing Engine's style
+    // FORCED MANUAL FORMATTER
     const localFormatDate = (dateStr) => {
         if (!dateStr || dateStr.toLowerCase().includes('site')) return 'On Site';
+        
+        // Try to create a date object
         const d = new Date(dateStr);
-        if (isNaN(d)) return dateStr; // Fallback if already formatted
-        return d.toLocaleDateString('en-IN'); // Forces dd/mm/yyyy
+        if (isNaN(d.getTime())) return dateStr; // Return as is if already formatted
+
+        // Manually build the string to guarantee DD/MM/YYYY
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        
+        return `${day}/${month}/${year}`;
     };
 
     let h = ""; 
@@ -993,12 +1002,13 @@ async function openSiteReportModal() {
                     s.bill.forEach(item => {
                         // FIX: Split and format just like your renderBillTable does!
                         const dates = item.duration.split(' to ');
-                        const formattedDuration = `${localFormatDate(dates[0])} to ${localFormatDate(dates[1])}`;
+                        const d1 = localFormatDate(dates[0]);
+                        const d2 = localFormatDate(dates[1]);
                         
                         h += `<tr>
                             <td>${item.name} (${item.cat})</td>
                             <td>${item.qty}</td>
-                            <td>${formattedDuration}</td> 
+                            <td>${d1} to ${d2}</td> 
                         </tr>`;
                     });
                     h += `</table>`;
@@ -1012,12 +1022,13 @@ async function openSiteReportModal() {
                 h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
                 data.bill.forEach(item => {
                     const dates = item.duration.split(' to ');
-                    const formattedDuration = `${localFormatDate(dates[0])} to ${localFormatDate(dates[1])}`;
+                    const d1 = localFormatDate(dates[0]);
+                    const d2 = localFormatDate(dates[1]);
                     
                     h += `<tr>
                         <td>${item.name} (${item.cat})</td>
                         <td>${item.qty}</td>
-                        <td>${formattedDuration}</td>
+                        <td>${d1} to ${d2}</td>
                     </tr>`;
                 });
                 h += `</table>`;
