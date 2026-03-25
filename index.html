@@ -964,9 +964,9 @@ async function openSiteReportModal() {
     const start = document.getElementById('repHoldStart').value;
     const end = document.getElementById('repHoldEnd').value;
     
-    // Validation
     if (!builderId || !siteId) return alert("Please select both Builder and Site!");
-    if (!start || !end) return alert("Please select both Start and End dates for the period report!");
+    if (!start || !end) return alert("Please select dates!");
+
     // Helper to match your Billing Engine's style
     const localFormatDate = (dateStr) => {
         if (!dateStr || dateStr.toLowerCase().includes('site')) return 'On Site';
@@ -977,43 +977,47 @@ async function openSiteReportModal() {
 
     let h = ""; 
     const query = `start=${start}&end=${end}&builderId=${builderId}`;
-    
+
     try {
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}?${query}`);
         const data = await res.json();
 
         if (data.isConsolidated) {
-            // Logic for ALL SITES
             for (let s of data.sites) {
                 h += `<h3 style="background:#f4f7f6; padding:10px; border-left:4px solid var(--accent); margin-top:20px;">📍 Site: ${s.siteName}</h3>`;
                 
-                if (s.bill.length === 0) {
+                if (!s.bill || s.bill.length === 0) {
                     h += `<p style="padding-left:15px; color:gray; font-style:italic;">No items held during this period.</p>`;
                 } else {
                     h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
                     s.bill.forEach(item => {
-                        // Formatting the duration string if needed
+                        // FIX: Split and format just like your renderBillTable does!
+                        const dates = item.duration.split(' to ');
+                        const formattedDuration = `${localFormatDate(dates[0])} to ${localFormatDate(dates[1])}`;
+                        
                         h += `<tr>
                             <td>${item.name} (${item.cat})</td>
                             <td>${item.qty}</td>
-                            <td>${item.duration}</td>
+                            <td>${formattedDuration}</td> 
                         </tr>`;
                     });
                     h += `</table>`;
                 }
             }
         } else {
-            // Logic for SINGLE SITE
-            h += `<h3 style="margin-bottom:10px;">Report Period: ${new Date(start).toLocaleDateString('en-IN')} to ${new Date(end).toLocaleDateString('en-IN')}</h3>`;
-            if (data.bill.length === 0) {
+            h += `<h3 style="margin-bottom:10px;">Report Period: ${localFormatDate(start)} to ${localFormatDate(end)}</h3>`;
+            if (!data.bill || data.bill.length === 0) {
                 h += `<p>No items found for this period.</p>`;
             } else {
                 h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
                 data.bill.forEach(item => {
+                    const dates = item.duration.split(' to ');
+                    const formattedDuration = `${localFormatDate(dates[0])} to ${localFormatDate(dates[1])}`;
+                    
                     h += `<tr>
                         <td>${item.name} (${item.cat})</td>
                         <td>${item.qty}</td>
-                        <td>${item.duration}</td>
+                        <td>${formattedDuration}</td>
                     </tr>`;
                 });
                 h += `</table>`;
@@ -1023,7 +1027,7 @@ async function openSiteReportModal() {
         openModal(siteId === "ALL" ? "Consolidated Holding Report" : "Site Holding Report", h);
     } catch (e) { 
         console.error(e);
-        alert("Error generating report logic"); 
+        alert("Error generating report"); 
     }
 }
     function showStock(id, lab) { const item = fullInventory.find(i => i._id === document.getElementById(id).value); document.getElementById(lab).innerText = item ? `Available: ${item.availableStock}` : 'Available: 0'; }
