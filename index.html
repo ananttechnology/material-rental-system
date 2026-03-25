@@ -970,6 +970,24 @@ async function openSiteReportModal() {
 
     let h = ""; 
     const query = `start=${start}&end=${end}&builderId=${builderId}`;
+       // Inside openSiteReportModal
+const formatDuration = (dur) => {
+    if (!dur || dur.includes('NaN')) return "Pending"; // Safety check
+    
+    return dur.split(' to ').map(d => {
+        if (d.toLowerCase().includes('site')) return 'On Site';
+        
+        const dateObj = new Date(d);
+        if (isNaN(dateObj)) return d; // If it's already dd/mm/yyyy, leave it
+
+        // Force Indian Format (DD/MM/YYYY)
+        return new Intl.DateTimeFormat('en-IN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }).format(dateObj);
+    }).join(' to ');
+};
     
     try {
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}?${query}`);
