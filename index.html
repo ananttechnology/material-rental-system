@@ -759,7 +759,8 @@ function renderReturnBasket() {
                 ...body, 
                 challanNo: result.challanNo, 
                 builder: builderName, 
-                site: siteName, 
+                site: siteName,
+                transportCharge: body.transportCharge,
                 item: JSON.parse(JSON.stringify(basket)) // For the Print function, deep copy of basket
             };
             
