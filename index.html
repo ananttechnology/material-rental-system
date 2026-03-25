@@ -970,6 +970,16 @@ async function openSiteReportModal() {
 
     let h = ""; 
     const query = `start=${start}&end=${end}&builderId=${builderId}`;
+    // Helper function to format the "MM/DD/YYYY to MM/DD/YYYY" string into "DD/MM/YYYY"
+    const formatDuration = (dur) => {
+        if (!dur) return "";
+        return dur.split(' to ').map(d => {
+            if (d === 'On Site') return d;
+            const dateObj = new Date(d);
+            // Check if date is valid before formatting
+            return isNaN(dateObj) ? d : dateObj.toLocaleDateString('en-IN');
+        }).join(' to ');
+    };
 
     try {
         const res = await fetch(`${API_URL}/calculate-bill/${siteId}?${query}`);
@@ -1265,6 +1275,16 @@ async function generateBill() {
     
     if (!builderId || !siteId) return alert("Please select Builder and Site before printing!");
     if (!start || !end) return alert("Please select Start and End dates for the report period!");
+        // Helper function to format the "MM/DD/YYYY to MM/DD/YYYY" string into "DD/MM/YYYY"
+    const formatDuration = (dur) => {
+        if (!dur) return "";
+        return dur.split(' to ').map(d => {
+            if (d === 'On Site') return d;
+            const dateObj = new Date(d);
+            // Check if date is valid before formatting
+            return isNaN(dateObj) ? d : dateObj.toLocaleDateString('en-IN');
+        }).join(' to ');
+    };
 
     try {
         let contentHtml = "";
