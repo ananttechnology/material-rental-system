@@ -1060,7 +1060,7 @@ async function openSiteReportModal() {
 
     const win = window.open('', '', 'height=800,width=1000');
     
-    // 1. Generate Rows with conditional logic for RC damage details
+    // 1. Generate Rows (Logic remains same as your provided code)
     const itemRows = lastTxn.items.map(i => {
         const total = Number(i.quantity) || 0;
         const dmg = Number(i.damagedQty) || 0;
@@ -1070,26 +1070,25 @@ async function openSiteReportModal() {
         if (type === 'DC') {
             return `
                 <tr>
-                    <td style="border:1px solid #000; padding:8px;">${i.itemName}</td>
-                    <td style="border:1px solid #000; padding:8px; text-align:center;">${total}</td>
-                    <td style="border:1px solid #000; padding:8px; text-align:right;">₹${rate}</td>
+                    <td>${i.itemName}</td>
+                    <td style="text-align:center;">${total}</td>
+                    <td style="text-align:right;">₹${rate}</td>
                 </tr>`;
         } else {
-            // Updated RC row: Shows Total, Good, and Damaged (if any)
             return `
                 <tr>
-                    <td style="border:1px solid #000; padding:8px;">
+                    <td>
                         ${i.itemName}
                         ${dmg > 0 ? `<br><small style="color:red;">* Penalty for ${dmg} units @ ₹${rate}</small>` : ''}
                     </td>
-                    <td style="border:1px solid #000; padding:8px; text-align:center;">${total}</td>
-                    <td style="border:1px solid #000; padding:8px; text-align:center;">${good}</td>
-                    <td style="border:1px solid #000; padding:8px; text-align:center;">${dmg}</td>
+                    <td style="text-align:center;">${total}</td>
+                    <td style="text-align:center;">${good}</td>
+                    <td style="text-align:center;">${dmg}</td>
                 </tr>`;
         }
     }).join('');
 
-    // 2. Build the full Print Document with dynamic headers
+    // 2. Build the Document
     win.document.write(`
         <html>
         <head>
@@ -1097,11 +1096,12 @@ async function openSiteReportModal() {
             <style>
                 body { font-family: sans-serif; padding: 20px; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #000; padding: 8px; font-size: 13px; }
+                th, td { border: 1px solid #000; padding: 8px; font-size: 13px; text-align: left; }
                 th { background: #eee; }
                 .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
                 .details { margin-bottom: 20px; line-height: 1.6; }
                 .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+                .charge-box { margin-top: 20px; border: 1px solid #000; padding: 10px; width: fit-content; min-width: 250px; }
             </style>
         </head>
         <body>
@@ -1133,14 +1133,17 @@ async function openSiteReportModal() {
                 </tbody>
             </table>
 
-            <div class="details" style="margin-top:20px;">
-                ${type === 'DC' ? `<p><strong>Loading Charges:</strong> ₹${lastTxn.loadingCharges || 0}</p>` : `<p><strong>Unloading Charges:</strong> ₹${lastTxn.unloadingCharges || 0}</p>`}
-                ${lastTxn.deposit ? `<p><strong>Advance Deposit:</strong> ₹${lastTxn.deposit}</p>` : ''}
+            <div class="charge-box">
+                ${type === 'DC' 
+                    ? `<p><strong>Loading Charges:</strong> ₹${lastTxn.loadingCharges || 0}</p>` 
+                    : `<p><strong>Unloading Charges:</strong> ₹${lastTxn.unloadingCharges || 0}</p>`
+                }
+                <p><strong>Transport Charges:</strong> ₹${lastTxn.transportCharge || 0}</p> ${lastTxn.deposit ? `<p><strong>Advance Deposit:</strong> ₹${lastTxn.deposit}</p>` : ''}
             </div>
 
             <div class="footer">
-                <p>_______________________<br>Receiver's Signature</p>
-                <p>_______________________<br>Authorized Signatory</p>
+                <div><p>_______________________<br>Receiver's Signature</p></div>
+                <div style="text-align:right;"><p>_______________________<br>Authorized Signatory</p></div>
             </div>
         </body>
         </html>
