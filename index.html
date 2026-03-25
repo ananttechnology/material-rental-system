@@ -167,6 +167,7 @@
 
     <div class="grid">
         <input type="number" id="dLoading" placeholder="Total Loading Charges (₹)">
+        <input type="number" id="dTransport" placeholder="Transport Charges (₹)">
         <input type="number" id="dDeposit" placeholder="Deposit (Advance ₹)" style="border: 1px solid var(--success);">
     </div>
     <div class="grid">
@@ -225,6 +226,7 @@
 
     <div class="grid">
         <input type="number" id="rUnloading" placeholder="Unloading Charges (₹)">
+        <input type="number" id="rTransport" placeholder="Transport Charges (₹)"> 
         <input type="date" id="rDate">
     </div>
 
@@ -711,13 +713,14 @@ function renderReturnBasket() {
     }
 
     const body = { 
-        builderId: document.getElementById(`${p}Builder`).value, 
-        siteId: document.getElementById(`${p}Site`).value, 
-        items: basket, // NEW: Sending the array
-        date: document.getElementById(`${p}Date`).value, 
-        loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
-        unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0,
-        deposit: type === 'dispatch' ? Number(document.getElementById(`dDeposit`).value) : 0 
+    builderId: document.getElementById(`${p}Builder`).value, 
+    siteId: document.getElementById(`${p}Site`).value, 
+    items: basket, 
+    date: document.getElementById(`${p}Date`).value, 
+    loadingCharges: type === 'dispatch' ? Number(document.getElementById(`dLoading`).value) : 0, 
+    unloadingCharges: type === 'return' ? Number(document.getElementById(`rUnloading`).value) : 0,
+    transportCharge: Number(document.getElementById(`${p}Transport`).value) || 0, // <--- NEW
+    deposit: type === 'dispatch' ? Number(document.getElementById(`dDeposit`).value) : 0 
     };
 
     // Use your existing validate function (make sure it handles 'items' check if you updated it, 
@@ -780,6 +783,7 @@ function renderReturnBasket() {
                 document.getElementById(`dBuilder`).value = "";
                 document.getElementById(`dSite`).value = "";
                 document.getElementById(`dItem`).value = "";
+                document.getElementById(`dTransport`).value = "";
                 document.getElementById('dispatchGodown').disabled = false; 
                 document.getElementById('dispatchGodown').value = "";
             } else {
@@ -793,6 +797,7 @@ function renderReturnBasket() {
                 document.getElementById(`rSite`).value = "";
                 document.getElementById(`rItem`).value = "";
                 document.getElementById(`rItemList`).innerHTML = "";
+                document.getElementById(`rTransport`).value = "";
             }
             
             await masterSync(); 
@@ -1181,15 +1186,15 @@ async function generateBill() {
                 }
             });
             
-            const gst = isGst ? (data.totalSubtotal + data.totalService + (data.totalDamage || 0)) * 0.18 : 0;
+            const gst = isGst ? (data.totalSubtotal + data.totalService + data.totalTransport + (data.totalDamage || 0)) * 0.18 : 0;
             
             // NEW: Passing data.totalDamage
-            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst, data.totalDamage || 0);
+            billH += renderBillSummary(data.totalSubtotal, data.totalService, gst, data.totalDamage || 0, data.totalTransport || 0);
         } else {
             billH += renderBillTable(data.bill || [], data.damageList || []);
-            const gst = isGst ? (data.subtotal + data.service + (data.damageTotal || 0)) * 0.18 : 0;
+            const gst = isGst ? (data.subtotal + data.service + data.transportTotal + (data.damageTotal || 0)) * 0.18 : 0;
             // NEW: Passing data.damageTotal
-            billH += renderBillSummary(data.subtotal, data.service, gst, data.damageTotal || 0, data.damageList || 0);
+            billH += renderBillSummary(data.subtotal, data.service, gst, data.damageTotal || 0, data.totalTransport || 0, data.damageList || 0);
         }
         
         billH += `<button onclick="printInvoice()" style="background:#2c3e50; color:white; margin-top:20px; font-size:1.1rem; width:100%;"><i class="fas fa-print"></i> Print Professional Invoice</button>`;
@@ -1266,12 +1271,13 @@ async function generateBill() {
 }
 
     // Helper: Render the Summary
-    function renderBillSummary(sub, ser, gst, dmg = 0) {
-    const grandTotal = sub + ser + gst + dmg;
+    function renderBillSummary(sub, ser, gst, dmg = 0, trans = 0) {
+    const grandTotal = sub + ser + gst + dmg + trans;
     
     return `<div style="text-align:right; margin-top:15px; border-top:2px solid #333; padding-top:10px;">
           <p>Rent Subtotal: ₹${sub.toLocaleString()}</p>
           <p>Service Charges: ₹${ser.toLocaleString()}</p>
+          <p>Transport Charges: ₹${trans.toLocaleString()}</p>
           <p style="color:red;">Damage/Loss Charges: ₹${dmg.toLocaleString()}</p>
           <p>GST (18%): ₹${gst.toLocaleString()}</p>
           <h3 style="color:var(--danger); border-top:1px solid #eee; display:inline-block; padding-top:5px;">Grand Total: ₹${grandTotal.toLocaleString()}</h3>
