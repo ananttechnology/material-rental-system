@@ -18,19 +18,19 @@ mongoose.connect(MONGO_URI).then(() => console.log("✅ System Audit: DB Connect
 const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: String, mobile: String, gstNumber: String, address: String }));
 const Site = mongoose.model('Site', new mongoose.Schema({ builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' }, siteName: String, siteAddress: String }));
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({ itemName: String, category: String, godown: String, totalStock: Number, availableStock: Number }));
-const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, items: [{ itemId: mongoose.Schema.Types.ObjectId, itemName: String, quantity: Number, rate: { type: Number, default: 0 }, damagedQty: { type: Number, default: 0 }, damagedRate: { type: Number, default: 0 } }], loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
+const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, items: [{ itemId: mongoose.Schema.Types.ObjectId, itemName: String, quantity: Number, rate: { type: Number, default: 0 }, damagedQty: { type: Number, default: 0 }, damagedRate: { type: Number, default: 0 } }], loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, transportCharge: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
 const Payment = mongoose.model('Payment', new mongoose.Schema({ builderId: mongoose.Schema.Types.ObjectId, amountPaid: Number, paymentMode: String, referenceNo: { type: String, default: "" }, date: { type: Date, default: Date.now } }));
 
 // --- BILLING ENGINE LOGIC ---
 async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     const txns = await Transaction.find({ siteId }).sort({ date: 1 });
-    let service = 0, bill = [], items = {}, damageTotal = 0, damageList = []; // damageTotal initialized
+    let service = 0, bill = [], items = {}, damageTotal = 0, damageList = [], transportTotal = 0; // damageTotal initialized
     
     const filterStart = startDate ? new Date(startDate) : null;
     const filterEnd = endDate ? new Date(endDate) : new Date();
     //console.log(`--- Billing Debug for Site: ${siteId} ---`);
     //console.log(`Filter Range: ${filterStart} to ${filterEnd}`);
-    //console.log(`Total Transactions Found: ${txns.length}`);
+    //console.log(`Total s Found: ${txns.length}`);
 
     txns.forEach(t => {
         // Fix 1: Ensure we check the transaction date correctly for Service & Damage
@@ -60,6 +60,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
                 });
             }
             service += (t.loadingCharges || 0) + (t.unloadingCharges || 0);
+            transportTotal += (t.transportCharge || 0);
         } else {
             // This will tell us if the transaction is being ignored because of the date
             if (t.type === 'RC') {
@@ -131,7 +132,7 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
     //console.log(`Final calculated damageTotal: ${damageTotal}`);
     const subtotal = bill.reduce((s, i) => s + i.total, 0);
     // grandTotal now correctly includes the calculated damageTotal
-    return { bill, service, subtotal, damageTotal, damageList, grandTotal: subtotal + service + damageTotal };
+    return { bill, service, subtotal, transportTotal, damageTotal, damageList, grandTotal: subtotal + service + transportTotal + damageTotal };
 }
 // --- ROUTES ---
 app.get('/builders', async (req, res) => res.json(await Builder.find()));
@@ -162,7 +163,7 @@ app.post('/transfer-stock', async (req, res) => {
 // 1. Modified Dispatch to handle Deposit
 app.post('/dispatch', async (req, res) => {
     try {
-        const { builderId, siteId, items, loadingCharges, deposit, date, godown } = req.body;
+        const { builderId, siteId, items, loadingCharges, transportCharge, deposit, date, godown } = req.body;
 
         // 1. Validate ALL items in basket first
         for (const cartItem of items) {
@@ -184,7 +185,7 @@ app.post('/dispatch', async (req, res) => {
         const challan = new Transaction({
             type: 'DC',
             challanNo: `DC-${1001 + count}`,
-            builderId, siteId, godown, items, loadingCharges, deposit, date
+            builderId, siteId, godown, items, loadingCharges, transportCharge: Number(transportCharge) || 0, deposit, date
         });
         await challan.save();
 
@@ -201,7 +202,7 @@ app.post('/dispatch', async (req, res) => {
 
 app.post('/return', async (req, res) => {
     try {
-        const { siteId, items, unloadingCharges, date, builderId } = req.body;
+        const { siteId, items, unloadingCharges, transportCharge, date, builderId } = req.body;
 
         // 1. GET CURRENT SITE BALANCE (Exact same logic as your code)
         const txns = await Transaction.find({ siteId: siteId });
@@ -246,7 +247,8 @@ app.post('/return', async (req, res) => {
         const challanNo = `RC-${1001 + count}`;
         
         const newTxn = new Transaction({ 
-            ...req.body, 
+            ...req.body,
+            transportCharge: Number(req.body.transportCharge) || 0,
             type: 'RC', 
             challanNo
         });
@@ -316,6 +318,7 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
                 sites: [],
                 grandTotal: 0,
                 totalService: 0,
+                totalTransport: 0,
                 totalSubtotal: 0,
                 totalDamage: 0
             };
@@ -327,14 +330,16 @@ app.get('/calculate-bill/:siteId', async (req, res) => {
                     bill: siteBill.bill,
                     subtotal: siteBill.subtotal,
                     service: siteBill.service,
+                    transportTotal: siteBill.service,
                     damageTotal: siteBill.damageTotal,
                     damageList: siteBill.damageList
                 });
                 consolidatedData.totalSubtotal += siteBill.subtotal;
                 consolidatedData.totalService += siteBill.service;
+                consolidatedData.totalTransport += (siteBill.transportTotal || 0);
                 consolidatedData.totalDamage += (siteBill.damageTotal || 0);
             }
-            consolidatedData.grandTotal = consolidatedData.totalSubtotal + consolidatedData.totalService + consolidatedData.totalDamage;
+            consolidatedData.grandTotal = consolidatedData.totalSubtotal + consolidatedData.totalService + consolidatedData.totalTransport + consolidatedData.totalDamage;
             res.json(consolidatedData);
         } else {
             // 2. Logic for Single Site Billing (Existing Functionality)
