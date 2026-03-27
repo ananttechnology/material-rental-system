@@ -469,7 +469,7 @@ app.get('/all-transactions', async (req, res) => {
 app.put('/edit-transaction/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { date, items, loadingCharges, unloadingCharges,transpostCharge } = req.body;
+        const { date, items, loadingCharges, unloadingCharges, transportCharge } = req.body;
 
         const oldTxn = await Transaction.findById(id);
         if (!oldTxn) return res.status(404).json({ error: "Transaction not found" });
@@ -527,8 +527,8 @@ app.put('/edit-transaction/:id', async (req, res) => {
         // STEP 4: UPDATE TRANSACTION RECORD
         oldTxn.date = date;
         oldTxn.items = items; // This now saves damagedQty/damageRate correctly
-        if (oldTxn.type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
-        else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
+        if (oldTxn.type === 'DC') { oldTxn.loadingCharges = parseFloat(loadingCharges) || 0; }
+        else { oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0; }
         oldTxn.transportCharge = parseFloat(transportCharge) || 0;
         
         await oldTxn.save();
