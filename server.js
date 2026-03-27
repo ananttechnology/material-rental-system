@@ -527,8 +527,8 @@ app.put('/edit-transaction/:id', async (req, res) => {
         // STEP 4: UPDATE TRANSACTION RECORD
         oldTxn.date = date;
         oldTxn.items = items; // This now saves damagedQty/damageRate correctly
-        if (oldTxn.type === 'DC') { oldTxn.loadingCharges = parseFloat(loadingCharges) || 0; }
-        else { oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0; }
+        if (oldTxn.type === 'DC') oldTxn.loadingCharges = parseFloat(loadingCharges) || 0;
+        else oldTxn.unloadingCharges = parseFloat(unloadingCharges) || 0;
         oldTxn.transportCharge = parseFloat(transportCharge) || 0;
         
         await oldTxn.save();
