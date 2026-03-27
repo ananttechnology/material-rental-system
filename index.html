@@ -1004,17 +1004,17 @@ async function openSiteReportModal() {
                 if (!s.bill || s.bill.length === 0) {
                     h += `<p style="padding-left:15px; color:gray; font-style:italic;">No items held during this period.</p>`;
                 } else {
-                    h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                    h += `<table><tr><th>Item Name</th><th>Qty</th><th>From</th><th>To</th></tr>`;
                     s.bill.forEach(item => {
                         // FIX: Split and format just like your renderBillTable does!
-                        const dates = item.duration.split(' to ');
                         const d1 = localFormatDate(dates[0]);
                         const d2 = localFormatDate(dates[1]);
                         
                         h += `<tr>
                             <td>${item.name} (${item.cat})</td>
                             <td>${item.qty}</td>
-                            <td>${d1} to ${d2}</td> 
+                            <td>${d1}</td> 
+                            <td>${d2}</td> 
                         </tr>`;
                     });
                     h += `</table>`;
@@ -1025,18 +1025,19 @@ async function openSiteReportModal() {
             if (!data.bill || data.bill.length === 0) {
                 h += `<p>No items found for this period.</p>`;
             } else {
-                h += `<table><tr><th>Item Name</th><th>Qty</th><th>Period (From - To)</th></tr>`;
-                data.bill.forEach(item => {
-                    const dates = item.duration.split(' to ');
-                    const d1 = localFormatDate(dates[0]);
-                    const d2 = localFormatDate(dates[1]);
-                    
-                    h += `<tr>
-                        <td>${item.name} (${item.cat})</td>
-                        <td>${item.qty}</td>
-                        <td>${d1} to ${d2}</td>
-                    </tr>`;
-                });
+                h += `<table><tr><th>Item Name</th><th>Qty</th><th>From</th><th>To</th></tr>`;
+                    s.bill.forEach(item => {
+                        // FIX: Split and format just like your renderBillTable does!
+                        const d1 = localFormatDate(dates[0]);
+                        const d2 = localFormatDate(dates[1]);
+                        
+                        h += `<tr>
+                            <td>${item.name} (${item.cat})</td>
+                            <td>${item.qty}</td>
+                            <td>${d1}</td> 
+                            <td>${d2}</td> 
+                        </tr>`;
+                    });
                 h += `</table>`;
             }
         }
@@ -1354,16 +1355,16 @@ async function generateBill() {
                 if (!s.bill || s.bill.length === 0) {
                     contentHtml += `<p>No items held during this period.</p>`;
                 } else {
-                    contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                    contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Qty</th><th>From</th><th>To</th></tr>`;
                     s.bill.forEach(item => {
-                        const dates = item.duration.split(' to ');
-                        const d1 = localFormatDate(dates[0]);
-                        const d2 = localFormatDate(dates[1]);
+                        const d1 = localFormatDate(item.startDate);
+                        const d2 = localFormatDate(item.endDate);
                         contentHtml += `<tr>
                             <td>${item.name}</td>
                             <td>${item.cat}</td>
                             <td>${item.qty}</td>
-                            <td>${d1} to ${d2}</td>
+                            <td>${d1}</td>
+                            <td>${d2}</td>
                         </tr>`;
                     });
                     contentHtml += `</table>`;
@@ -1375,16 +1376,17 @@ async function generateBill() {
             if (!data.bill || data.bill.length === 0) {
                 contentHtml += `<p>No items found for this period.</p>`;
             } else {
-                contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Qty</th><th>Period (From - To)</th></tr>`;
+                contentHtml += `<table><tr><th>Item Description</th><th>Category</th><th>Qty</th><th>From</th><th>To</th></tr>`;
                 data.bill.forEach(item => {
-                    const dates = item.duration.split(' to ');
-                    const d1 = localFormatDate(dates[0]);
-                    const d2 = localFormatDate(dates[1]);
+                    
+                    const d1 = localFormatDate(item.startDate);
+                    const d2 = localFormatDate(item.endDate);
                     contentHtml += `<tr>
-                        <td>${item.name}</td>
-                        <td>${item.cat}</td>
-                        <td>${item.qty}</td>
-                        <td>${d1} to ${d2}</td>
+                            <td>${item.name}</td>
+                            <td>${item.cat}</td>
+                            <td>${item.qty}</td>
+                            <td>${d1}</td>
+                            <td>${d2}</td>
                     </tr>`;
                 });
                 contentHtml += `</table>`;
