@@ -1630,6 +1630,11 @@ async function openEditModal(txnId) {
         
         // 2. Handle Charges based on Type
         document.getElementById('editCharges').value = txn.type === 'DC' ? (txn.loadingCharges || 0) : (txn.unloadingCharges || 0);
+        // 3. Handle Transport Charges explicitly
+        const transInput = document.getElementById('editTransport');
+                if (transInput) {
+                    transInput.value = txn.transportCharge || 0; // <--- ADD THIS LINE
+                }
 
         // 3. Load the basket into memory with explicit damage fields
         // We use .map to ensure every item has damagedQty and damagedRate initialized
@@ -1745,15 +1750,18 @@ async function saveEdit() {
     const id = document.getElementById('editId').value;
     const type = document.getElementById('saveEditBtn').getAttribute('data-type');
     
-    // We explicitly calculate the charge to avoid any confusion in the database update
+    // 1. Grab values from both boxes
     const chargeValue = parseFloat(document.getElementById('editCharges').value) || 0;
+    const transportValue = parseFloat(document.getElementById('editTransport').value) || 0; // NEW
 
     const updateData = {
         date: document.getElementById('editDate').value,
         items: editBasket, 
-        // Logic: Map the single edit box to the correct DB field
+        // 2. Map service charges correctly
         loadingCharges: type === 'DC' ? chargeValue : 0,
-        unloadingCharges: type === 'RC' ? chargeValue : 0
+        unloadingCharges: type === 'RC' ? chargeValue : 0,
+        // 3. Add transport charge
+        transportCharge: transportValue // NEW
     };
 
     try {
@@ -1762,6 +1770,8 @@ async function saveEdit() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateData)
         });
+        
+        // ... (rest of your existing logic for handling response)
         const result = await res.json();
 
         if (res.ok) {
