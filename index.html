@@ -1261,20 +1261,35 @@ async function generateBill() {
     function renderBillTable(billItems, damageItems = []) {
     if (billItems.length === 0 && damageItems.length === 0) return `<p style="color:gray;">No activity found.</p>`;
     
+    // Updated header: split Duration/Date into From and To
     let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-             <tr style="background:#eee;"><th>Item</th><th>Qty</th><th>Duration/Date</th><th>Days</th><th>Rate</th><th>Total</th></tr>`;
+             <tr style="background:#eee;">
+                <th>Item</th>
+                <th>Qty</th>
+                <th>From</th> <th>To</th>   <th>Days</th>
+                <th>Rate</th>
+                <th>Total</th>
+             </tr>`;
     
     // 1. Rent Rows
     billItems.forEach(i => { 
-        const dates = i.duration.split(' to ');
-        const formattedDuration = `${formatDate(dates[0])} to ${formatDate(dates[1])}`;
-        t += `<tr><td>${i.name} (${i.cat})</td><td>${i.qty}</td><td>${formattedDuration}</td><td>${i.days}</td><td>₹${i.rate}</td><td>₹${i.total.toLocaleString()}</td></tr>`; 
+        // Logic: Use the new startDate/endDate from backend, or fallback to parsing duration if necessary
+        const fromDate = i.startDate ? formatDate(i.startDate) : "-";
+        const toDate = i.endDate ? formatDate(i.endDate) : "On Site";
+
+        t += `<tr>
+                <td>${i.name} (${i.cat})</td>
+                <td>${i.qty}</td>
+                <td>${fromDate}</td> <td>${toDate}</td>   <td>${i.days}</td>
+                <td>₹${i.rate}</td>
+                <td>₹${i.total.toLocaleString()}</td>
+              </tr>`; 
     });
 
-    // 2. Damage Rows (If any exist)
+    // 2. Damage Rows (Update colspan from 6 to 7)
     if (damageItems.length > 0) {
         t += `<tr style="background:#fff1f0;">
-                <td colspan="6" style="font-weight:bold; color:var(--danger); border-top:2px solid #333;">
+                <td colspan="7" style="font-weight:bold; color:var(--danger); border-top:2px solid #333;">
                     <i class="fas fa-exclamation-triangle"></i> Material Damage / Loss Penalties
                 </td>
               </tr>`;
@@ -1282,8 +1297,7 @@ async function generateBill() {
             t += `<tr style="color:var(--danger);">
                     <td>${d.name} [DAMAGED/LOSS]</td>
                     <td>${d.qty}</td>
-                    <td>${formatDate(d.date)}</td>
-                    <td style="text-align:center;">-</td>
+                    <td colspan="2" style="text-align:center;">${formatDate(d.date)}</td> <td style="text-align:center;">-</td>
                     <td>₹${d.rate}</td>
                     <td>₹${d.total.toLocaleString()}</td>
                   </tr>`;
@@ -1292,7 +1306,6 @@ async function generateBill() {
     
     return t + `</table>`;
 }
-
     // Helper: Render the Summary
     function renderBillSummary(sub, ser, gst, dmg = 0, trans = 0) {
     const grandTotal = sub + ser + gst + dmg + trans;
@@ -1435,7 +1448,7 @@ async function generateBill() {
         .details { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; page-break-inside: auto; }
         tr { page-break-inside: avoid; page-break-after: auto; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; font-size: 11px; }
         th { background: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
         h2 { font-size: 1.2rem; margin-top: 30px; color: #2c3e50; border-bottom: 1px solid #eee; }
         h4 { background: #f9f9f9; padding: 5px; margin-bottom: 5px; border-left: 3px solid #3498db; -webkit-print-color-adjust: exact; }
