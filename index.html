@@ -1007,8 +1007,8 @@ async function openSiteReportModal() {
                     h += `<table><tr><th>Item Name</th><th>Qty</th><th>From</th><th>To</th></tr>`;
                     s.bill.forEach(item => {
                         // FIX: Split and format just like your renderBillTable does!
-                        const d1 = localFormatDate(dates[0]);
-                        const d2 = localFormatDate(dates[1]);
+                        const d1 = localFormatDate(item.startDate);
+                        const d2 = localFormatDate(item.endDate);
                         
                         h += `<tr>
                             <td>${item.name} (${item.cat})</td>
@@ -1028,8 +1028,8 @@ async function openSiteReportModal() {
                 h += `<table><tr><th>Item Name</th><th>Qty</th><th>From</th><th>To</th></tr>`;
                     s.bill.forEach(item => {
                         // FIX: Split and format just like your renderBillTable does!
-                        const d1 = localFormatDate(dates[0]);
-                        const d2 = localFormatDate(dates[1]);
+                        const d1 = localFormatDate(item.startDate);
+                        const d2 = localFormatDate(item.endDate);
                         
                         h += `<tr>
                             <td>${item.name} (${item.cat})</td>
