@@ -104,7 +104,8 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
                         bill.push({ 
                             name: info.itemName, cat: info.category, qty: take, days, rate: d.rate, 
                             total: take * d.rate * days, 
-                            duration: `${rentStart.toLocaleDateString()} to ${actualEnd.toLocaleDateString()}` 
+                            startDate: rentStart,
+                            endDate: actualEnd
                         });
                     }
                     d.quantity -= take; q -= take;
@@ -122,7 +123,8 @@ async function calculateSiteBill(siteId, startDate = null, endDate = null) {
                     bill.push({ 
                         name: info.itemName, cat: info.category, qty: d.quantity, days, rate: d.rate, 
                         total: d.quantity * d.rate * days, 
-                        duration: `${rentStart.toLocaleDateString()} to ${filterEnd ? filterEnd.toLocaleDateString() : 'On Site'}` 
+                        startDate: rentStart,
+                        endDate: filterEnd
                     });
                 }
             }
