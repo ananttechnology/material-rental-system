@@ -1232,11 +1232,30 @@ async function generateBill() {
     // Helper: Render the Holding Table
     function renderHoldingTable(data) {
     if (data.length === 0) return `<p style="color:gray; font-style:italic;">No items currently held on this site.</p>`;
+    
     let t = `<table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
-             <tr style="background:#eee;"><th>Item</th><th>Type</th><th>Qty on Site</th></tr>`;
-    data.forEach(i => { t += `<tr><td>${i.itemName}</td><td>${i.category}</td><td>${i.currentBalance}</td></tr>`; });
+             <tr style="background:#eee;">
+                <th style="border:1px solid #ccc; padding:8px;">Item Description</th>
+                <th style="border:1px solid #ccc; padding:8px;">Category</th>
+                <th style="border:1px solid #ccc; padding:8px; text-align:center;">Qty on Site</th>
+             </tr>`;
+
+    data.forEach(i => { 
+        // 1. Clean the name: Removes "[Stock: XX]" if it exists
+        const cleanName = i.itemName.split(' [')[0];
+        
+        // 2. Fix the "undefined" category
+        const category = i.category || i.cat || "-";
+
+        t += `<tr>
+                <td style="border:1px solid #ccc; padding:8px;">${cleanName}</td>
+                <td style="border:1px solid #ccc; padding:8px;">${category}</td>
+                <td style="border:1px solid #ccc; padding:8px; text-align:center;"><b>${i.currentBalance}</b></td>
+              </tr>`; 
+    });
+
     return t + `</table>`;
-    }
+}
 
     // Helper: Render the Bill Table
     function renderBillTable(billItems, damageItems = []) {
