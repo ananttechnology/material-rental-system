@@ -1600,6 +1600,7 @@ async function generateBill() {
             items: txn.items,
             loadingCharges: txn.loadingCharges || 0,
             unloadingCharges: txn.unloadingCharges || 0,
+            transportCharge: txn.transportCharge || 0,
             deposit: txn.deposit || 0
         };
 
