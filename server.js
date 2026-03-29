@@ -15,7 +15,7 @@ const MONGO_URI = "mongodb+srv://ananttechnology25:Lkg7begZ0WcFIqoC@materialtent
 mongoose.connect(MONGO_URI).then(() => console.log("✅ System Audit: DB Connected"));
 
 // --- MODELS ---
-const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: String, mobile: String, gstNumber: String, address: String }));
+const Builder = mongoose.model('Builder', new mongoose.Schema({ companyName: String, mobile: String, gstNumber: String, address: String, openingBalance: { type: Number, default: 0 } }));
 const Site = mongoose.model('Site', new mongoose.Schema({ builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder' }, siteName: String, siteAddress: String }));
 const Inventory = mongoose.model('Inventory', new mongoose.Schema({ itemName: String, category: String, godown: String, totalStock: Number, availableStock: Number }));
 const Transaction = mongoose.model('Transaction', new mongoose.Schema({ type: String, challanNo: String, builderId: mongoose.Schema.Types.ObjectId, siteId: mongoose.Schema.Types.ObjectId, items: [{ itemId: mongoose.Schema.Types.ObjectId, itemName: String, quantity: Number, rate: { type: Number, default: 0 }, damagedQty: { type: Number, default: 0 }, damagedRate: { type: Number, default: 0 } }], loadingCharges: { type: Number, default: 0 }, unloadingCharges: { type: Number, default: 0 }, transportCharge: { type: Number, default: 0 }, date: { type: Date, default: Date.now } }));
