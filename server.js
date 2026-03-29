@@ -356,42 +356,54 @@ app.post('/add-payment', async (req, res) => { await new Payment(req.body).save(
 // 2. Modified Statement for Month-wise calculation
 app.get('/statement/:builderId', async (req, res) => {
     const bId = req.params.builderId;
+    const builder = await Builder.findById(bId); // <--- Get Opening Balance
     const sites = await Site.find({ builderId: bId });
     const payments = await Payment.find({ builderId: bId }).sort({ date: 1 });
-    
-    // Find the first ever dispatch date for this builder
     const firstTxn = await Transaction.findOne({ builderId: bId }).sort({ date: 1 });
     
-    let monthlyBilled = [];
     let totalBilled = 0;
+    let monthlyBilled = [];
+
+    // Add Opening Balance to the monthly list as the first entry
+    if (builder.openingBalance > 0) {
+        monthlyBilled.push({
+            month: "Previous Balance (Notebook)",
+            amount: builder.openingBalance
+        });
+        totalBilled += builder.openingBalance;
+    }
 
     if (firstTxn) {
         let current = new Date(firstTxn.date);
-        current.setDate(1); // Start of the first month
+        current.setDate(1);
         const today = new Date();
 
         while (current <= today) {
+            let monthTotal = 0;
             const mStart = new Date(current.getFullYear(), current.getMonth(), 1);
             const mEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
             const calcEnd = mEnd > today ? today : mEnd;
 
-            let monthTotal = 0;
             for (let s of sites) {
                 const result = await calculateSiteBill(s._id, mStart, calcEnd);
-                monthTotal += (result.subtotal + result.service);
+                // Include EVERYTHING (Rent + Service + Transport + Damage)
+                monthTotal += result.grandTotal; 
             }
 
-            monthlyBilled.push({
-                month: current.toLocaleString('default', { month: 'long', year: 'numeric' }),
-                amount: monthTotal
-            });
-            totalBilled += monthTotal;
+            if (monthTotal > 0) {
+                monthlyBilled.push({
+                    month: current.toLocaleString('default', { month: 'long', year: 'numeric' }),
+                    amount: monthTotal
+                });
+                totalBilled += monthTotal;
+            }
             current.setMonth(current.getMonth() + 1);
         }
     }
 
     const totalPaid = payments.reduce((sum, p) => sum + p.amountPaid, 0);
     res.json({ 
+        openingBalance: builder.openingBalance,
         monthlyBilled, 
         totalBilled, 
         totalPaid, 
