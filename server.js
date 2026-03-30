@@ -367,7 +367,7 @@ app.get('/statement/:builderId', async (req, res) => {
     // Add Opening Balance to the monthly list as the first entry
     if (builder.openingBalance > 0) {
         monthlyBilled.push({
-            month: "Previous Balance (Notebook)",
+            month: "Previous Outstanding (Notebook)",
             amount: builder.openingBalance
         });
         totalBilled += builder.openingBalance;
